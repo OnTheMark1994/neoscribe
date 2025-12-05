@@ -29,6 +29,7 @@ jobs:
           path: apps/desktop-app/release/*.exe
 
   build-macos:
+    needs: build-windows  # Run after Windows
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +52,7 @@ jobs:
           path: apps/desktop-app/release/*.dmg
 
   build-linux:
+    needs: build-macos  # Run after macOS
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +75,7 @@ jobs:
           path: apps/desktop-app/release/*.AppImage
 
   create-release:
-    needs: [build-windows, build-macos, build-linux]
+    needs: build-windows  # Only require Windows to succeed
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
