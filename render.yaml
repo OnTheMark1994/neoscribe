@@ -15,11 +15,10 @@ services:
       - key: PORT
         value: "3000"
 
-  # Web Portal – Static site (THIS IS THE FIXED ONE)
+  # Web Portal – Static site (FIXED: No region for static)
   - type: web
     name: scribefold-ai-web-portal
-    runtime: static          # ← REQUIRED LINE (was missing before)
-    region: oregon
+    runtime: static          # Required for static sites
     plan: free
     rootDir: apps/web-portal
     buildCommand: npm install && npm run build
@@ -27,6 +26,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-    # ← THIS EXTRA BLANK COMMENT LINE forces Git to see a change
 
 # Add your secrets only in the Render dashboard, never here
