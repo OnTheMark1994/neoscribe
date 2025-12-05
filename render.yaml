@@ -30,15 +30,13 @@ services:
       # - STRIPE_PAYMENT_LINK_HEAVY
       # - FRONTEND_URL (set to your web portal URL)
 
-  # Web Portal
-  - type: web
+  # Web Portal (updated to static site)
+  - type: static
     name: scribefold-ai-web-portal
-    runtime: node
     region: oregon
     plan: free
     rootDir: apps/web-portal
     buildCommand: npm install && npm run build
-    startCommand: npx serve -s build -l 3000
     staticPublishPath: ./build
     envVars:
       - key: NODE_ENV
