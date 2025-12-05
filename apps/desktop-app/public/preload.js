@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // User management
   getAnonId: () => ipcRenderer.invoke('get-anon-id'),
   onAnonIdReady: (callback) => ipcRenderer.on('anon-id-ready', callback),
+  resetAnonId: () => ipcRenderer.invoke('reset-anon-id'),
   
   // Theme management
   getThemeList: () => ipcRenderer.invoke('get-theme-list'),

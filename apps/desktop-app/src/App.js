@@ -9,7 +9,7 @@ import AISidebar from './components/AISidebar';
 import Settings from './components/Settings';
 import DiffNavigation from './components/DiffNavigation';
 import ConfirmCloseModal from './components/ConfirmCloseModal';
-import { fetchUserAccount } from './utils/aiService';
+import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData } from './utils/aiService';
 
 function App() {
   const dispatch = useDispatch();
@@ -18,6 +18,7 @@ function App() {
   const [anonId, setAnonId] = useState(null);
   const [authId, setAuthId] = useState(null);
   const [userAccount, setUserAccount] = useState(null);
+  const [availableTokens, setAvailableTokens] = useState(null);
   const [isSettingsView, setIsSettingsView] = useState(false);
   const [isAIEnabled, setIsAIEnabled] = useState(() => {
     const saved = localStorage.getItem('aiEnabled');
@@ -193,6 +194,21 @@ function App() {
           localStorage.setItem('authId', newAuthId);
           dispatch(setUserAuthId(newAuthId));
         }
+
+        // After user ensure, load authoritative token stats so AISidebar can show real available tokens
+        try {
+          const tokenData = await fetchUserTokens(anonId, (data && (data.authId || data.auth_id)) || authId || null);
+          const normalized = normalizeUserTokenData(tokenData || {});
+          const initialAvailable = normalized.availableTokens > 0 ? normalized.availableTokens : 0;
+          console.log('[APP] Initial availableTokens from backend:', initialAvailable, 'normalized:', normalized);
+          if (!cancelled) {
+            setAvailableTokens(initialAvailable);
+          }
+        } catch (tokenErr) {
+          if (!cancelled) {
+            console.error('[APP] Failed to load initial tokens for anonId', anonId, tokenErr);
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         console.error('[APP] Failed to load user account data for anonId', anonId, err);
@@ -266,6 +282,7 @@ function App() {
           anonId={anonId}
           authId={authId}
           developerMode={developerMode}
+          initialAvailableTokens={availableTokens}
           onAIResponse={handleAIResponse}
         />
       )}

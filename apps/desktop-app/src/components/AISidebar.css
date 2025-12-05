@@ -19,7 +19,9 @@
   pointer-events: none;
 }
 
+
 .ai-sidebar-header {
+  position: relative;
   padding: 5px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background-color: rgba(0, 0, 0, 0.2);
@@ -28,7 +30,7 @@
 .ai-header-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 10px;
 }
 
@@ -40,10 +42,15 @@
 }
 
 .ai-header-title-box {
-  flex: 1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  pointer-events: none;
 }
 
 .ai-sidebar-title {

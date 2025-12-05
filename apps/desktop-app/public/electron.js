@@ -432,6 +432,19 @@ app.on('will-quit', () => {
 // IPC Handlers
 ipcMain.handle('get-anon-id', async () => anonId);
 
+// Developer utility: reset anon_id so the next launch behaves like a first-time run
+ipcMain.handle('reset-anon-id', async () => {
+  try {
+    console.log('[MAIN] reset-anon-id invoked - clearing anon_id from store and memory');
+    store.delete('anon_id');
+    anonId = null;
+    return { success: true };
+  } catch (err) {
+    console.error('[MAIN] Failed to reset anon_id:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle('get-theme-list', async () => {
   const imagesDir = path.join(__dirname, 'images');
   

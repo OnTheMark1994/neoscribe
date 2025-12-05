@@ -19,6 +19,7 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
   const [accountLoading, setAccountLoading] = useState(false);
   const [accountError, setAccountError] = useState(null);
   const [requestedTabLabel, setRequestedTabLabel] = useState('NONE');
+  const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
 
   useEffect(() => {
     // Load settings from localStorage
@@ -111,7 +112,11 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
       });
     }
 
-    // Settings saved silently - no dialog, no window close
+    // Show a transient confirmation message
+    setSettingsSavedMsg('Settings saved!');
+    setTimeout(() => {
+      setSettingsSavedMsg('');
+    }, 3000);
   };
 
   const handleCancel = () => {
@@ -206,12 +211,38 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
   const accountEmail = accountData && accountData.email ? accountData.email : '';
   const accountPassword = accountData && accountData.password ? accountData.password : '';
 
+  const handleDeveloperResetIds = () => {
+    // Developer-only: clear all locally stored IDs and account data so next launch mimics a first-time user
+    try {
+      localStorage.removeItem('authId');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userPassword');
+    } catch (e) {
+      // ignore storage errors
+    }
+
+    setAuthId(null);
+    setAccountData(null);
+    setTokenStats(null);
+    setTokenCount(0);
+
+    // Ask main process to clear anon_id so the next launch behaves like first run
+    if (window.electronAPI && window.electronAPI.resetAnonId) {
+      window.electronAPI.resetAnonId();
+    }
+
+    // Notify main window so primary App instance can clear authId immediately
+    if (window.electronAPI && window.electronAPI.settingsSaved) {
+      window.electronAPI.settingsSaved({ authId: null });
+    }
+  };
+
   return (
     <div className="settings-container">
       <div className="settings-header">
         <h1>Settings: KEYWORD: {requestedTabLabel}</h1>
         <img
-          src="/icon.ico"
+          src="/app-images/scribefold-ai-icon-png.png"
           alt="ScribeFold AI Icon"
           className="settings-logo"
         />
@@ -436,6 +467,17 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
                   <span className="stat-label">👤 Auth ID</span>
                   <span className="stat-value">{authId || 'Not logged in'}</span>
                 </div>
+
+                <div className="stat-item">
+                  <span className="stat-label">Developer Tools</span>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleDeveloperResetIds}
+                  >
+                    Reset local anon/auth IDs
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -530,6 +572,12 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {settingsSavedMsg && (
+        <div style={{ textAlign: 'center', marginTop: '10px', marginBottom: '10px', color: '#4CAF50' }}>
+          {settingsSavedMsg}
         </div>
       )}
 

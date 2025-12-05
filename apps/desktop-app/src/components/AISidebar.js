@@ -8,14 +8,15 @@ import { getLines, updateLinesFromText, getTextFromLines } from '../utils/editor
 // Duration to keep the refresh animation visible (ms)
 const REFRESH_ANIMATION_DURATION = 800;
 
-function AISidebar({ anonId, authId, onAIResponse, developerMode = true }) {
+function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initialAvailableTokens = null }) {
   const [messages, setMessages] = useState([]);
-  const [prompt, setPrompt] = useState('please add content in various places of your choosing ');
+  // In developer mode start with a sample prompt, otherwise start empty and show placeholder only
+  const [prompt, setPrompt] = useState(() => (developerMode ? 'please add content in various places of your choosing ' : ''));
   const [tokenCount, setTokenCount] = useState(0);
   const [isThinking, setIsThinking] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [tokenEstimate, setTokenEstimate] = useState(null);
-  const [availableTokens, setAvailableTokens] = useState(null);
+  const [availableTokens, setAvailableTokens] = useState(initialAvailableTokens);
   const messagesEndRef = useRef(null);
   const aiDebugDataRef = useRef([]);
   const [isRefreshingTokens, setIsRefreshingTokens] = useState(false);
@@ -25,35 +26,12 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true }) {
     updateTokenCount();
   }, []);
 
+  // If App provides an updated initialAvailableTokens (e.g., after /api/users/ensure completes), sync it into local state
   useEffect(() => {
-    // Load available tokens from backend when anonId is ready
-    const loadTokens = async () => {
-      if (!anonId) return;
-      try {
-        console.log('[AI] About to call fetchUserTokens from AISidebar with anonId/authId:', anonId, authId);
-        const data = await fetchUserTokens(anonId, authId);
-        if (!data) return;
-
-        // Prefer backend's availableTokens if present, otherwise compute
-        let effectiveAvailable;
-        if (typeof data.availableTokens === 'number') {
-          effectiveAvailable = data.availableTokens;
-        } else {
-          const limit = data.tokenLimit ?? data.token_limit ?? 0;
-          const used = data.tokensUsed ?? data.tokens_used ?? 0;
-          const added = data.tokensAdded ?? data.tokens_added ?? 0;
-          effectiveAvailable = limit - used + added;
-        }
-
-        console.log('[AI] fetchUserTokens result (effective availableTokens):', effectiveAvailable, 'raw data:', data);
-        setAvailableTokens(effectiveAvailable);
-      } catch (err) {
-        console.error('[AI] Failed to load user tokens:', err);
-      }
-    };
-
-    loadTokens();
-  }, [anonId, authId]);
+    if (initialAvailableTokens != null) {
+      setAvailableTokens(initialAvailableTokens);
+    }
+  }, [initialAvailableTokens]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
@@ -510,7 +488,7 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true }) {
         <div className="ai-header-inner">
           <div className="ai-header-icon-box">
             <img
-              src="/icon.ico"
+              src="/app-images/scribefold-ai-icon-png.png"
               alt="ScribeFold AI Icon"
               className="ai-sidebar-icon"
             />
@@ -668,7 +646,8 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true }) {
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
           spellCheck={true}
-          disabled={isThinking}
+          // Keep input editable even while AI is thinking; only disable the Send button
+          disabled={false}
         />
         <div className="ai-input-buttons">
           <button id="aiSettingsBtn" className="ai-settings-btn" onClick={openAiSettings}>⚙️ Settings</button>

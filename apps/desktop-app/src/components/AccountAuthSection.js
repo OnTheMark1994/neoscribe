@@ -85,9 +85,9 @@ function AccountAuthSection({
     }
   };
 
-  const handleDeleteAccount = () => {
-    // Placeholder until backend delete endpoint is added
-    setStatus('Delete account functionality coming soon.');
+  const handleViewWebpage = () => {
+    // Open the main web portal landing page in the user's browser
+    openExternalLink('https://scribefold-ai-monorepo.onrender.com');
   };
 
   const isSignedIn = !!authId;
@@ -192,10 +192,10 @@ function AccountAuthSection({
             <button
               type="button"
               className="btn-secondary auth-button"
-              onClick={handleDeleteAccount}
+              onClick={handleViewWebpage}
               disabled={loading}
             >
-              Delete Account
+              View Webpage
             </button>
 
             <button
