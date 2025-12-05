@@ -80,6 +80,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onAnonIdReady: (callback) => ipcRenderer.on('anon-id-ready', callback),
   resetAnonId: () => ipcRenderer.invoke('reset-anon-id'),
   
+  // Developer mode - controls DevTools visibility
+  setDeveloperMode: (enabled) => ipcRenderer.send('set-developer-mode', enabled),
+  
   // Theme management
   getThemeList: () => ipcRenderer.invoke('get-theme-list'),
   selectCustomTheme: () => ipcRenderer.invoke('select-custom-theme'),

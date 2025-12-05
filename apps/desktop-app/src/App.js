@@ -87,6 +87,13 @@ function App() {
     localStorage.setItem('aiEnabled', isAIEnabled ? 'true' : 'false');
   }, [isAIEnabled]);
 
+  // Notify main process about developer mode for DevTools control
+  useEffect(() => {
+    if (window.electronAPI && window.electronAPI.setDeveloperMode) {
+      window.electronAPI.setDeveloperMode(developerMode);
+    }
+  }, [developerMode]);
+
   useEffect(() => {
     // Get anon_id from Electron
     if (window.electronAPI) {

@@ -76,10 +76,8 @@ function createWindow() {
   
   mainWindow.loadURL(startUrl);
 
-  // Open DevTools in development
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
-  }
+  // DevTools will be opened by renderer if developerMode is enabled
+  // Don't open automatically here since developerMode is stored in localStorage (renderer)
 
   // Initialize anon_id
   anonId = getOrCreateAnonId();
@@ -501,6 +499,22 @@ ipcMain.handle('select-custom-theme', async () => {
 
   const filePath = result.filePaths[0];
   return { canceled: false, filePath };
+});
+
+// Toggle DevTools based on developer mode setting from renderer
+ipcMain.on('set-developer-mode', (event, enabled) => {
+  console.log('[MAIN] Developer mode set to:', enabled);
+  if (isDev && mainWindow && mainWindow.webContents) {
+    if (enabled) {
+      if (!mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.openDevTools();
+      }
+    } else {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      }
+    }
+  }
 });
 
 ipcMain.on('settings-saved', (event, settings) => {
