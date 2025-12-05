@@ -586,16 +586,28 @@ app.get('/api/subscription-tiers', (req, res) => {
 // Hellooo
 // Proxy endpoint to fetch GitHub releases for private repo (used by web-portal downloads page)
 app.get('/api/releases', async (req, res) => {
+  console.log('=== [GET /api/releases] Incoming request ===');
+  console.log('[GET /api/releases] Path:', req.path, 'OriginalUrl:', req.originalUrl);
+
   try {
     const owner = process.env.GITHUB_REPO_OWNER || 'AbeApple';
     const repo = process.env.GITHUB_REPO_NAME || 'scribefold-ai-monorepo';
     const token = process.env.GITHUB_DOWNLOAD_TOKEN;
 
+    console.log('[GET /api/releases] Env check:', {
+      owner,
+      repo,
+      hasToken: !!token,
+    });
+
     if (!token) {
+      console.error('[GET /api/releases] Missing GITHUB_DOWNLOAD_TOKEN');
       return res.status(500).json({ error: 'GitHub download token not configured' });
     }
 
     const url = `https://api.github.com/repos/${owner}/${repo}/releases`;
+    console.log('[GET /api/releases] Fetching from GitHub URL:', url);
+
     const ghRes = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -604,13 +616,16 @@ app.get('/api/releases', async (req, res) => {
       }
     });
 
+    console.log('[GET /api/releases] GitHub response status:', ghRes.status);
+
     if (!ghRes.ok) {
       const text = await ghRes.text().catch(() => '');
-      console.error('[GET /api/releases] GitHub error:', ghRes.status, text);
+      console.error('[GET /api/releases] GitHub error body:', text);
       return res.status(ghRes.status).json({ error: 'GitHub API error', status: ghRes.status });
     }
 
     const data = await ghRes.json();
+    console.log('[GET /api/releases] Successfully fetched releases. Count:', Array.isArray(data) ? data.length : 'n/a');
     return res.json(data);
   } catch (err) {
     console.error('[GET /api/releases] Unexpected error:', err);
