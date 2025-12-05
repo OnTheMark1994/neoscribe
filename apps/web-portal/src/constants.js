@@ -1,7 +1,7 @@
 // Shared constants for the ScribeFold AI Web Portal
 
 // API base URL (production)
-export const API_BASE_URL = 'https://scribefold-ai-api.onrender.com';
+export const API_BASE_URL = 'https://scribefold-ai-api-server.onrender.com';
 
 // Stripe customer portal URL (hosted by Stripe)
 // Test-mode portal link for managing subscriptions

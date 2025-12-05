@@ -26,8 +26,10 @@ const DownloadsPage = () => {
       })
       .then(data => {
         console.log('[DownloadsPage] Raw releases data:', data);
-        // Filter out releases without assets
-        const validReleases = data.filter(release => release.assets && release.assets.length > 0);
+        // Filter out releases without assets AND malformed tag names (e.g., just "v")
+        const validReleases = data
+          .filter(release => release.assets && release.assets.length > 0)
+          .filter(release => /^v\d+\.\d+\.\d+$/.test(release.tag_name)); // Only vX.Y.Z format
         console.log('[DownloadsPage] Valid releases with assets:', validReleases);
         setAllReleases(validReleases);
         // Auto-select the latest (first in array)
