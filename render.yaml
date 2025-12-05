@@ -37,7 +37,6 @@ services:
     plan: free
     rootDir: apps/web-portal
     buildCommand: npm install && npm run build
-    startCommand: npx serve -s build
     staticPublishPath: ./build
     envVars:
       - key: NODE_ENV
