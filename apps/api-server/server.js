@@ -584,6 +584,40 @@ app.get('/api/subscription-tiers', (req, res) => {
   res.json(subscription_tiers);
 });
 
+// Proxy endpoint to fetch GitHub releases for private repo (used by web-portal downloads page)
+app.get('/api/releases', async (req, res) => {
+  try {
+    const owner = process.env.GITHUB_REPO_OWNER || 'AbeApple';
+    const repo = process.env.GITHUB_REPO_NAME || 'scribefold-ai-monorepo';
+    const token = process.env.GITHUB_DOWNLOAD_TOKEN;
+
+    if (!token) {
+      return res.status(500).json({ error: 'GitHub download token not configured' });
+    }
+
+    const url = `https://api.github.com/repos/${owner}/${repo}/releases`;
+    const ghRes = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'scribefold-api-server'
+      }
+    });
+
+    if (!ghRes.ok) {
+      const text = await ghRes.text().catch(() => '');
+      console.error('[GET /api/releases] GitHub error:', ghRes.status, text);
+      return res.status(ghRes.status).json({ error: 'GitHub API error', status: ghRes.status });
+    }
+
+    const data = await ghRes.json();
+    return res.json(data);
+  } catch (err) {
+    console.error('[GET /api/releases] Unexpected error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Login to existing auth account and link to anon user without bonus tokens
 app.post('/api/users/login', async (req, res) => {
   try {

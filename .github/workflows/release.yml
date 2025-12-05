@@ -95,6 +95,8 @@ jobs:
   create-release:
     needs: build-windows  # Only require Windows to succeed
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Download all artifacts
@@ -106,8 +108,6 @@ jobs:
         with:
           files: |
             artifacts/windows-exe/*
-          tag_name: v${{ steps.get-version.outputs.version }}
-          name: v${{ steps.get-version.outputs.version }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

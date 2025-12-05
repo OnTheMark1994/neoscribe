@@ -13,7 +13,9 @@
     "start:api": "npm run start --workspace=apps/api-server",
     "dev:api": "npm run dev --workspace=apps/api-server",
     "build:desktop": "npm run build --workspace=apps/desktop-app",
-    "build:web": "npm run build --workspace=apps/web-portal"
+    "build:web": "npm run build --workspace=apps/web-portal",
+    "release": "node scripts/release.js --bump",
+    "release:version": "node scripts/release.js"
   },
   "keywords": [
     "scribefold",

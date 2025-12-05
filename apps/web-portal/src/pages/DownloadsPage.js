@@ -1,49 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { GITHUB_RELEASES_API, GITHUB_REPO_OWNER, GITHUB_REPO_NAME } from '../constants';
+import { API_BASE_URL, GITHUB_REPO_OWNER, GITHUB_REPO_NAME } from '../constants';
 import './DownloadsPage.css';
 
 const DownloadsPage = () => {
-  const [releaseData, setReleaseData] = useState(null);
+  const [allReleases, setAllReleases] = useState([]);
+  const [selectedRelease, setSelectedRelease] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch latest release from GitHub API (public, no auth needed)
-    fetch(GITHUB_RELEASES_API)
+    // Fetch ALL releases via backend proxy (handles private repo + token)
+    const url = `${API_BASE_URL}/releases`;
+    console.log('[DownloadsPage] Fetching releases from:', url);
+
+    fetch(url)
       .then(res => {
+        console.log('[DownloadsPage] /releases status:', res.status);
         if (!res.ok) {
-          throw new Error('No releases found yet');
+          return res.text().then(text => {
+            console.log('[DownloadsPage] /releases error body:', text);
+            throw new Error('No releases found yet');
+          });
         }
         return res.json();
       })
       .then(data => {
-        setReleaseData(data);
+        console.log('[DownloadsPage] Raw releases data:', data);
+        // Filter out releases without assets
+        const validReleases = data.filter(release => release.assets && release.assets.length > 0);
+        console.log('[DownloadsPage] Valid releases with assets:', validReleases);
+        setAllReleases(validReleases);
+        // Auto-select the latest (first in array)
+        if (validReleases.length > 0) {
+          console.log('[DownloadsPage] Auto-selecting latest release:', validReleases[0].tag_name);
+          setSelectedRelease(validReleases[0]);
+        }
         setLoading(false);
       })
       .catch(err => {
+        console.error('[DownloadsPage] Error fetching releases:', err);
         setError(err.message);
         setLoading(false);
       });
   }, []);
 
   // Extract version from tag (e.g., "v1.0.0" -> "1.0.0")
-  const version = releaseData?.tag_name?.replace('v', '') || '1.0.0';
+  const version = selectedRelease?.tag_name?.replace('v', '') || '1.0.0';
   
-  // Build download URLs based on electron-builder artifact naming
-  // Format: "ScribeFold AI-Setup-1.0.0.exe" (note the space in product name)
+  // Build download URLs using actual asset names from the release
   const getDownloadUrl = (platform) => {
-    const baseUrl = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/download/${releaseData?.tag_name || 'v1.0.0'}`;
+    if (!selectedRelease || !selectedRelease.assets) return '#';
     
+    // Find the actual asset for this platform
+    let assetName;
     switch(platform) {
       case 'windows':
-        return `${baseUrl}/ScribeFold%20AI-Setup-${version}.exe`;
+        assetName = selectedRelease.assets.find(a => a.name.endsWith('.exe'))?.name;
+        break;
       case 'mac':
-        return `${baseUrl}/ScribeFold%20AI-${version}.dmg`;
+        assetName = selectedRelease.assets.find(a => a.name.endsWith('.dmg'))?.name;
+        break;
       case 'linux':
-        return `${baseUrl}/ScribeFold%20AI-${version}.AppImage`;
+        assetName = selectedRelease.assets.find(a => a.name.endsWith('.AppImage'))?.name;
+        break;
       default:
         return '#';
     }
+    
+    if (!assetName) return '#';
+    
+    return `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/download/${selectedRelease.tag_name}/${assetName}`;
   };
 
   return (
@@ -53,7 +79,27 @@ const DownloadsPage = () => {
         <p>Get the latest ScribeFold AI desktop builds for your platform.</p>
         {loading && <p className="sf-loading">Loading release info...</p>}
         {error && <p className="sf-error">⚠️ {error}. Using fallback version.</p>}
-        {releaseData && <p className="sf-version">Latest version: {version}</p>}
+        
+        {allReleases.length > 0 && (
+          <div className="sf-version-selector">
+            <label htmlFor="version-select">Select Version: </label>
+            <select 
+              id="version-select"
+              value={selectedRelease?.tag_name || ''}
+              onChange={(e) => {
+                const release = allReleases.find(r => r.tag_name === e.target.value);
+                setSelectedRelease(release);
+              }}
+              className="sf-version-dropdown"
+            >
+              {allReleases.map((release) => (
+                <option key={release.id} value={release.tag_name}>
+                  {release.tag_name} {release === allReleases[0] ? '(Latest)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </header>
 
       <section className="sf-download-grid">
@@ -92,15 +138,15 @@ const DownloadsPage = () => {
         </div>
       </section>
 
-      {releaseData && (
+      {selectedRelease && (
         <section className="sf-page-section">
           <h2>Release Notes</h2>
-          <h3>{releaseData.name || `Version ${version}`}</h3>
+          <h3>{selectedRelease.name || `Version ${version}`}</h3>
           <p className="sf-release-date">
-            Released: {new Date(releaseData.published_at).toLocaleDateString()}
+            Released: {new Date(selectedRelease.published_at).toLocaleDateString()}
           </p>
           <div className="sf-release-body">
-            {releaseData.body || 'No release notes available.'}
+            {selectedRelease.body || 'No release notes available.'}
           </div>
         </section>
       )}
