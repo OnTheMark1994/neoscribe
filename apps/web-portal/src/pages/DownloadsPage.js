@@ -1,153 +1,107 @@
 import React, { useState, useEffect } from 'react';
-import { GITHUB_REPO } from '../constants';
+import { GITHUB_RELEASES_API, GITHUB_REPO_OWNER, GITHUB_REPO_NAME } from '../constants';
 import './DownloadsPage.css';
 
 const DownloadsPage = () => {
-  const [release, setRelease] = useState(null);
+  const [releaseData, setReleaseData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchLatestRelease();
+    // Fetch latest release from GitHub API (public, no auth needed)
+    fetch(GITHUB_RELEASES_API)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('No releases found yet');
+        }
+        return res.json();
+      })
+      .then(data => {
+        setReleaseData(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
   }, []);
 
-  const fetchLatestRelease = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch latest release from GitHub API
-      const response = await fetch(
-        `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch release: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setRelease(data);
-    } catch (err) {
-      console.error('Error fetching release:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  // Extract version from tag (e.g., "v1.0.0" -> "1.0.0")
+  const version = releaseData?.tag_name?.replace('v', '') || '1.0.0';
+  
+  // Build download URLs based on electron-builder artifact naming
+  // Format: "ScribeFold AI-Setup-1.0.0.exe" (note the space in product name)
+  const getDownloadUrl = (platform) => {
+    const baseUrl = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/download/${releaseData?.tag_name || 'v1.0.0'}`;
+    
+    switch(platform) {
+      case 'windows':
+        return `${baseUrl}/ScribeFold%20AI-Setup-${version}.exe`;
+      case 'mac':
+        return `${baseUrl}/ScribeFold%20AI-${version}.dmg`;
+      case 'linux':
+        return `${baseUrl}/ScribeFold%20AI-${version}.AppImage`;
+      default:
+        return '#';
     }
   };
-
-  const getAssetsByPlatform = () => {
-    if (!release || !release.assets) return {};
-
-    const assets = {
-      windows: null,
-      mac: null,
-      linux: null,
-    };
-
-    release.assets.forEach((asset) => {
-      const name = asset.name.toLowerCase();
-      if (name.includes('setup') && name.endsWith('.exe')) {
-        assets.windows = asset;
-      } else if (name.endsWith('.dmg')) {
-        assets.mac = asset;
-      } else if (name.endsWith('.appimage')) {
-        assets.linux = asset;
-      }
-    });
-
-    return assets;
-  };
-
-  const formatFileSize = (bytes) => {
-    if (!bytes) return '';
-    const mb = (bytes / (1024 * 1024)).toFixed(2);
-    return ` (${mb} MB)`;
-  };
-
-  const assets = getAssetsByPlatform();
-
-  if (loading) {
-    return (
-      <div className="sf-page">
-        <header className="sf-page-header">
-          <h1>Downloads</h1>
-          <p>Loading latest version...</p>
-        </header>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="sf-page">
-        <header className="sf-page-header">
-          <h1>Downloads</h1>
-          <p className="error-text">Failed to load downloads: {error}</p>
-          <button onClick={fetchLatestRelease} className="sf-download-btn retry-btn">
-            Retry
-          </button>
-        </header>
-      </div>
-    );
-  }
-
-  if (!release) {
-    return (
-      <div className="sf-page">
-        <header className="sf-page-header">
-          <h1>Downloads</h1>
-          <p>No releases available yet.</p>
-        </header>
-      </div>
-    );
-  }
 
   return (
     <div className="sf-page">
       <header className="sf-page-header">
         <h1>Downloads</h1>
         <p>Get the latest ScribeFold AI desktop builds for your platform.</p>
-        <p className="version-badge">
-          Latest: <strong>{release.tag_name}</strong> • Released: {new Date(release.published_at).toLocaleDateString()}
-        </p>
+        {loading && <p className="sf-loading">Loading release info...</p>}
+        {error && <p className="sf-error">⚠️ {error}. Using fallback version.</p>}
+        {releaseData && <p className="sf-version">Latest version: {version}</p>}
       </header>
 
       <section className="sf-download-grid">
-        {assets.windows && (
-          <div className="sf-download-card">
-            <h2>🪟 Windows</h2>
-            <p>Recommended for most users. 64-bit installer{formatFileSize(assets.windows.size)}.</p>
-            <a href={assets.windows.browser_download_url} className="sf-download-btn" download>
-              Download for Windows
-            </a>
-          </div>
-        )}
-        
-        {assets.mac && (
-          <div className="sf-download-card">
-            <h2>🍎 macOS</h2>
-            <p>Universal build for Apple Silicon and Intel Macs{formatFileSize(assets.mac.size)}.</p>
-            <a href={assets.mac.browser_download_url} className="sf-download-btn" download>
-              Download for macOS
-            </a>
-          </div>
-        )}
-        
-        {assets.linux && (
-          <div className="sf-download-card">
-            <h2>🐧 Linux</h2>
-            <p>AppImage build for modern desktop distributions{formatFileSize(assets.linux.size)}.</p>
-            <a href={assets.linux.browser_download_url} className="sf-download-btn" download>
-              Download for Linux
-            </a>
-          </div>
-        )}
+        <div className="sf-download-card">
+          <h2>Windows</h2>
+          <p>Recommended for most users. 64-bit installer.</p>
+          <a 
+            href={getDownloadUrl('windows')} 
+            className="sf-download-btn"
+            download
+          >
+            Download for Windows
+          </a>
+        </div>
+        <div className="sf-download-card">
+          <h2>macOS</h2>
+          <p>Universal build for Apple Silicon and Intel Macs.</p>
+          <a 
+            href={getDownloadUrl('mac')} 
+            className="sf-download-btn"
+            download
+          >
+            Download for macOS
+          </a>
+        </div>
+        <div className="sf-download-card">
+          <h2>Linux</h2>
+          <p>AppImage build for modern desktop distributions.</p>
+          <a 
+            href={getDownloadUrl('linux')} 
+            className="sf-download-btn"
+            download
+          >
+            Download for Linux
+          </a>
+        </div>
       </section>
 
-      {release.body && (
+      {releaseData && (
         <section className="sf-page-section">
           <h2>Release Notes</h2>
-          <div className="release-notes-body">{release.body}</div>
+          <h3>{releaseData.name || `Version ${version}`}</h3>
+          <p className="sf-release-date">
+            Released: {new Date(releaseData.published_at).toLocaleDateString()}
+          </p>
+          <div className="sf-release-body">
+            {releaseData.body || 'No release notes available.'}
+          </div>
         </section>
       )}
     </div>

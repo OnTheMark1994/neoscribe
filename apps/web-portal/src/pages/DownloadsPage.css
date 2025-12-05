@@ -68,33 +68,6 @@
   color: #d1d5db;
 }
 
-.version-badge {
-  color: #a78bfa !important;
-  font-size: 0.9rem !important;
-  margin-top: 8px;
-}
-
-.version-badge strong {
-  color: #c4b5fd;
-}
-
-.error-text {
-  color: #f87171 !important;
-}
-
-.retry-btn {
-  margin-top: 12px;
-  cursor: pointer;
-  border: none;
-}
-
-.release-notes-body {
-  font-size: 0.95rem;
-  color: #d1d5db;
-  white-space: pre-wrap;
-  line-height: 1.6;
-}
-
 @media (max-width: 900px) {
   .sf-download-grid {
     grid-template-columns: minmax(0, 1fr);
