@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:  # Allow manual rebuilds without a new tag
 
 jobs:
   build-windows:
