@@ -10,7 +10,7 @@ const DownloadsPage = () => {
 
   useEffect(() => {
     // Fetch ALL releases via backend proxy (handles private repo + token)
-    const url = `${API_BASE_URL}/releases`;
+    const url = `${API_BASE_URL}/api/releases`;
     console.log('[DownloadsPage] Fetching releases from:', url);
 
     fetch(url)
