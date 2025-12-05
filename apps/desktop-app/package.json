@@ -1,6 +1,6 @@
 {
   "name": "scribefold-ai",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "ScribeFold AI - A foldable section text editor with AI assistance built with Electron and React",
   "author": "",
   "private": true,
@@ -87,7 +87,7 @@
       "artifactName": "${productName}-${version}.${ext}"
     },
     "linux": {
-      "icon": "public/icon.png",
+      "icon": "public/scribefold-ai-icon-256.png",
       "target": "AppImage",
       "category": "Utility",
       "artifactName": "${productName}-${version}.${ext}"
