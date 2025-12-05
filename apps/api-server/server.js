@@ -568,6 +568,10 @@ async function callDeepSeekAPI(messages, options = {}) {
   return data;
 }
 
+app.get('/', (req, res) => {
+  res.json({"message": "server running."})
+})
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
