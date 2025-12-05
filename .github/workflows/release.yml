@@ -21,7 +21,8 @@ jobs:
           npm ci
       - name: Build Windows
         env:
-          CI: false  # Allow react-scripts build to pass with warnings in CI
+          CI: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd apps/desktop-app
           npm run build:win

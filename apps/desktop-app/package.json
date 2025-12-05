@@ -87,8 +87,8 @@
       "artifactName": "${productName}-${version}.${ext}"
     },
     "linux": {
-      "target": "AppImage",
       "icon": "public/icon.png",
+      "target": "AppImage",
       "category": "Utility",
       "artifactName": "${productName}-${version}.${ext}"
     },
