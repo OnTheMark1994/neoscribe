@@ -30,13 +30,14 @@ services:
       # - STRIPE_PAYMENT_LINK_HEAVY
       # - FRONTEND_URL (set to your web portal URL)
 
-  # Web Portal (updated to static site)
-  - type: static
+  # Web Portal (configured as static site with type web)
+  - type: web
     name: scribefold-ai-web-portal
     region: oregon
     plan: free
     rootDir: apps/web-portal
     buildCommand: npm install && npm run build
+    startCommand: npx serve -s build
     staticPublishPath: ./build
     envVars:
       - key: NODE_ENV
@@ -44,6 +45,6 @@ services:
       # Add these in Render Dashboard:
       # - REACT_APP_SUPABASE_URL
       # - REACT_APP_SUPABASE_ANON_KEY
-      # - REACT_APP_API_BASE_URL (point to your API service URL)
-      # - REACT_APP_GITHUB_REPO (format: username/repo-name)
+      # - REACT_APP_API_BASE_URL
+      # - REACT_APP_GITHUB_REPO
       # - REACT_APP_STRIPE_CUSTOMER_PORTAL_URL
