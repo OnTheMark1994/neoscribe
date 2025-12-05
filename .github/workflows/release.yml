@@ -6,6 +6,10 @@ on:
       - 'v*'
   workflow_dispatch:  # Allow manual rebuilds without a new tag
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
