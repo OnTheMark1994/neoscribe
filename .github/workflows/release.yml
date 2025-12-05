@@ -137,6 +137,9 @@ jobs:
         with:
           files: |
             artifacts/windows-exe/*
-          generate_release_notes: true
+            artifacts/macos-dmg/*
+            artifacts/linux-appimage/*
+          generate_release_notes: false
+          body: ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
