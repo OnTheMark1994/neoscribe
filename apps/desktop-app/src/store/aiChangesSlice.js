@@ -22,13 +22,21 @@ const aiChangesSlice = createSlice({
       // Preserve autoAdvanceOnResolve across sessions; do not reset here
     },
     nextChange: (state) => {
-      if (state.currentChangeIdIndex < state.allChangeIds.length - 1) {
-        state.currentChangeIdIndex++;
+      const len = state.allChangeIds.length;
+      if (len === 0) return;
+      if (state.currentChangeIdIndex < 0) {
+        state.currentChangeIdIndex = 0;
+      } else {
+        state.currentChangeIdIndex = (state.currentChangeIdIndex + 1) % len;
       }
     },
     previousChange: (state) => {
-      if (state.currentChangeIdIndex > 0) {
-        state.currentChangeIdIndex--;
+      const len = state.allChangeIds.length;
+      if (len === 0) return;
+      if (state.currentChangeIdIndex < 0) {
+        state.currentChangeIdIndex = 0;
+      } else {
+        state.currentChangeIdIndex = (state.currentChangeIdIndex - 1 + len) % len;
       }
     },
     rebuildChangeIds: (state, action) => {
@@ -53,6 +61,10 @@ const aiChangesSlice = createSlice({
     },
     clearCurrentChangeSelection: (state) => {
       state.currentChangeIdIndex = -1;
+    },
+    setCurrentChangeIndex: (state, action) => {
+      const idx = typeof action.payload === 'number' ? action.payload : 0;
+      state.currentChangeIdIndex = idx;
     }
   }
 });
@@ -66,6 +78,7 @@ export const {
   setAutoAdvanceOnResolve,
   toggleAutoAdvanceOnResolve,
   clearCurrentChangeSelection,
+  setCurrentChangeIndex,
 } = aiChangesSlice.actions;
 
 export default aiChangesSlice.reducer;

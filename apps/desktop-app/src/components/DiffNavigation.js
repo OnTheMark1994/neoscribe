@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { nextChange, previousChange, clearAIChanges } from '../store/aiChangesSlice';
+import { nextChange, previousChange, clearAIChanges, clearCurrentChangeSelection, setCurrentChangeIndex } from '../store/aiChangesSlice';
 import { getLines, setLines } from '../utils/editorEngine';
 import './DiffNavigation.css';
 
@@ -14,11 +14,29 @@ function DiffNavigation({ onUpdate }) {
 
   const handlePrevious = () => {
     console.log('[DIFFNAV] Previous requested from index:', currentChangeIdIndex, 'of', allChangeIds.length);
+    if (allChangeIds.length === 1) {
+      // Workaround: when only one change exists, toggling the selection
+      // forces EditorLine's useEffect to re-run and scroll into view.
+      const originalIndex = currentChangeIdIndex;
+      dispatch(clearCurrentChangeSelection());
+      setTimeout(() => {
+        dispatch(setCurrentChangeIndex(originalIndex));
+      }, 0);
+      return;
+    }
     dispatch(previousChange());
   };
 
   const handleNext = () => {
     console.log('[DIFFNAV] Next requested from index:', currentChangeIdIndex, 'of', allChangeIds.length);
+    if (allChangeIds.length === 1) {
+      const originalIndex = currentChangeIdIndex;
+      dispatch(clearCurrentChangeSelection());
+      setTimeout(() => {
+        dispatch(setCurrentChangeIndex(originalIndex));
+      }, 0);
+      return;
+    }
     dispatch(nextChange());
   };
 
@@ -94,7 +112,12 @@ function DiffNavigation({ onUpdate }) {
         ▲
       </button>
       <span className="diff-counter">
-        Change {currentChangeIdIndex + 1} of {allChangeIds.length}
+        {(() => {
+          const len = allChangeIds.length;
+          if (len === 0) return 'No changes';
+          const displayIndex = currentChangeIdIndex >= 0 ? currentChangeIdIndex + 1 : 1;
+          return `Change ${displayIndex} of ${len}`;
+        })()}
       </span>
       <button 
         className="diff-nav-btn" 

@@ -1,12 +1,33 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { rebuildChangeIds, nextChange, toggleAutoAdvanceOnResolve, clearCurrentChangeSelection } from '../store/aiChangesSlice';
+import { rebuildChangeIds, toggleAutoAdvanceOnResolve, clearCurrentChangeSelection, setCurrentChangeIndex } from '../store/aiChangesSlice';
 import { getLines, setLines } from '../utils/editorEngine';
 import './DiffActionButtons.css';
 
 function DiffActionButtons({ proposedChangeId, changeType, onUpdate, onContentChange }) {
   const dispatch = useDispatch();
   const autoAdvance = useSelector(state => state.aiChanges.autoAdvanceOnResolve);
+
+  const advanceToNextChangeBelow = (lines, fromLineIndex) => {
+    const remaining = [];
+    lines.forEach((l, idx) => {
+      if (l.proposedChangeId) {
+        remaining.push({ id: l.proposedChangeId, idx });
+      }
+    });
+
+    if (remaining.length === 0) {
+      dispatch(clearCurrentChangeSelection());
+      return;
+    }
+
+    let targetPos = remaining.findIndex(c => c.idx >= fromLineIndex);
+    if (targetPos === -1) {
+      targetPos = 0;
+    }
+
+    dispatch(setCurrentChangeIndex(targetPos));
+  };
 
   const acceptChange = () => {
     console.log('[DIFF] Accepting change, autoAdvance:', autoAdvance);
@@ -37,8 +58,9 @@ function DiffActionButtons({ proposedChangeId, changeType, onUpdate, onContentCh
     setLines(lines);
     dispatch(rebuildChangeIds(lines));
     if (autoAdvance) {
-      console.log('[DIFF] Auto-advancing to next change');
-      dispatch(nextChange());
+      console.log('[DIFF] Auto-advancing to next change (accept)');
+      // After mutation, move to the next change at or below this line, wrapping if needed
+      advanceToNextChangeBelow(lines, lineIndex);
     } else {
       dispatch(clearCurrentChangeSelection());
     }
@@ -80,8 +102,8 @@ function DiffActionButtons({ proposedChangeId, changeType, onUpdate, onContentCh
     setLines(lines);
     dispatch(rebuildChangeIds(lines));
     if (autoAdvance) {
-      console.log('[DIFF] Auto-advancing to next change');
-      dispatch(nextChange());
+      console.log('[DIFF] Auto-advancing to next change (reject)');
+      advanceToNextChangeBelow(lines, lineIndex);
     } else {
       dispatch(clearCurrentChangeSelection());
     }
