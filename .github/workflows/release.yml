@@ -23,6 +23,10 @@ jobs:
         run: |
           cd apps/desktop-app
           npm ci
+      - name: Get version
+        id: get-version
+        run: |
+          echo "version=$(node -p 'require("./apps/desktop-app/package.json").version')" >> $GITHUB_OUTPUT
       - name: Build Windows
         env:
           CI: false
@@ -51,7 +55,8 @@ jobs:
           npm ci
       - name: Build macOS
         env:
-          CI: false  # Allow react-scripts build to pass with warnings in CI
+          CI: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd apps/desktop-app
           npm run build:mac
@@ -76,7 +81,8 @@ jobs:
           npm ci
       - name: Build Linux
         env:
-          CI: false  # Allow react-scripts build to pass with warnings in CI
+          CI: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd apps/desktop-app
           npm run build:linux
@@ -99,11 +105,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/windows-exe/*.exe
-            artifacts/macos-dmg/*.dmg
-            artifacts/linux-appimage/*.AppImage
-          draft: false
-          prerelease: false
+            artifacts/windows-exe/*
+          tag_name: v${{ steps.get-version.outputs.version }}
+          name: v${{ steps.get-version.outputs.version }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
