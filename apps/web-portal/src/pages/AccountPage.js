@@ -1,0 +1,987 @@
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+import { supabase } from '../supabaseClient';
+import { API_BASE_URL, STRIPE_CUSTOMER_PORTAL_URL } from '../constants';
+import './AccountPage.css';
+
+// Initial client-side plans: correct IDs/names but placeholder values so we never
+// show stale numeric token counts while server config is loading.
+const PLANS = [
+  {
+    id: 'light',
+    name: 'Light',
+    description: 'Loading...',
+    monthlyPrice: 'Loading...',
+    tokens: 'Loading...',
+    stripe_payment_link: null
+  },
+  {
+    id: 'basic',
+    name: 'Basic',
+    description: 'Loading...',
+    monthlyPrice: 'Loading...',
+    tokens: 'Loading...',
+    stripe_payment_link: null
+  },
+  {
+    id: 'full',
+    name: 'Full',
+    description: 'Loading...',
+    monthlyPrice: 'Loading...',
+    tokens: 'Loading...',
+    stripe_payment_link: null
+  },
+  {
+    id: 'heavy',
+    name: 'Heavy',
+    description: 'Loading...',
+    monthlyPrice: 'Loading...',
+    tokens: 'Loading...',
+    stripe_payment_link: null
+  }
+];
+const ADDON_INCREMENTS = [
+  500_000,
+  1_000_000,
+  1_500_000,
+  2_000_000,
+  2_500_000,
+  3_000_000,
+  3_500_000,
+  4_000_000,
+  4_500_000
+];
+
+const useQuery = () => {
+  return new URLSearchParams(useLocation().search);
+};
+
+const AccountPage = () => {
+  const { user, loading, signInWithEmail, signUpWithEmail, signOut } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState('');
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState('basic');
+  const [selectedAddonTokens, setSelectedAddonTokens] = useState(2_000_000);
+  const [subscriptionStatusMsg, setSubscriptionStatusMsg] = useState('');
+  const [addonStatusMsg, setAddonStatusMsg] = useState('');
+  const [passwordStatusMsg, setPasswordStatusMsg] = useState('');
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [addonLoading, setAddonLoading] = useState(false);
+  const [checkoutStatus, setCheckoutStatus] = useState(null); // 'success' | 'cancel' | null
+
+  const navigate = useNavigate();
+  const query = useQuery();
+
+  // API base URL from constants
+  const SERVER_URL = API_BASE_URL;
+
+  const [plans, setPlans] = useState(PLANS);
+
+  const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) || plans[1] || PLANS[1];
+  const selectedPrice = Number(selectedPlan?.monthlyPrice);
+  const selectedTokens = Number(selectedPlan?.tokens);
+  const unitPrice =
+    Number.isFinite(selectedPrice) && Number.isFinite(selectedTokens) && selectedTokens > 0
+      ? selectedPrice / selectedTokens
+      : 0;
+  const discountedUnitPrice = unitPrice * 0.75;
+
+  const formatTokens = (value) => {
+    if (!Number.isFinite(value)) return 'n/a';
+    return value.toLocaleString();
+  };
+
+  const formatCurrency = (value) => {
+    if (!Number.isFinite(value)) return 'n/a';
+    return `$${value.toFixed(2)}`;
+  };
+
+  const getPlanNameByTierId = (tierId) => {
+    if (tierId == null) return 'None';
+
+    const numericId = Number(tierId);
+    if (!Number.isFinite(numericId)) return `Tier ${tierId}`;
+
+    const match = Array.isArray(plans)
+      ? plans.find((plan) => plan.tier_id != null && Number(plan.tier_id) === numericId)
+      : null;
+
+    if (match && match.name) return match.name;
+
+    return `Tier ${numericId}`;
+  };
+
+  // Auto-login route: /account?email=...&password=...
+  useEffect(() => {
+    const urlEmail = query.get('email');
+    const urlPassword = query.get('password');
+    if (urlEmail && urlPassword && !user && !loading) {
+      (async () => {
+        try {
+          setStatus('Signing you in...');
+          await signInWithEmail(urlEmail, urlPassword);
+          setStatus('');
+          navigate('/account', { replace: true });
+        } catch (err) {
+          setStatus(err.message || 'Auto sign-in failed');
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, user, loading]);
+
+  // Load subscription tiers from server so the portal stays in sync with server-side JSON
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        const url = `${SERVER_URL}/api/subscription-tiers`;
+
+        // eslint-disable-next-line no-console
+        console.log('[WEB] Fetching subscription tiers from:', url);
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Subscription tiers endpoint error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        // data is expected to be an object keyed by id (light/basic/full),
+        // with each tier including a numeric tier_id we can use for matching.
+        const mapped = Object.entries(data || {}).map(([id, tier]) => ({
+          id,
+          tier_id: tier.tier_id ?? tier.tierId ?? null,
+          name: tier.title || id,
+          description: tier.description || '',
+          monthlyPrice: tier.monthly_price,
+          tokens: tier.monthly_allowance,
+          stripe_payment_link: tier.stripe_payment_link || null,
+        }));
+
+        if (mapped.length > 0) {
+          setPlans(mapped);
+        } else {
+          setPlans(PLANS);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[WEB] Failed to load subscription tiers from server, using defaults:', err);
+        setPlans(PLANS);
+      }
+    };
+
+    loadPlans();
+  }, [SERVER_URL]);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user) return;
+      setStatsLoading(true);
+      try {
+        // Load token stats from backend server using auth_id as authId
+        const url = `${SERVER_URL}/api/user/tokens/`;
+        const body = {
+          userId: null,
+          authId: user.id,
+        };
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          throw new Error(`User tokens endpoint error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        setStats(data || null);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[WEB] Failed to load account stats:', err);
+        setStats(null);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    loadStats();
+  }, [user]);
+
+  useEffect(() => {
+    if (stats && stats.subscription_type != null && Array.isArray(plans) && plans.length) {
+      const match = plans.find(
+        (plan) =>
+          plan.tier_id != null &&
+          Number(plan.tier_id) === Number(stats.subscription_type),
+      );
+      if (match) {
+        setSelectedPlanId(match.id);
+      }
+    }
+  }, [stats, plans]);
+
+  // Handle checkout return from Stripe
+  useEffect(() => {
+    const checkoutParam = query.get('checkout');
+    if (checkoutParam === 'success') {
+      setCheckoutStatus('success');
+      setSubscriptionStatusMsg('Payment successful! Click "Sync Stripe" to activate your subscription.');
+      // Clear the URL params
+      navigate('/account', { replace: true });
+    } else if (checkoutParam === 'cancel') {
+      setCheckoutStatus('cancel');
+      setSubscriptionStatusMsg('Checkout was cancelled. You can try again when ready.');
+      navigate('/account', { replace: true });
+    }
+  }, [query, navigate]);
+
+  // Detect if returning from Stripe checkout
+  const urlParams = new URLSearchParams(window.location.search);
+  const isCheckoutSuccess = urlParams.get('checkout') === 'success';
+
+  useEffect(() => {
+    if (isCheckoutSuccess && user) {
+      console.log('Returning from Stripe checkout, auto-syncing subscription status');
+      handleSyncStripe();
+    }
+  }, [isCheckoutSuccess, user]);
+
+  // Handle explicit refresh cases (e.g., /account/refresh)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('force_refresh') === 'true') {
+      handleSyncStripe();
+      navigate('/account', { replace: true });
+    }
+  }, []);
+
+  // Manual refresh function
+  const handleRefreshStats = async () => {
+    if (!user) return;
+    
+    setStatsLoading(true);
+    
+    try {
+      const response = await fetch(`${SERVER_URL}/api/user/tokens/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: null, authId: user.id }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data || null);
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[WEB] Refresh error:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Sync subscription from Stripe - use when webhook didn't update the database
+  const handleSyncStripe = async () => {
+    if (!user) return;
+    
+    setStatsLoading(true);
+    setSubscriptionStatusMsg('Syncing with Stripe...');
+    
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[WEB] Syncing subscription from Stripe for user:', user.email);
+      
+      const response = await fetch(`${SERVER_URL}/api/stripe/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authId: user.id, email: user.email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create customer portal session');
+      }
+
+      // eslint-disable-next-line no-console
+      console.log('[WEB] Stripe sync response:', data);
+      
+      if (response.ok && data.synced) {
+        const planName = getPlanNameByTierId(data.subscriptionType);
+        setSubscriptionStatusMsg(`Synced! Subscription: ${planName}`);
+        // Reload stats to get updated data
+        const statsResponse = await fetch(`${SERVER_URL}/api/user/tokens/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: null, authId: user.id }),
+        });
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setStats(statsData || null);
+        }
+      } else {
+        setSubscriptionStatusMsg(data.message || data.error || 'Sync failed');
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[WEB] Stripe sync error:', err);
+      setSubscriptionStatusMsg(`Sync error: ${err.message}`);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setStatus('');
+    try {
+      if (authMode === 'login') {
+        await signInWithEmail(email, password);
+        setStatus('');
+      } else {
+        await signUpWithEmail(email, password);
+        setStatus('Check your email to confirm your account.');
+      }
+    } catch (err) {
+      setStatus(err.message || (authMode === 'login' ? 'Sign-in failed' : 'Sign-up failed'));
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setStatus('Enter your email above to reset your password.');
+      return;
+    }
+    try {
+      setStatus('Sending password reset email...');
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/account',
+      });
+      setStatus('If an account exists for that email, a reset link has been sent.');
+    } catch (err) {
+      setStatus(err.message || 'Failed to send password reset email');
+    }
+  };
+
+  const handleNeedHelp = () => {
+    navigate('/help');
+  };
+
+  // Handle Stripe checkout for subscriptions using Payment Links
+  const handleSubscribeWithStripe = async () => {
+    if (!user) return;
+
+    const selectedPlanData = plans.find((plan) => plan.id === selectedPlanId);
+    if (!selectedPlanData) {
+      setSubscriptionStatusMsg('Plan not found');
+      return;
+    }
+
+    // Check if payment link is configured
+    if (!selectedPlanData.stripe_payment_link) {
+      setSubscriptionStatusMsg('Payment link not configured for this plan. Please try again later.');
+      return;
+    }
+
+    setSubscriptionLoading(true);
+    setSubscriptionStatusMsg('Redirecting to checkout...');
+
+    try {
+      // Build the payment link URL with customer email prefilled
+      let paymentUrl = selectedPlanData.stripe_payment_link;
+      
+      // Add prefilled_email parameter if user has email (Stripe Payment Links support this)
+      if (user.email) {
+        const separator = paymentUrl.includes('?') ? '&' : '?';
+        paymentUrl = `${paymentUrl}${separator}prefilled_email=${encodeURIComponent(user.email)}`;
+      }
+
+      // Add client_reference_id to track which user made the purchase
+      const separator = paymentUrl.includes('?') ? '&' : '?';
+      paymentUrl = `${paymentUrl}${separator}client_reference_id=${encodeURIComponent(user.id)}`;
+
+      // Redirect to Stripe Payment Link
+      window.location.href = paymentUrl;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[WEB] Checkout error:', err);
+      setSubscriptionStatusMsg(`Failed to redirect to checkout: ${err.message}`);
+      setSubscriptionLoading(false);
+    }
+  };
+
+  // Handle managing subscription via Stripe Customer Portal
+  const handleManageSubscription = async () => {
+    if (!user) return;
+
+    try {
+      setSubscriptionLoading(true);
+      setSubscriptionStatusMsg('Opening subscription management...');
+
+      // Open the Stripe-hosted customer portal in a new tab
+      window.open(STRIPE_CUSTOMER_PORTAL_URL, '_blank', 'noopener,noreferrer');
+
+      // We don't strictly need loading state once the tab is opened
+      setSubscriptionLoading(false);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Customer portal error:', err);
+      setSubscriptionStatusMsg(`Failed to open subscription management: ${err.message}`);
+      setSubscriptionLoading(false);
+    }
+  };
+
+  // Legacy direct subscription update (for testing/development without Stripe)
+  const handleSubscribe = async () => {
+    if (!user) return;
+    try {
+      setSubscriptionLoading(true);
+      setSubscriptionStatusMsg('Processing...');
+
+      const url = `${SERVER_URL}/api/user/subscription`;
+      const body = {
+        authId: user.id,
+        subscriptionType: selectedPlanId,
+      };
+
+      // eslint-disable-next-line no-console
+      console.log('[WEB] Updating subscription via:', url, 'body:', body);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Subscription endpoint error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      // eslint-disable-next-line no-console
+      console.log('[WEB] Subscription updated, new token data:', data);
+
+      setStats(data || null);
+      setSubscriptionStatusMsg(`Subscription updated to ${selectedPlan.name}`);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update subscription:', err);
+      setSubscriptionStatusMsg('Failed to update subscription.');
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const handleAddTokens = async () => {
+    if (!user) return;
+    try {
+      setAddonLoading(true);
+      setAddonStatusMsg('Processing...');
+
+      const url = `${SERVER_URL}/api/user/add-tokens`;
+      const body = {
+        authId: user.id,
+        tokensToAdd: selectedAddonTokens,
+      };
+
+      // eslint-disable-next-line no-console
+      console.log('[WEB] Adding tokens via:', url, 'body:', body);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Add-tokens endpoint error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      // eslint-disable-next-line no-console
+      console.log('[WEB] Tokens added, new token data:', data);
+
+      setStats(data || null);
+      setAddonStatusMsg(`${formatTokens(selectedAddonTokens)} tokens added!`);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to add tokens:', err);
+      setAddonStatusMsg('Failed to add tokens.');
+    } finally {
+      setAddonLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      setStatus(err.message || 'Logout failed');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!user || !user.email) {
+      setPasswordStatusMsg('No email available for password reset.');
+      return;
+    }
+
+    try {
+      setPasswordStatusMsg('Sending password reset email...');
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email);
+      if (error) {
+        setPasswordStatusMsg(error.message || 'Failed to send password reset email.');
+      } else {
+        setPasswordStatusMsg('Password reset email sent. Please check your inbox.');
+      }
+    } catch (err) {
+      setPasswordStatusMsg(err.message || 'Failed to send password reset email.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="sf-page">
+        <p>Loading accounthellip;</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="sf-page sf-account-page">
+        <div className="sf-account-auth-wrapper">
+          <header className="sf-page-header">
+            <h1>Account</h1>
+            <p>Sign in to view your ScribeFold AI account and usage stats.</p>
+          </header>
+
+          <form className="sf-auth-form" onSubmit={handleAuthSubmit}>
+          <div className="sf-form-row">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="sf-form-row">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {status && <div className="sf-status-message">{status}</div>}
+          <div className="sf-auth-actions">
+            <button type="submit" className="sf-primary-btn">
+              {authMode === 'login' ? 'Sign In' : 'Create Account'}
+            </button>
+          </div>
+          <div className="sf-auth-toggle">
+            {authMode === 'login' ? (
+              <button
+                type="button"
+                className="sf-link-btn"
+                onClick={() => setAuthMode('signup')}
+              >
+                Don&apos;t have an account? Create one
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="sf-link-btn"
+                onClick={() => setAuthMode('login')}
+              >
+                Already have an account? Log in
+              </button>
+            )}
+          </div>
+          <div className="sf-auth-secondary-row">
+            <button
+              type="button"
+              className="sf-link-btn"
+              onClick={handleForgotPassword}
+            >
+              Forgot password?
+            </button>
+            <span className="sf-auth-secondary-separator">•</span>
+            <button
+              type="button"
+              className="sf-link-btn"
+              onClick={handleNeedHelp}
+            >
+              Need help?
+            </button>
+          </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sf-page sf-account-page">
+      <div className="sf-account-inner">
+        <header className="sf-page-header">
+          <h1>Your Account</h1>
+          <p>View your ScribeFold AI usage and manage your account.</p>
+        </header>
+
+        <section className="sf-account-summary">
+        <div>
+          <div className="sf-section-header">
+            <h2>Account details</h2>
+            <button 
+              type="button" 
+              className={`sf-refresh-btn-icon ${statsLoading ? 'sf-spinning' : ''}`}
+              onClick={() => { handleRefreshStats(); handleSyncStripe(); }}
+              disabled={statsLoading}
+              title="Refresh account details and sync Stripe"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                <path d="M16 21h5v-5"/>
+              </svg>
+            </button>
+          </div>
+          <div className="sf-account-detail-row">
+            <span>Email</span>
+            <span>{user.email}</span>
+          </div>
+          <div className="sf-account-detail-row">
+            <span>User ID</span>
+            <span>{user.id}</span>
+          </div>
+          <div className="sf-account-detail-row">
+            <span>Current Plan</span>
+            <span>
+              {!stats
+                ? 'Loading...'
+                : stats.subscription_tier_name
+                  ? `${stats.subscription_tier_name} (${stats.subscription_status || 'active'})`
+                  : 'No active subscription'}
+            </span>
+          </div>
+          {stats && stats.stripe_subscription_id && (
+            <div className="sf-account-detail-row">
+              <span>Subscription ID</span>
+              <span style={{ fontSize: '0.8em', opacity: 0.7 }}>{stats.stripe_subscription_id}</span>
+            </div>
+          )}
+          {stats && stats.next_billing_date && (
+            <div className="sf-account-detail-row">
+              <span>Next Billing Date</span>
+              <span>{new Date(stats.next_billing_date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</span>
+            </div>
+          )}
+        </div>
+        </section>
+
+        <section className="sf-account-stats">
+        <div className="sf-section-header">
+          <h2>Usage stats</h2>
+          <button 
+            type="button" 
+            className={`sf-refresh-btn-icon ${statsLoading ? 'sf-spinning' : ''}`}
+            onClick={handleRefreshStats}
+            disabled={statsLoading}
+            title="Refresh usage stats"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+              <path d="M16 21h5v-5"/>
+            </svg>
+          </button>
+        </div>
+        <div className="sf-stats-grid">
+          <div className="sf-stat-card">
+            <span className="sf-stat-label">Available Tokens</span>
+            <span className="sf-stat-value">
+              {!stats
+                ? 'Loading...'
+                : (() => {
+                    // Prefer backend's availableTokens from /api/user/tokens when present
+                    if (typeof stats.availableTokens === 'number') {
+                      return stats.availableTokens.toLocaleString();
+                    }
+
+                    const tokenLimit = stats.tokenLimit ?? stats.token_limit ?? 0;
+                    const tokensUsed = stats.tokensUsed ?? stats.tokens_used ?? 0;
+                    const tokensAdded = stats.tokensAdded ?? stats.tokens_added ?? 0;
+                    const remaining = Math.max(0, tokenLimit - tokensUsed + tokensAdded);
+                    return Number.isFinite(remaining) ? remaining.toLocaleString() : 'n/a';
+                  })()}
+            </span>
+          </div>
+          <div className="sf-stat-card">
+            <span className="sf-stat-label">Monthly Allowance</span>
+            <span className="sf-stat-value">
+              {!stats
+                ? 'Loading...'
+                : (() => {
+                    const tokenLimit = stats.tokenLimit ?? stats.token_limit;
+                    return tokenLimit != null ? Number(tokenLimit).toLocaleString() : 'n/a';
+                  })()}
+            </span>
+          </div>
+          <div className="sf-stat-card">
+            <span className="sf-stat-label">Tokens Used This Month</span>
+            <span className="sf-stat-value">
+              {!stats
+                ? 'Loading...'
+                : (() => {
+                    const used = stats.tokensUsed ?? stats.tokens_used;
+                    return used != null ? Number(used).toLocaleString() : 'n/a';
+                  })()}
+            </span>
+          </div>
+          <div className="sf-stat-card">
+            <span className="sf-stat-label">Tokens Used All Time</span>
+            <span className="sf-stat-value">
+              {!stats
+                ? 'Loading...'
+                : (() => {
+                    const allTime = stats.tokensUsedAllTime ?? stats.tokens_used_all_time;
+                    return allTime != null ? Number(allTime).toLocaleString() : 'n/a';
+                  })()}
+            </span>
+          </div>
+        </div>
+        </section>
+
+        <section className="sf-plans-section">
+        <div className="sf-plans-header">
+          <div className="sf-section-header">
+            <h2>Choose A Plan</h2>
+            <button 
+              type="button" 
+              className={`sf-refresh-btn-icon ${statsLoading ? 'sf-spinning' : ''}`}
+              onClick={handleSyncStripe}
+              disabled={statsLoading}
+              title="Sync subscription from Stripe"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                <path d="M16 21h5v-5"/>
+              </svg>
+            </button>
+          </div>
+          <p>Choose a monthly plan that fits your writing and editing volume.</p>
+        </div>
+        <div className="sf-plans-grid">
+          {plans.map((plan) => {
+            const numericTokens = Number(plan.tokens);
+            const numericPrice = Number(plan.monthlyPrice);
+            const hasNumericTokens = Number.isFinite(numericTokens);
+            const hasNumericPrice = Number.isFinite(numericPrice);
+            const pricePerThousand =
+              hasNumericTokens && hasNumericPrice && numericTokens > 0
+                ? numericPrice / (numericTokens / 1000)
+                : null;
+            const isSelected = plan.id === selectedPlanId;
+            const isCurrentPlan =
+              stats &&
+              stats.subscription_type != null &&
+              plan.tier_id != null &&
+              Number(plan.tier_id) === Number(stats.subscription_type);
+            return (
+              <button
+                key={plan.id}
+                type="button"
+                className={
+                  'sf-plan-card' + (isSelected ? ' sf-plan-card-selected' : '')
+                }
+                onClick={() => setSelectedPlanId(plan.id)}
+              >
+                {isCurrentPlan && (
+                  <div className="sf-plan-current-badge">
+                    <span>Your</span>
+                    <span>Plan</span>
+                  </div>
+                )}
+                <div className="sf-plan-header-row">
+                  <span
+                    className="sf-plan-name"
+                  >
+                    {plan.name}
+                  </span>
+                </div>
+                <div className="sf-plan-body">
+                  <div className="sf-plan-tokens">
+                    {hasNumericTokens
+                      ? `${formatTokens(numericTokens)} tokens / month`
+                      : 'Loading tokens...'}
+                  </div>
+                  <div className="sf-plan-price">
+                    {hasNumericPrice ? `${formatCurrency(numericPrice)}/mo` : 'Loading...'}
+                  </div>
+                  <div className="sf-plan-unit-price">
+                    {pricePerThousand != null
+                      ? `$${pricePerThousand.toFixed(3)} per 1k tokens`
+                      : 'Loading...'}
+                  </div>
+                  <div className="sf-plan-description" style={{ textAlign: 'center' }}>
+                    {plan.description}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="sf-plans-footer">
+          {subscriptionStatusMsg && (
+            <div className={`sf-plans-status-message ${checkoutStatus === 'success' ? 'sf-status-success' : checkoutStatus === 'cancel' ? 'sf-status-cancel' : ''}`}>
+              {subscriptionStatusMsg}
+            </div>
+          )}
+          <div className="sf-plans-buttons">
+            <button
+              type="button"
+              className="sf-primary-btn sf-plans-subscribe-btn"
+              disabled={(
+                stats &&
+                stats.subscription_type != null &&
+                selectedPlan &&
+                selectedPlan.tier_id != null &&
+                Number(selectedPlan.tier_id) === Number(stats.subscription_type)
+              ) || subscriptionLoading}
+              onClick={handleSubscribeWithStripe}
+            >
+              {subscriptionLoading
+                ? 'Processing...'
+                : stats &&
+                    stats.subscription_type != null &&
+                    selectedPlan &&
+                    selectedPlan.tier_id != null &&
+                    Number(selectedPlan.tier_id) === Number(stats.subscription_type)
+                  ? `You are currently subscribed to ${selectedPlan.name}`
+                  : `Subscribe to ${selectedPlan.name}`}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="sf-addon-section">
+        <div className="sf-addon-header">
+          <h2>One-time token packs</h2>
+          <p>
+            Need an extra burst? Token packs use the same per-token pricing as your
+            selected monthly plan. Tokens you buy here never expire, but you need an
+            active subscription plan to use them.
+          </p>
+        </div>
+        <div className="sf-addon-slider-row">
+          <div className="sf-addon-slider-label">Pick size</div>
+          <div className="sf-addon-slider-amount">
+            {formatTokens(selectedAddonTokens)} tokens
+          </div>
+          <div className="sf-addon-slider-price">
+            {formatCurrency(discountedUnitPrice * selectedAddonTokens)} one-time
+          </div>
+          <input
+            type="range"
+            min={500000}
+            max={5000000}
+            step={500000}
+            value={selectedAddonTokens}
+            onChange={(e) => setSelectedAddonTokens(Number(e.target.value))}
+          />
+        </div>
+        <div className="sf-addon-grid">
+          {[500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 5000000].map((tokens) => {
+            const price = discountedUnitPrice * tokens;
+            const isSelected = tokens === selectedAddonTokens;
+            return (
+              <button
+                key={tokens}
+                type="button"
+                className={
+                  'sf-addon-card' + (isSelected ? ' sf-addon-card-selected' : '')
+                }
+                onClick={() => setSelectedAddonTokens(tokens)}
+              >
+                <div className="sf-addon-tokens">{formatTokens(tokens)} tokens</div>
+                <div className="sf-addon-price">{formatCurrency(price)}</div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="sf-addon-footer">
+          {addonStatusMsg && (
+            <div className="sf-plans-status-message">{addonStatusMsg}</div>
+          )}
+          <button
+            type="button"
+            className="sf-primary-btn sf-plans-subscribe-btn"
+            onClick={handleAddTokens}
+            disabled={addonLoading}
+          >
+            Add {formatTokens(selectedAddonTokens)} tokens
+          </button>
+        </div>
+      </section>
+
+      <section className="sf-account-actions-section">
+        <h2>Account actions</h2>
+        <div className="sf-account-actions-grid">
+          {stats && stats.stripe_subscription_id && (
+            <button 
+              className="sf-secondary-btn sf-secondary-btn-neutral" 
+              type="button"
+              onClick={handleManageSubscription}
+              disabled={subscriptionLoading}
+            >
+              Manage Subscription
+            </button>
+          )}
+          <button className="sf-secondary-btn sf-secondary-btn-neutral" type="button" onClick={handleChangePassword}>
+            Change Password
+          </button>
+          <button className="sf-secondary-btn sf-secondary-btn-neutral" onClick={handleLogout}>
+            Log Out
+          </button>
+        </div>
+        {passwordStatusMsg && (
+          <div
+            className="sf-status-message"
+            style={{ marginTop: '8px', textAlign: 'center' }}
+          >
+            {passwordStatusMsg}
+          </div>
+        )}
+      </section>
+      </div>
+    </div>
+  );
+};
+
+export default AccountPage;

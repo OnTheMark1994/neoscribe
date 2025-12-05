@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables (NEVER commit these)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+**/.env
+**/.env.*
+# BUT allow .env.example files
+!.env.example
+!**/.env.example
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Electron builds (these go to GitHub Releases, not git)
+release/
+**/release/
+out/
+**/out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+*.pem
+.cache/
+
+# Local development
+*.local

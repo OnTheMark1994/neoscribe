@@ -1,0 +1,51 @@
+services:
+  # API Server
+  - type: web
+    name: scribefold-ai-api
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: apps/api-server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Add these in Render Dashboard (not here - they contain secrets):
+      # - SUPABASE_URL
+      # - SUPABASE_SERVICE_ROLE_KEY
+      # - DEEPSEEK_API_KEY
+      # - STRIPE_SECRET_KEY
+      # - STRIPE_WEBHOOK_SECRET
+      # - STRIPE_PRICE_ID_LIGHT
+      # - STRIPE_PRICE_ID_BASIC
+      # - STRIPE_PRICE_ID_FULL
+      # - STRIPE_PRICE_ID_HEAVY
+      # - STRIPE_PAYMENT_LINK_LIGHT
+      # - STRIPE_PAYMENT_LINK_BASIC
+      # - STRIPE_PAYMENT_LINK_FULL
+      # - STRIPE_PAYMENT_LINK_HEAVY
+      # - FRONTEND_URL (set to your web portal URL)
+
+  # Web Portal
+  - type: web
+    name: scribefold-ai-web-portal
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: apps/web-portal
+    buildCommand: npm install && npm run build
+    startCommand: npx serve -s build -l 3000
+    staticPublishPath: ./build
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Add these in Render Dashboard:
+      # - REACT_APP_SUPABASE_URL
+      # - REACT_APP_SUPABASE_ANON_KEY
+      # - REACT_APP_API_BASE_URL (point to your API service URL)
+      # - REACT_APP_GITHUB_REPO (format: username/repo-name)
+      # - REACT_APP_STRIPE_CUSTOMER_PORTAL_URL

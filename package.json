@@ -1,0 +1,27 @@
+{
+  "name": "scribefold-ai-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ScribeFold AI Monorepo - Desktop App, Web Portal, and API Server",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm install --workspace=apps/desktop-app && npm install --workspace=apps/web-portal && npm install --workspace=apps/api-server",
+    "start:desktop": "npm run start --workspace=apps/desktop-app",
+    "start:web": "npm run start --workspace=apps/web-portal",
+    "start:api": "npm run start --workspace=apps/api-server",
+    "dev:api": "npm run dev --workspace=apps/api-server",
+    "build:desktop": "npm run build --workspace=apps/desktop-app",
+    "build:web": "npm run build --workspace=apps/web-portal"
+  },
+  "keywords": [
+    "scribefold",
+    "ai",
+    "writing",
+    "electron",
+    "monorepo"
+  ],
+  "author": "Scribefold-AI 2025",
+  "license": "MIT"
+}
