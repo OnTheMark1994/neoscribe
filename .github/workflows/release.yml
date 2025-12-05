@@ -122,7 +122,7 @@ jobs:
           path: apps/desktop-app/release/*.AppImage
 
   create-release:
-    needs: build-windows  # Only require Windows to succeed
+    needs: [build-windows, build-macos, build-linux]  # Require all builds to succeed
     runs-on: ubuntu-latest
     permissions:
       contents: write
