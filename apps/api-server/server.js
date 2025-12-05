@@ -583,7 +583,7 @@ app.get('/health', (req, res) => {
 app.get('/api/subscription-tiers', (req, res) => {
   res.json(subscription_tiers);
 });
-
+// Hellooo
 // Proxy endpoint to fetch GitHub releases for private repo (used by web-portal downloads page)
 app.get('/api/releases', async (req, res) => {
   try {
