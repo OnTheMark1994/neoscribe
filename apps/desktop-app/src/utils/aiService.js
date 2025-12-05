@@ -5,7 +5,7 @@ import { WEB_PORTAL_BASE_URL, API_BASE_URL } from './constants';
 export function buildWebPortalAutoLoginUrl(email, password) {
   const safeEmail = email || '';
   const safePassword = password || '';
-  return `${WEB_PORTAL_BASE_URL}/auto-login?email=${encodeURIComponent(safeEmail)}&password=${encodeURIComponent(safePassword)}`;
+  return `${WEB_PORTAL_BASE_URL}/#/auto-login?email=${encodeURIComponent(safeEmail)}&password=${encodeURIComponent(safePassword)}`;
 }
 
 // Default prompt preface
