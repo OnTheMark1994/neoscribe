@@ -8,38 +8,6 @@ export function buildWebPortalAutoLoginUrl(email, password) {
   return `${WEB_PORTAL_BASE_URL}/#/auto-login?email=${encodeURIComponent(safeEmail)}&password=${encodeURIComponent(safePassword)}`;
 }
 
-// Fetch token_log entries for the current user (paginated)
-export async function fetchUserTokenLog(anonId, authId = null, { limit = 20, offset = 0 } = {}) {
-  if (!anonId && !authId) {
-    throw new Error('anonId or authId is required to fetch token log');
-  }
-
-  const serverUrl = API_BASE_URL;
-  const url = `${serverUrl}/api/user/token-log`;
-
-  const body = {
-    anonId: anonId || null,
-    authId: authId || null,
-    limit,
-    offset,
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Failed to fetch token log: ${response.status} ${text}`);
-  }
-
-  return response.json();
-}
-
 // Default prompt preface
 export const DEFAULT_PROMPT_PREFACE = `You are an AI writing assistant for ScribeFold AI.
 

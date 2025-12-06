@@ -3,7 +3,6 @@ import './Settings.css';
 import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData, devBurnTokens } from '../utils/aiService';
 import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
-import TokenUsageLog from './TokenUsageLog';
 
 function Settings({ anonId, authId: authIdProp, userAccount }) {
   const [activeTab, setActiveTab] = useState('general');
@@ -586,8 +585,6 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
                 {tokensUsedAllTime != null ? tokensUsedAllTime.toLocaleString() : 'Loading...'}
               </span>
             </div>
-
-            <TokenUsageLog anonId={anonId} authId={authId} />
           </div>
 
           {accountError && (
