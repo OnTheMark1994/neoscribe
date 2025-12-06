@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import './TokenUsageLog.css';
 import { API_BASE_URL } from '../utils/constants';
 
+// Number of token_log entries to fetch per page (initial load and each "Load More" click)
+const TOKEN_LOG_PAGE_SIZE = 4;
+
 /**
  * TokenUsageLog - A foldable panel that displays token_log entries for the current user.
  * Fetches data via the API server endpoint.
@@ -13,8 +16,6 @@ function TokenUsageLog({ anonId, authId }) {
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(false);
   const [onlyAdditions, setOnlyAdditions] = useState(false);
-
-  const pageSize = 50;
 
   const toggleOpen = async () => {
     const nextOpen = !isOpen;
@@ -44,7 +45,7 @@ function TokenUsageLog({ anonId, authId }) {
         body: JSON.stringify({
           anonId: anonId || null,
           authId: authId || null,
-          limit: pageSize,
+          limit: TOKEN_LOG_PAGE_SIZE,
           offset: currentOffset,
         }),
       });
@@ -151,9 +152,6 @@ function TokenUsageLog({ anonId, authId }) {
                             : '—'}
                         </span>
                         <span className="token-usage-log-id">ID: {entry.id}</span>
-                        <span className="token-usage-log-user-id">
-                          User: {entry.user_id}
-                        </span>
                       </div>
                     </div>
                     <div
