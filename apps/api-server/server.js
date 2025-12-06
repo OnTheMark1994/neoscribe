@@ -2620,14 +2620,14 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
  * IMPORTANT:
  *   - This endpoint should NOT be called as part of normal user flows or
  *     routine refreshes in the web portal.
- *   - It does NOT modify token buckets (tokens_monthly, tokens_added,
- *     tokens_used, tokens_used_all_time). Tokens are managed exclusively by
- *     the Stripe webhook handlers and dev simulation endpoints.
  *
  * Behavior:
  *   - Looks up the Stripe customer/subscription by email.
+ *   - Determines tier_id from Stripe price/product data.
  *   - Updates stripe_customer_id, stripe_subscription_id, tier_id,
  *     subscription_status, and billing dates on the user row.
+ *   - Applies the same token logic as a "subscription created" event
+ *     (tokens_monthly / tokens_used) using applySubscriptionCreated.
  */
 app.post('/api/stripe/sync', async (req, res) => {
   console.log('\n[STRIPE SYNC] ========================================');
@@ -2792,9 +2792,18 @@ app.post('/api/stripe/sync', async (req, res) => {
       const periodEndTs = getSubscriptionCurrentPeriodEndTimestamp(subscription);
       const currentPeriodEnd = periodEndTs ? new Date(periodEndTs * 1000) : null;
 
-      // NOTE: Manual sync only aligns subscription metadata; it does NOT touch
-      // token buckets. Token refills and usage resets are handled solely by
-      // the real webhook handlers and dev simulation endpoints.
+      // Apply the same token logic as our subscription-created handler
+      if (tierIdFromSync) {
+        try {
+          console.log('[STRIPE SYNC] Applying subscription-created token logic from sync for tier_id:', tierIdFromSync);
+          const tokenResult = await applySubscriptionCreated(user.auth_id, tierIdFromSync);
+          console.log('[STRIPE SYNC] Token update applied during sync (applied data):', JSON.stringify(tokenResult.applied, null, 2));
+        } catch (tokenErr) {
+          console.error('[STRIPE SYNC] Warning: Failed to apply token logic during manual sync:', tokenErr.message);
+        }
+      } else {
+        console.log('[STRIPE SYNC] No tier_id determined from Stripe; skipping token updates');
+      }
 
       updateData = {
         ...updateData,
