@@ -2833,6 +2833,12 @@ app.post('/api/dev/burn-tokens', async (req, res) => {
   try {
     const { anonId, authId, amount } = req.body || {};
 
+    console.log('[DEV] /api/dev/burn-tokens request body:', {
+      anonId,
+      authId,
+      amount,
+    });
+
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
     }
@@ -2894,7 +2900,7 @@ app.post('/api/dev/burn-tokens', async (req, res) => {
       burned: burnAmount
     };
 
-    console.log('[DEV] Burn tokens result:', responseData);
+    console.log('[DEV] /api/dev/burn-tokens response data:', responseData);
     res.json(responseData);
   } catch (error) {
     console.error('[DEV] Burn tokens error:', error);

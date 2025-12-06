@@ -24,6 +24,7 @@ let settingsWindow = null;
 let isClosingForReal = false;
 let pendingSettingsTab = null; // 'general' | 'ai' | 'account' requested before settings finishes loading
 let lastSettingsTab = 'general'; // remember the last requested tab for settings window to read on load
+let developerModeEnabled = false; // tracked from renderer to control DevTools behavior
 
 // Load encryption module
 let encrypt, decrypt, ALGORITHMS;
@@ -353,6 +354,14 @@ function showSettingsWindow(hash = '#settings') {
 
   // When the settings UI has finished loading, apply any pending tab request
   settingsWindow.webContents.on('did-finish-load', () => {
+    // Auto-open DevTools for the settings window when in developer mode
+    if (isDev && developerModeEnabled && !settingsWindow.isDestroyed()) {
+      const wc = settingsWindow.webContents;
+      if (wc && !wc.isDevToolsOpened()) {
+        wc.openDevTools();
+      }
+    }
+
     if (pendingSettingsTab && !settingsWindow.isDestroyed()) {
       settingsWindow.webContents.send('requested-settings-tab', pendingSettingsTab);
       pendingSettingsTab = null;
@@ -504,6 +513,7 @@ ipcMain.handle('select-custom-theme', async () => {
 // Toggle DevTools based on developer mode setting from renderer
 ipcMain.on('set-developer-mode', (event, enabled) => {
   console.log('[MAIN] Developer mode set to:', enabled);
+  developerModeEnabled = !!enabled;
   if (isDev && mainWindow && mainWindow.webContents) {
     if (enabled) {
       if (!mainWindow.webContents.isDevToolsOpened()) {
@@ -512,6 +522,20 @@ ipcMain.on('set-developer-mode', (event, enabled) => {
     } else {
       if (mainWindow.webContents.isDevToolsOpened()) {
         mainWindow.webContents.closeDevTools();
+      }
+    }
+  }
+
+  // Keep settings window DevTools in sync when developer mode changes
+  if (isDev && settingsWindow && !settingsWindow.isDestroyed()) {
+    const wc = settingsWindow.webContents;
+    if (enabled) {
+      if (wc && !wc.isDevToolsOpened()) {
+        wc.openDevTools();
+      }
+    } else {
+      if (wc && wc.isDevToolsOpened()) {
+        wc.closeDevTools();
       }
     }
   }

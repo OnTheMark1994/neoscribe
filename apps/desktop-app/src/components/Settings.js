@@ -20,6 +20,7 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
   const [accountError, setAccountError] = useState(null);
   const [requestedTabLabel, setRequestedTabLabel] = useState('NONE');
   const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
+  const [developerToolsStatus, setDeveloperToolsStatus] = useState('');
 
   useEffect(() => {
     // Load settings from localStorage
@@ -237,18 +238,40 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
     if (window.electronAPI && window.electronAPI.settingsSaved) {
       window.electronAPI.settingsSaved({ authId: null });
     }
+
+    setDeveloperToolsStatus('Developer Tools: Reset local anon/auth IDs and cleared local account data.');
   };
 
   const handleDeveloperBurnTokens = async () => {
+    console.log("in handleDeveloperBurnTokens")
     if (!anonId && !authId) {
       return;
     }
 
+    console.log('[SETTINGS] -14k tokens button pressed', {
+      anonId,
+      authId,
+      amount: 14000,
+      tokenStats,
+      tokenCount,
+    });
+
     try {
-      await devBurnTokens(anonId, authId, 14000);
+      const result = await devBurnTokens(anonId, authId, 14000);
+      console.log('[SETTINGS] -14k tokens endpoint response', result);
+      const newAvailable =
+        result && typeof result.availableTokens === 'number'
+          ? result.availableTokens
+          : 'unknown';
+      setDeveloperToolsStatus(
+        `Developer Tools: Burned 14,000 tokens. New availableTokens = ${newAvailable}.`
+      );
       await loadAccountData();
     } catch (error) {
       console.error('[SETTINGS] Failed to burn tokens:', error);
+      setDeveloperToolsStatus(
+        `Developer Tools error burning tokens: ${error.message || 'Unknown error'}`
+      );
     }
   };
 
@@ -482,6 +505,12 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
                   <span className="stat-label">👤 Auth ID</span>
                   <span className="stat-value">{authId || 'Not logged in'}</span>
                 </div>
+
+                {developerToolsStatus && (
+                  <div className="stat-item">
+                    <span className="stat-label">{developerToolsStatus}</span>
+                  </div>
+                )}
 
                 <div className="stat-item">
                   <span
