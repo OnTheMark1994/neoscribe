@@ -423,6 +423,97 @@ This section defines scenarios for validating the new token tracking system. Eac
 
 ### 9.1 General User Flows
 
+#### GF-0: First-time anon → auth upgrade (desktop primary new-user flow)
+
+**This is the most important test case – the first experience of every new user.**
+
+- **Preconditions**
+  - Desktop app launched with no existing `users` row for this device's `anon_id`.
+  - User is anonymous (no `auth_id`).
+  - Constants (as of this spec):
+    - `NEW_ANON_TOKENS = 15,000` (initial anon bonus).
+    - `NEW_AUTH_TOKENS = 25,000` (auth upgrade bonus).
+
+- **User actions and expected outcomes**
+
+  **Step 1: User opens app for first time**
+  - Desktop app launches and generates a new `anon_id`.
+  - First AI request triggers `getOrCreateUser(anonId, null, ipAddress)`.
+  - **Backend**: A new `users` row is created:
+    - `anon_id` = generated device ID.
+    - `auth_id = null`.
+    - `tokens_monthly = 0`.
+    - `tokens_added = NEW_ANON_TOKENS = 15,000`.
+    - `tokens_used = 0`.
+    - `tokens_used_all_time = 0`.
+    - `tier_id = null`.
+  - **UI (AISidebar)**: Shows "Available tokens: 15,000".
+
+  **Step 2: User uses AI until all 15k tokens are consumed**
+  - Each AI request calls `updateUserTokens(userId, N)` where `N` = token cost.
+  - Deduction order: `tokens_monthly` first (0 available), then `tokens_added`.
+  - `tokens_used` and `tokens_used_all_time` increment by `N` each request.
+  - **Backend state after all tokens used**:
+    - `tokens_monthly = 0`.
+    - `tokens_added = 0`.
+    - `tokens_used = 15,000` (total tokens spent this month).
+    - `tokens_used_all_time = 15,000`.
+  - **UI (AISidebar)**: Shows "Available tokens: 0".
+
+  **Step 3: Out-of-tokens message appears**
+  - When `totalAvailable = tokens_monthly + tokens_added = 0`, the next AI request is blocked.
+  - Server returns `OUT_OF_TOKENS_MESSAGE_ANON`:
+    - "All tokens have been used! Click the button below or check File => settings => account to create an account for 25,000 tokens now, 15,000 per month, and to view more options."
+  - **UI (AISidebar)**: Displays the out-of-tokens message with an "Account Settings" button.
+
+  **Step 4: User clicks "Account Settings" button**
+  - Desktop app opens the Settings window to the Account tab.
+  - User sees the account creation form (email, password fields).
+  - This step is UI-only; no backend changes yet.
+
+  **Step 5: User completes account creation**
+  - User enters email/password and clicks "Create Account".
+  - Desktop calls `POST /api/users/create-account` with `{ anonId, email, password }`.
+  - Server:
+    1. Creates a new Supabase auth user with the provided credentials.
+    2. Finds the existing anon `users` row by `anon_id`.
+    3. Since there is exactly 1 row with no `auth_id`, server updates that row:
+       - Sets `auth_id` to the new Supabase auth user ID.
+       - Sets `tokens_added = currentAdded + NEW_AUTH_TOKENS`.
+         - In this flow: `currentAdded = 0`, so `tokens_added = 25,000`.
+       - Does NOT change `tokens_monthly` (remains 0).
+       - Does NOT change `tokens_used` (remains 15,000).
+       - Does NOT change `tokens_used_all_time` (remains 15,000).
+    4. Returns response with `message = AUTH_LINK_EXISTING_ANON_MESSAGE`:
+       - "Created new auth account and linked to existing anon user; added 25,000 bonus tokens."
+  - **Backend state after account creation**:
+    - `auth_id` = new Supabase auth user ID.
+    - `tokens_monthly = 0`.
+    - `tokens_added = 25,000`.
+    - `tokens_used = 15,000`.
+    - `tokens_used_all_time = 15,000`.
+    - `tier_id = null` (no subscription yet).
+  - **UI (Settings/AISidebar)**:
+    - Status message: "Created new auth account and linked to existing anon user; added 25,000 bonus tokens."
+    - AISidebar "Available tokens": 25,000.
+    - Settings "Monthly Balance": 0.
+    - Settings "Tokens Added": 25,000.
+    - Settings "Tokens Used This Month": 15,000.
+    - Settings "Tokens Used All Time": 15,000.
+
+- **Summary of expected final state**
+
+  | Field | Value |
+  |-------|-------|
+  | `tokens_monthly` | 0 |
+  | `tokens_added` | 25,000 |
+  | `tokens_used` | 15,000 |
+  | `tokens_used_all_time` | 15,000 |
+  | `tier_id` | null |
+  | `auth_id` | (set) |
+  | Available tokens (display) | 25,000 |
+  | Message | "Created new auth account and linked to existing anon user; added 25,000 bonus tokens." |
+
 #### GF-1: Anonymous desktop user – first launch and free tokens
 
 - **Preconditions**

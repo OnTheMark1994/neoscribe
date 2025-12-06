@@ -15,9 +15,9 @@ const NEW_MONTHLY_TOKENS = 15000;        // Monthly refill amount for paid tiers
 
 // Auth account status messages (keep here so they stay in sync with token constants)
 const AUTH_CREATE_NEW_USER_MESSAGE =
-  `Created new auth account and user record; added ${NEW_ANON_TOKENS.toLocaleString()} bonus tokens.`;
+  `Created new auth account and user record; added ${NEW_AUTH_TOKENS.toLocaleString()} bonus tokens.`;
 const AUTH_LINK_EXISTING_ANON_MESSAGE =
-  `Created new auth account and linked to existing anon user; added ${NEW_ANON_TOKENS.toLocaleString()} bonus tokens.`;
+  `Created new auth account and linked to existing anon user; added ${NEW_AUTH_TOKENS.toLocaleString()} bonus tokens.`;
 const AUTH_REPEAT_ACCOUNT_MESSAGE =
   'Created repeat auth account; added 0 bonus tokens because this anon ID already has an account.';
 
@@ -815,7 +815,7 @@ app.post('/api/users/create-account', async (req, res) => {
 
     const authUser = authData.user;
     const authId = authUser.id;
-    const BONUS_TOKENS = NEW_ANON_TOKENS;
+    const BONUS_TOKENS = NEW_AUTH_TOKENS;
 
     // Find all user rows with this anon_id
     const { data: existingUsers, error: existingError } = await supabase
