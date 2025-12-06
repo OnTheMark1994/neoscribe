@@ -2251,8 +2251,8 @@ async function handleSubscriptionCancellation(subscription) {
   console.log('[handleSubscriptionCancellation] User had tokens_monthly:', user.tokens_monthly);
 
   // Subscription has actually ended - now remove access
-  // Per TOKEN_TRACKING.md: On cancel, we zero out tokens_monthly (they lose monthly allowance)
-  // tokens_added remains intact for use
+  // IMPORTANT: Do NOT change token balances here. On cancel, the user keeps
+  // whatever tokens they already have; we only clear plan/subscription metadata.
   const { error: updateError } = await supabase
     .from('users')
     .update({
@@ -2260,8 +2260,7 @@ async function handleSubscriptionCancellation(subscription) {
       subscription_status: 'canceled',
       stripe_subscription_id: null,
       subscription_end_date: null,
-      next_billing_date: null,
-      tokens_monthly: 0 // Remove monthly token allowance
+      next_billing_date: null
     })
     .eq('id', user.id);
 
@@ -2986,14 +2985,14 @@ async function applySubscriptionCanceled(authId) {
   
   const user = users[0];
   
-  // Per TOKEN_TRACKING.md: On cancel, set tokens_monthly to 0, keep tokens_added
+  // On cancel, we now keep existing token balances and only clear
+  // plan/subscription metadata so the user is no longer billed.
   const updateData = {
     tier_id: null,
     subscription_status: 'canceled',
     stripe_subscription_id: null,
     subscription_end_date: null,
-    next_billing_date: null,
-    tokens_monthly: 0
+    next_billing_date: null
   };
   
   const { error: updateError } = await supabase
