@@ -341,13 +341,19 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
       return null;
     }
 
-    const totalTokens = initialTokensAdded;
-    // console.log('  → New user created with', totalTokens, 'tokens (bonus)');
-
-    // Best-effort log of initial bonus tokens
+    // Log initial bonus tokens using the unified function
+    // Note: User was just created with tokens_added set, so we log after creation
+    // We use applyTokenChange with deltaAdded=0 just to create a log entry since tokens are already set
     try {
       const note = isNewAnon ? 'New anon user initial tokens' : 'New auth user initial tokens';
-      await logTokenChange(newUser.id, initialTokensAdded, note);
+      await supabase
+        .from('token_log')
+        .insert({
+          user_id: String(newUser.id),
+          tokens_monthly: 0,
+          tokens_added: initialTokensAdded,
+          note: note,
+        });
     } catch (logError) {
       console.error('[getOrCreateUser] Failed to log initial token grant:', logError);
     }
@@ -386,12 +392,8 @@ const DEFAULT_USER_TEMPLATE = {
 };
 
 /**
- * Update user token usage
- * NEW TOKEN TRACKING SYSTEM:
- * - tokens_monthly: Current monthly allowance BALANCE (decreases as used)
- * - tokens_used: Tokens used in current billing period (counter, resets monthly)
- * - tokens_added: Long-lived bonus tokens (never reset by month)
- * - tokens_used_all_time: Lifetime usage counter (never resets)
+ * Update user token usage (deduction for API calls)
+ * Uses applyTokenChange internally.
  * 
  * DEDUCTION ORDER (per TOKEN_TRACKING.md Section 4.2):
  * 1. Use monthly allowance first: tokens_monthly decreases
@@ -409,9 +411,9 @@ async function updateUserTokens(userId, tokensToUse, note = null) {
   if (!supabase || !userId) return { success: false, error: 'No database connection' };
 
   try {
-    const N = tokensToUse;
+    const N = Math.abs(tokensToUse);
     
-    // Get current user data
+    // Get current user data to check eligibility and calculate deduction split
     const { data: user, error: fetchError } = await supabase
       .from('users')
       .select('tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
@@ -423,11 +425,9 @@ async function updateUserTokens(userId, tokensToUse, note = null) {
       return { success: false, error: fetchError.message };
     }
     
-    // Coerce all token fields to numbers in case Supabase returns strings for int8
+    // Coerce all token fields to numbers
     const monthly = Math.max(Number(user.tokens_monthly) || 0, 0);
     const added = Math.max(Number(user.tokens_added) || 0, 0);
-    const tokensUsed = Number(user.tokens_used) || 0;
-    const tokensUsedAllTime = Number(user.tokens_used_all_time) || 0;
     
     // Calculate total available BEFORE this usage
     const totalAvailable = monthly + added;
@@ -435,81 +435,35 @@ async function updateUserTokens(userId, tokensToUse, note = null) {
     // ELIGIBILITY CHECK (Section 4.1)
     // Block if totalAvailable <= 0, allow even if N > totalAvailable
     if (totalAvailable <= 0) {
-      console.error('❌ All tokens used:', tokenUpdateResult.error);
-      
-      // Log failed request
-      await logApiRequest({
-        userId: user.id,
-        anonId: userId,
-        authId: authId || null,
-        ipAddress: ipAddress,
-        endpoint: '/api/deepseek/query',
-        tokensInput: inputTokens,
-        tokensOutput: responseTokens,
-        tokensTotal: totalTokens,
-        model: apiResponse.model || model || 'deepseek-chat',
-        responseTime: responseTime,
-        success: false,
-        errorMessage: tokenUpdateResult.error
-      });
-      
-      // Return error response
-      return res.status(429).json({
+      return {
         success: false,
         error: 'All tokens used',
-        message: 'You have used all your available tokens. Upgrade your account for more tokens.',
         availableTokens: 0
-      });
+      };
     }
     
     // DEDUCTION ORDER (Section 4.2)
     // Step 1: Use monthly allowance first
     const useFromMonthly = Math.min(N, monthly);
     const remaining = N - useFromMonthly;
-    let newTokensMonthly = monthly - useFromMonthly;
     
     // Step 2: Then use from added
     const useFromAdded = Math.min(remaining, added);
-    let newTokensAdded = added - useFromAdded;
     
-    // Step 3: No negative balances (safety)
-    newTokensMonthly = Math.max(0, newTokensMonthly);
-    newTokensAdded = Math.max(0, newTokensAdded);
-    
-    // Step 4: Usage counters (always increment by N)
-    const newTokensUsed = tokensUsed + N;
-    const newTokensUsedAllTime = tokensUsedAllTime + N;
-    
-    // Update database
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({
-        tokens_monthly: newTokensMonthly,
-        tokens_used: newTokensUsed,
-        tokens_added: newTokensAdded,
-        tokens_used_all_time: newTokensUsedAllTime
-      })
-      .eq('id', userId);
-    
-    if (updateError) {
-      console.error('[updateUserTokens] Error updating tokens:', updateError);
-      return { success: false, error: updateError.message };
-    }
-    
-    // Calculate new available tokens
-    const newAvailable = newTokensMonthly + newTokensAdded;
-    
-    console.log(`[updateUserTokens] Deducted ${N} tokens: monthly ${monthly}->${newTokensMonthly}, added ${added}->${newTokensAdded}, available ${totalAvailable}->${newAvailable}`);
+    // Use the unified function with negative deltas
+    const result = await applyTokenChange({
+      userId,
+      deltaMonthly: -useFromMonthly,
+      deltaAdded: -useFromAdded,
+      note: note || 'API usage',
+      incrementUsageCounters: true,
+    });
 
-    // Best-effort audit log to token_log (negative for deductions)
-    try {
-      const delta = -Math.abs(N);
-      const logNote = note || 'API usage';
-      await logTokenChange(userId, delta, logNote);
-    } catch (logError) {
-      console.error('[updateUserTokens] Failed to log token change:', logError);
-      // Do not fail the main operation if logging fails
+    if (!result.success) {
+      return { success: false, error: result.error };
     }
+
+    const newAvailable = (Number(result.user?.tokens_monthly) || 0) + (Number(result.user?.tokens_added) || 0);
 
     return {
       success: true,
@@ -551,26 +505,150 @@ async function logApiRequest(requestData) {
 }
 
 /**
- * Log a token change to token_log (best-effort)
- * @param {string} userId - User ID from users table
- * @param {number} tokensDelta - Signed delta (+ for additions, - for deductions)
- * @param {string} note - Human-readable description of the event
+ * UNIFIED TOKEN CHANGE FUNCTION
+ * This is the ONLY function that should modify token balances in the users table.
+ * All token changes (usage, grants, bonuses, subscription updates) MUST go through this function.
+ *
+ * It updates the users table AND logs to token_log with separate tokens_monthly and tokens_added deltas.
+ *
+ * @param {Object} params
+ * @param {string} params.userId - User database ID (users.id)
+ * @param {number} [params.deltaMonthly=0] - Change to tokens_monthly (positive = add, negative = subtract)
+ * @param {number} [params.deltaAdded=0] - Change to tokens_added (positive = add, negative = subtract)
+ * @param {string} [params.note] - Human-readable description for the log
+ * @param {boolean} [params.incrementUsageCounters=false] - If true, increment tokens_used and tokens_used_all_time by abs(deltaMonthly + deltaAdded)
+ * @param {boolean} [params.resetTokensUsed=false] - If true, reset tokens_used to 0 (for renewals)
+ * @param {boolean} [params.setMonthlyAbsolute=null] - If set, use this as the new absolute value for tokens_monthly instead of delta
+ * @param {boolean} [params.setAddedAbsolute=null] - If set, use this as the new absolute value for tokens_added instead of delta
+ * @returns {Promise<Object>} - { success, user, error }
  */
-async function logTokenChange(userId, tokensDelta, note) {
-  if (!supabase) return;
-  if (!userId) return;
-  if (!tokensDelta || Number(tokensDelta) === 0) return;
+async function applyTokenChange({
+  userId,
+  deltaMonthly = 0,
+  deltaAdded = 0,
+  note = null,
+  incrementUsageCounters = false,
+  resetTokensUsed = false,
+  setMonthlyAbsolute = null,
+  setAddedAbsolute = null,
+}) {
+  if (!supabase) return { success: false, error: 'Database not configured' };
+  if (!userId) return { success: false, error: 'No userId provided' };
 
   try {
-    await supabase
-      .from('token_log')
-      .insert({
-        user_id: String(userId),
-        tokens: Number(tokensDelta),
-        note: note || null,
-      });
+    // Fetch current user data
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !user) {
+      console.error('[applyTokenChange] Error fetching user:', fetchError);
+      return { success: false, error: fetchError?.message || 'User not found' };
+    }
+
+    // Coerce current values to numbers
+    const currentMonthly = Number(user.tokens_monthly) || 0;
+    const currentAdded = Number(user.tokens_added) || 0;
+    const currentUsed = Number(user.tokens_used) || 0;
+    const currentUsedAllTime = Number(user.tokens_used_all_time) || 0;
+
+    // Calculate new values
+    let newMonthly, newAdded;
+    let actualDeltaMonthly = 0;
+    let actualDeltaAdded = 0;
+
+    if (setMonthlyAbsolute !== null) {
+      // Absolute set (e.g., subscription created sets to tierLimit)
+      newMonthly = Math.max(0, Number(setMonthlyAbsolute));
+      actualDeltaMonthly = newMonthly - currentMonthly;
+    } else {
+      // Delta change
+      newMonthly = Math.max(0, currentMonthly + deltaMonthly);
+      actualDeltaMonthly = newMonthly - currentMonthly;
+    }
+
+    if (setAddedAbsolute !== null) {
+      newAdded = Math.max(0, Number(setAddedAbsolute));
+      actualDeltaAdded = newAdded - currentAdded;
+    } else {
+      newAdded = Math.max(0, currentAdded + deltaAdded);
+      actualDeltaAdded = newAdded - currentAdded;
+    }
+
+    // Usage counters
+    let newUsed = currentUsed;
+    let newUsedAllTime = currentUsedAllTime;
+
+    if (resetTokensUsed) {
+      newUsed = 0;
+    }
+
+    if (incrementUsageCounters) {
+      // For usage deductions, increment by the total tokens consumed
+      const totalConsumed = Math.abs(actualDeltaMonthly) + Math.abs(actualDeltaAdded);
+      // Only increment if we're actually deducting (negative deltas)
+      if (deltaMonthly < 0 || deltaAdded < 0) {
+        newUsed += totalConsumed;
+        newUsedAllTime += totalConsumed;
+      }
+    }
+
+    // Build update object
+    const updateData = {
+      tokens_monthly: newMonthly,
+      tokens_added: newAdded,
+      tokens_used: newUsed,
+      tokens_used_all_time: newUsedAllTime,
+    };
+
+    // Update database
+    const { error: updateError } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('[applyTokenChange] Error updating user:', updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    console.log(`[applyTokenChange] userId=${userId} monthly: ${currentMonthly}->${newMonthly} (delta ${actualDeltaMonthly}), added: ${currentAdded}->${newAdded} (delta ${actualDeltaAdded}), note: ${note || '(none)'}`);
+
+    // Best-effort log to token_log with separate columns
+    if (actualDeltaMonthly !== 0 || actualDeltaAdded !== 0) {
+      try {
+        await supabase
+          .from('token_log')
+          .insert({
+            user_id: String(userId),
+            tokens_monthly: actualDeltaMonthly,
+            tokens_added: actualDeltaAdded,
+            note: note || null,
+          });
+      } catch (logError) {
+        console.error('[applyTokenChange] Failed to insert token_log row:', logError);
+        // Don't fail the main operation if logging fails
+      }
+    }
+
+    // Fetch and return updated user
+    const { data: updatedUser } = await supabase
+      .from('users')
+      .select('id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
+      .eq('id', userId)
+      .single();
+
+    return {
+      success: true,
+      user: updatedUser,
+      deltaMonthly: actualDeltaMonthly,
+      deltaAdded: actualDeltaAdded,
+    };
   } catch (error) {
-    console.error('[logTokenChange] Failed to insert token_log row:', error);
+    console.error('[applyTokenChange] Exception:', error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -991,25 +1069,30 @@ app.post('/api/users/create-account', async (req, res) => {
       userRow = inserted;
       message = AUTH_CREATE_NEW_USER_MESSAGE;
 
-      // Log bonus tokens for brand new auth user
+      // Log bonus tokens for brand new auth user using new schema
       try {
-        await logTokenChange(userRow.id, BONUS_TOKENS, 'Auth create-account bonus (new user)');
+        await supabase
+          .from('token_log')
+          .insert({
+            user_id: String(userRow.id),
+            tokens_monthly: 0,
+            tokens_added: BONUS_TOKENS,
+            note: 'Auth create-account bonus (new user)',
+          });
       } catch (logError) {
         console.error('[create-account] Failed to log auth create bonus:', logError);
       }
     } else if (existingUsers.length === 1 && !existingUsers[0].auth_id) {
       // Single anon row without auth_id: link and add bonus tokens
       const row = existingUsers[0];
-      const currentAdded = Number(row.tokens_added) || 0;
-      const newTokensAdded = currentAdded + BONUS_TOKENS;
 
+      // First update auth fields
       const { data: updated, error: updateError } = await supabase
         .from('users')
         .update({
           auth_id: authId,
           email,
           password,
-          tokens_added: newTokensAdded
         })
         .eq('id', row.id)
         .select()
@@ -1024,15 +1107,26 @@ app.post('/api/users/create-account', async (req, res) => {
         });
       }
 
-      userRow = updated;
-      message = AUTH_LINK_EXISTING_ANON_MESSAGE;
+      // Then add bonus tokens using the unified function
+      const tokenResult = await applyTokenChange({
+        userId: row.id,
+        deltaAdded: BONUS_TOKENS,
+        note: 'Auth upgrade bonus (link anon → auth)',
+      });
 
-      // Log auth upgrade bonus when linking anon -> auth
-      try {
-        await logTokenChange(userRow.id, BONUS_TOKENS, 'Auth upgrade bonus (link anon → auth)');
-      } catch (logError) {
-        console.error('[create-account] Failed to log auth upgrade bonus:', logError);
+      if (!tokenResult.success) {
+        console.error('[create-account] Failed to apply auth upgrade bonus:', tokenResult.error);
       }
+
+      // Fetch updated user
+      const { data: finalUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', row.id)
+        .single();
+
+      userRow = finalUser || updated;
+      message = AUTH_LINK_EXISTING_ANON_MESSAGE;
     } else {
       // Multiple rows with this anon_id or at least one already has auth_id
       // Treat as repeat account: create a fresh row with 0 new tokens
@@ -2148,13 +2242,8 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
   console.log('  - Is same tier:', isSameTier);
   console.log('  - Cancel at period end:', cancelAtPeriodEnd);
 
-  // Update user subscription data
-  // Per TOKEN_TRACKING.md:
-  // - NEW SUBSCRIPTION: tokens_monthly = max(current, tierLimit), tokens_used = 0
-  // - UPGRADE: tokens_monthly = max(current, newTierLimit) - user paid extra
-  // - DOWNGRADE: Don't reduce tokens_monthly until renewal
-  // - SAME TIER: Don't touch tokens_monthly
-  const updateData = {
+  // Update user subscription metadata (non-token fields)
+  const subscriptionMetadata = {
     stripe_customer_id: customerId,
     stripe_subscription_id: stripeSubscriptionId,
     tier_id: newTierId,
@@ -2163,57 +2252,73 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
     next_billing_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null
   };
 
+  console.log('[handleSubscriptionUpdate] Updating subscription metadata:', JSON.stringify(subscriptionMetadata, null, 2));
+
+  const { error: metaUpdateError } = await supabase
+    .from('users')
+    .update(subscriptionMetadata)
+    .eq('id', user.id);
+
+  if (metaUpdateError) {
+    console.error('[handleSubscriptionUpdate] ERROR: Failed to update subscription metadata:', metaUpdateError);
+  }
+
   // Get current user's tokens_monthly from DB
   const currentTokensMonthly = Number(user.tokens_monthly) || 0;
 
-  // Handle tokens_monthly changes based on upgrade vs downgrade
+  // Handle token changes via the unified applyTokenChange function
   // Per TOKEN_TRACKING.md Section 3:
   // - NEW SUBSCRIPTION: tokens_monthly = max(currentMonthly, tierLimit), tokens_used = 0
-  // - RENEWAL: tokens_monthly = max(tokens_monthly, tierLimit) - never reduced by renewal
   // - UPGRADE: Immediately set tokens_monthly = max(current, newAllowance)
   // - DOWNGRADE: Keep current tokens_monthly until next billing
+  // - SAME TIER: Don't touch tokens_monthly
+  
+  let tokenResult = null;
+  
   if (currentTierId === null) {
-    // New subscription - set tokens_monthly to max(current, tierLimit)
-    updateData.tokens_monthly = Math.max(currentTokensMonthly, newAllowance);
-    updateData.tokens_used = 0;
-    console.log('[handleSubscriptionUpdate] New subscription - setting tokens_monthly to:', updateData.tokens_monthly);
+    // New subscription - set tokens_monthly to max(current, tierLimit), reset tokens_used
+    const newMonthly = Math.max(currentTokensMonthly, newAllowance);
+    console.log('[handleSubscriptionUpdate] New subscription - setting tokens_monthly to:', newMonthly);
+    
+    tokenResult = await applyTokenChange({
+      userId: user.id,
+      setMonthlyAbsolute: newMonthly,
+      resetTokensUsed: true,
+      note: 'Stripe subscription created',
+    });
   } else if (isUpgrade) {
     // Upgrade - set tokens_monthly to max(current, newAllowance)
-    updateData.tokens_monthly = Math.max(currentTokensMonthly, newAllowance);
-    console.log('[handleSubscriptionUpdate] Upgrade - updating tokens_monthly to:', updateData.tokens_monthly);
+    const newMonthly = Math.max(currentTokensMonthly, newAllowance);
+    console.log('[handleSubscriptionUpdate] Upgrade - updating tokens_monthly to:', newMonthly);
+    
+    tokenResult = await applyTokenChange({
+      userId: user.id,
+      setMonthlyAbsolute: newMonthly,
+      note: 'Stripe subscription upgrade',
+    });
   } else if (isDowngrade) {
     // Downgrade - keep current tokens_monthly until next billing
-    // When invoice.payment_succeeded fires, renewal logic will apply
     console.log('[handleSubscriptionUpdate] Downgrade - keeping tokens_monthly at:', currentTokensMonthly);
     console.log('[handleSubscriptionUpdate] tokens_monthly will update at renewal via max(current, newTierLimit)');
+    // No token change needed
   } else if (isSameTier) {
     // Same tier - don't change tokens_monthly
     console.log('[handleSubscriptionUpdate] Same tier - keeping tokens_monthly at:', currentTokensMonthly);
+    // No token change needed
   } else {
-    // This should never happen with tier_id comparison, but log it for safety
     console.warn('[handleSubscriptionUpdate] WARNING: Unexpected tier comparison state');
     console.warn('[handleSubscriptionUpdate] Current:', currentTierId, 'New:', newTierId);
+  }
+
+  if (tokenResult && !tokenResult.success) {
+    console.error('[handleSubscriptionUpdate] ERROR: Failed to apply token changes:', tokenResult.error);
+  } else if (tokenResult) {
+    console.log('[handleSubscriptionUpdate] SUCCESS: Token changes applied');
   }
 
   console.log('[handleSubscriptionUpdate] Token behavior:');
   console.log('  - Current tokens_monthly in DB:', currentTokensMonthly);
   console.log('  - New tier allowance:', newAllowance);
-  console.log('  - Will set tokens_monthly to:', updateData.tokens_monthly ?? '(unchanged)');
-
-  console.log('[handleSubscriptionUpdate] Update data:', JSON.stringify(updateData, null, 2));
-
-  const { data: updatedUser, error: updateError } = await supabase
-    .from('users')
-    .update(updateData)
-    .eq('id', user.id)
-    .select();
-
-  if (updateError) {
-    console.error('[handleSubscriptionUpdate] ERROR: Failed to update user:', updateError);
-  } else {
-    console.log('[handleSubscriptionUpdate] SUCCESS: User subscription updated');
-    console.log('[handleSubscriptionUpdate] Updated user data:', JSON.stringify(updatedUser, null, 2));
-  }
   
   console.log('--- handleSubscriptionUpdate END ---\n');
 }
@@ -2331,22 +2436,29 @@ async function handleSubscriptionRenewal(subscription) {
   console.log('[handleSubscriptionRenewal] Tier limit from Stripe:', tierLimit);
   console.log('[handleSubscriptionRenewal] New tokens_monthly (max of current and tierLimit):', newTokensMonthly);
 
-  // Build update data
-  const updateData = {
-    tokens_used: 0, // Reset monthly usage counter
-    tokens_monthly: newTokensMonthly,
-    tier_id: newTierId,
-    next_billing_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null
-  };
-
-  // Reset monthly token usage and update subscription
-  const { error: updateError } = await supabase
+  // First update subscription metadata (non-token fields)
+  const { error: metaError } = await supabase
     .from('users')
-    .update(updateData)
+    .update({
+      tier_id: newTierId,
+      next_billing_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null
+    })
     .eq('id', user.id);
 
-  if (updateError) {
-    console.error('[handleSubscriptionRenewal] Failed to reset tokens:', updateError);
+  if (metaError) {
+    console.error('[handleSubscriptionRenewal] Failed to update subscription metadata:', metaError);
+  }
+
+  // Use unified function for token changes (handles logging automatically)
+  const tokenResult = await applyTokenChange({
+    userId: user.id,
+    setMonthlyAbsolute: newTokensMonthly, // Set to max(current, tierLimit)
+    resetTokensUsed: true, // Reset monthly usage counter
+    note: 'Stripe subscription renewal',
+  });
+
+  if (!tokenResult.success) {
+    console.error('[handleSubscriptionRenewal] Failed to apply token changes:', tokenResult.error);
   } else {
     console.log('[handleSubscriptionRenewal] Monthly tokens reset successfully');
     console.log('[handleSubscriptionRenewal] tokens_monthly:', currentTokensMonthly, '->', newTokensMonthly);
@@ -2890,19 +3002,30 @@ async function applySubscriptionCreated(authId, tierId) {
   const currentTokensMonthly = Number(user.tokens_monthly) || 0;
   
   // Per TOKEN_TRACKING.md Section 3.1: tokens_monthly = max(current, tierLimit), tokens_used = 0
-  const updateData = {
-    tier_id: tierId,
-    subscription_status: 'active',
-    tokens_monthly: Math.max(currentTokensMonthly, tierLimit),
-    tokens_used: 0
-  };
-  
-  const { error: updateError } = await supabase
+  const newTokensMonthly = Math.max(currentTokensMonthly, tierLimit);
+
+  // First update subscription metadata
+  const { error: metaError } = await supabase
     .from('users')
-    .update(updateData)
+    .update({
+      tier_id: tierId,
+      subscription_status: 'active',
+    })
     .eq('id', user.id);
   
-  if (updateError) throw new Error(`Failed to update user: ${updateError.message}`);
+  if (metaError) throw new Error(`Failed to update subscription metadata: ${metaError.message}`);
+
+  // Use unified function for token changes (handles logging automatically)
+  const tokenResult = await applyTokenChange({
+    userId: user.id,
+    setMonthlyAbsolute: newTokensMonthly,
+    resetTokensUsed: true,
+    note: 'Stripe subscription created / synced',
+  });
+  
+  if (!tokenResult.success) {
+    throw new Error(`Failed to apply token changes: ${tokenResult.error}`);
+  }
   
   // Return updated user data
   const { data: updatedUser } = await supabase
@@ -2911,7 +3034,7 @@ async function applySubscriptionCreated(authId, tierId) {
     .eq('id', user.id)
     .single();
   
-  return { success: true, user: updatedUser, applied: updateData };
+  return { success: true, user: updatedUser, applied: { tier_id: tierId, tokens_monthly: newTokensMonthly, tokens_used: 0 } };
 }
 
 /**
@@ -2942,18 +3065,27 @@ async function applySubscriptionRenewed(authId, tierId) {
   const currentTokensMonthly = Number(user.tokens_monthly) || 0;
   
   // Per TOKEN_TRACKING.md Section 3.2/5: tokens_monthly = max(current, tierLimit), tokens_used = 0
-  const updateData = {
-    tier_id: tierId,
-    tokens_monthly: Math.max(currentTokensMonthly, tierLimit),
-    tokens_used: 0 // Reset monthly usage counter
-  };
-  
-  const { error: updateError } = await supabase
+  const newTokensMonthly = Math.max(currentTokensMonthly, tierLimit);
+
+  // First update subscription metadata
+  const { error: metaError } = await supabase
     .from('users')
-    .update(updateData)
+    .update({ tier_id: tierId })
     .eq('id', user.id);
   
-  if (updateError) throw new Error(`Failed to update user: ${updateError.message}`);
+  if (metaError) throw new Error(`Failed to update tier: ${metaError.message}`);
+
+  // Use unified function for token changes (handles logging automatically)
+  const tokenResult = await applyTokenChange({
+    userId: user.id,
+    setMonthlyAbsolute: newTokensMonthly,
+    resetTokensUsed: true,
+    note: 'Stripe subscription renewed',
+  });
+  
+  if (!tokenResult.success) {
+    throw new Error(`Failed to apply token changes: ${tokenResult.error}`);
+  }
   
   // Return updated user data
   const { data: updatedUser } = await supabase
@@ -2962,7 +3094,7 @@ async function applySubscriptionRenewed(authId, tierId) {
     .eq('id', user.id)
     .single();
   
-  return { success: true, user: updatedUser, applied: updateData };
+  return { success: true, user: updatedUser, applied: { tier_id: tierId, tokens_monthly: newTokensMonthly, tokens_used: 0 } };
 }
 
 /**

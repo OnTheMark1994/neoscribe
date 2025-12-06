@@ -126,12 +126,29 @@
   color: #707070;
 }
 
-.token-usage-log-tokens {
+.token-usage-log-tokens-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   min-width: 90px;
+}
+
+.token-usage-log-tokens {
   text-align: right;
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.token-usage-log-tokens-label {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.7;
 }
 
 .token-usage-log-tokens--positive {

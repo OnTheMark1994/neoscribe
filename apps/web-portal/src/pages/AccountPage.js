@@ -807,6 +807,13 @@ const AccountPage = () => {
         </div>
         </section>
 
+        <div
+          style={{
+            borderTop: '1px solid var(--sf-border-color, #333)',
+            margin: '24px 0',
+          }}
+        />
+
         <section className="sf-account-stats">
         <div className="sf-section-header">
           <h2>Usage stats</h2>
@@ -936,6 +943,13 @@ const AccountPage = () => {
         <TokenUsageLog authId={user.id} />
         </section>
 
+        <div
+          style={{
+            borderTop: '1px solid var(--sf-border-color, #333)',
+            margin: '24px 0',
+          }}
+        />
+
         <section className="sf-plans-section">
         <div className="sf-plans-header">
           <div className="sf-section-header">
@@ -1050,6 +1064,13 @@ const AccountPage = () => {
         </div>
       </section>
 
+      <div
+        style={{
+          borderTop: '1px solid var(--sf-border-color, #333)',
+          margin: '24px 0',
+        }}
+      />
+
       <section className="sf-addon-section">
         <div className="sf-addon-header">
           <h2>One-time token packs</h2>
@@ -1110,6 +1131,13 @@ const AccountPage = () => {
         </div>
       </section>
 
+      <div
+        style={{
+          borderTop: '1px solid var(--sf-border-color, #333)',
+          margin: '24px 0',
+        }}
+      />
+
       <section className="sf-account-actions-section">
         <h2>Account actions</h2>
         <div className="sf-account-actions-grid">
@@ -1130,6 +1158,13 @@ const AccountPage = () => {
             Log Out
           </button>
         </div>
+        <div
+          style={{
+            borderTop: '1px solid var(--sf-border-color, #333)',
+            marginTop: '24px',
+            paddingTop: '16px',
+          }}
+        />
         {passwordStatusMsg && (
           <div
             className="sf-status-message"
@@ -1138,31 +1173,6 @@ const AccountPage = () => {
             {passwordStatusMsg}
           </div>
         )}
-
-        {/* Cancel All Subscriptions - dangerous action, shown at bottom in red */}
-        <div style={{ marginTop: '24px', borderTop: '1px solid var(--sf-border-color, #333)', paddingTop: '16px' }}>
-          <button
-            className="sf-secondary-btn sf-secondary-btn-danger"
-            type="button"
-            onClick={handleCancelAllSubscriptions}
-            disabled={cancelLoading}
-            style={{
-              backgroundColor: '#dc3545',
-              borderColor: '#dc3545',
-              color: '#fff',
-            }}
-          >
-            {cancelLoading ? 'Canceling...' : 'Cancel All Subscriptions'}
-          </button>
-          {cancelStatusMsg && (
-            <div
-              className="sf-status-message"
-              style={{ marginTop: '8px', textAlign: 'center' }}
-            >
-              {cancelStatusMsg}
-            </div>
-          )}
-        </div>
       </section>
       </div>
     </div>

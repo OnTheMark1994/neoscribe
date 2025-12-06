@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import './HelpPage.css';
+import { useAuth } from '../AuthContext';
+import { API_BASE_URL } from '../constants';
 
 const FoldSection = ({ title, children, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
@@ -20,12 +22,48 @@ const FoldSection = ({ title, children, defaultOpen = false }) => {
 };
 
 const HelpPage = () => {
+  const { user } = useAuth();
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelStatusMsg, setCancelStatusMsg] = useState('');
+
   const handleBackupCancel = async () => {
-    // This button is intended as a backup when Stripe's portal login isn't working
-    // because the user no longer has access to the email used at checkout.
-    // For now, direct users to contact support so we can cancel from our side.
-    // When a dedicated server endpoint exists, wire it up here.
-    window.location.href = 'mailto:support@scribefold.ai?subject=Cancel%20subscription&body=Please%20cancel%20my%20ScribeFold%20AI%20subscription.%20Include%20the%20email%20you%20used%20at%20checkout%20and%20last%204%20digits%20of%20your%20card.';
+    if (!user) {
+      setCancelStatusMsg('You need to be signed in to cancel your subscription from here.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Use this only if the Stripe portal login is not working for your email.\n\n' +
+      'This will attempt to cancel ALL active subscriptions associated with your email address.\n\n' +
+      'Are you sure you want to continue?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setCancelLoading(true);
+      setCancelStatusMsg('Contacting Stripe to cancel your subscriptions...');
+
+      const response = await fetch(`${API_BASE_URL}/api/stripe/cancel-all-subscriptions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authId: user.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to cancel subscriptions');
+      }
+
+      setCancelStatusMsg(`✓ ${data.message}`);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[HELP] Backup cancel error:', err);
+      setCancelStatusMsg(`✗ ${err.message}`);
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   return (
@@ -63,15 +101,20 @@ const HelpPage = () => {
           type="button"
           className="sf-secondary-btn sf-secondary-btn-neutral sf-help-cancel-btn"
           onClick={handleBackupCancel}
+          disabled={cancelLoading}
+          style={{
+            backgroundColor: '#dc3545',
+            borderColor: '#dc3545',
+            color: '#3b0202',
+          }}
         >
-          Cancel Subscription Here
+          {cancelLoading ? 'Canceling subscriptions...' : 'Cancel All Subscriptions Here'}
         </button>
-        <p className="sf-help-note">
-          When you click this, it opens an email to our support team. Please include the
-          email you used at checkout and any details that help us locate your Stripe
-          subscription (such as the last 4 digits of your card). We&apos;ll cancel the
-          subscription on our side if we can&apos;t resolve the portal login issue.
-        </p>
+        {cancelStatusMsg && (
+          <p className="sf-help-note" style={{ marginTop: '8px' }}>
+            {cancelStatusMsg}
+          </p>
+        )}
       </FoldSection>
 
       <FoldSection title="General questions">

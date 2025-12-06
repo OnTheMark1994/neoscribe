@@ -83,9 +83,15 @@ function TokenUsageLog({ anonId, authId }) {
     }
   };
 
-  // Filter logs based on checkbox
+  // Filter logic supporting both old and new schema
   const displayedLogs = onlyAdditions
-    ? logs.filter((entry) => Number(entry.tokens) > 0)
+    ? logs.filter((entry) => {
+        const monthlyDelta = Number(entry.tokens_monthly) || 0;
+        const addedDelta = Number(entry.tokens_added) || 0;
+        const legacyTokens = Number(entry.tokens) || 0;
+        const hasNewSchema = entry.tokens_monthly !== undefined || entry.tokens_added !== undefined;
+        return hasNewSchema ? (monthlyDelta > 0 || addedDelta > 0) : legacyTokens > 0;
+      })
     : logs;
 
   return (
@@ -133,8 +139,15 @@ function TokenUsageLog({ anonId, authId }) {
           {displayedLogs.length > 0 && (
             <div className="token-usage-log-list">
               {displayedLogs.map((entry) => {
-                const tokensValue = Number(entry.tokens) || 0;
-                const isPositive = tokensValue > 0;
+                // Support both old schema (tokens) and new schema (tokens_monthly, tokens_added)
+                const monthlyDelta = Number(entry.tokens_monthly) || 0;
+                const addedDelta = Number(entry.tokens_added) || 0;
+                // Fallback for old entries that only have 'tokens' field
+                const legacyTokens = Number(entry.tokens) || 0;
+                const hasNewSchema = entry.tokens_monthly !== undefined || entry.tokens_added !== undefined;
+                
+                // For filtering: consider positive if any delta is positive
+                const totalDelta = hasNewSchema ? (monthlyDelta + addedDelta) : legacyTokens;
 
                 return (
                   <div
@@ -154,15 +167,53 @@ function TokenUsageLog({ anonId, authId }) {
                         <span className="token-usage-log-id">ID: {entry.id}</span>
                       </div>
                     </div>
-                    <div
-                      className={`token-usage-log-tokens ${
-                        isPositive
-                          ? 'token-usage-log-tokens--positive'
-                          : 'token-usage-log-tokens--negative'
-                      }`}
-                    >
-                      {isPositive ? '+' : ''}
-                      {tokensValue.toLocaleString()}
+                    <div className="token-usage-log-tokens-container">
+                      {hasNewSchema ? (
+                        <>
+                          {monthlyDelta !== 0 && (
+                            <div
+                              className={`token-usage-log-tokens ${
+                                monthlyDelta > 0
+                                  ? 'token-usage-log-tokens--positive'
+                                  : 'token-usage-log-tokens--negative'
+                              }`}
+                              title="Monthly tokens"
+                            >
+                              <span className="token-usage-log-tokens-label">M:</span>
+                              {monthlyDelta > 0 ? '+' : ''}
+                              {monthlyDelta.toLocaleString()}
+                            </div>
+                          )}
+                          {addedDelta !== 0 && (
+                            <div
+                              className={`token-usage-log-tokens ${
+                                addedDelta > 0
+                                  ? 'token-usage-log-tokens--positive'
+                                  : 'token-usage-log-tokens--negative'
+                              }`}
+                              title="Added tokens"
+                            >
+                              <span className="token-usage-log-tokens-label">A:</span>
+                              {addedDelta > 0 ? '+' : ''}
+                              {addedDelta.toLocaleString()}
+                            </div>
+                          )}
+                          {monthlyDelta === 0 && addedDelta === 0 && (
+                            <div className="token-usage-log-tokens">0</div>
+                          )}
+                        </>
+                      ) : (
+                        <div
+                          className={`token-usage-log-tokens ${
+                            totalDelta > 0
+                              ? 'token-usage-log-tokens--positive'
+                              : 'token-usage-log-tokens--negative'
+                          }`}
+                        >
+                          {totalDelta > 0 ? '+' : ''}
+                          {totalDelta.toLocaleString()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

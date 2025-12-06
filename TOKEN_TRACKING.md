@@ -46,39 +46,112 @@ All fields live on the `users` table.
 
 ### 1.3 Token Log Table (Audit Trail)
 
-All token-changing operations write an audit row to the `token_log` table. This table is **append-only** and is used for debugging and historical analysis.
+All token-changing operations write an audit row to the `token_log` table via the unified `applyTokenChange()` function. This table is **append-only** and is used for debugging and historical analysis.
+
+#### Token Log Schema
 
 - `id`
   - Primary key.
 - `created_at`
   - Timestamp when the log row was created (DB default `now()`).
-- `tokens`
-  - `int8` signed value representing the **delta** applied to the user's balance.
-  - **Positive** for additions (bonuses, subscription refills, manual grants).
-  - **Negative** for deductions (per-request usage, dev burn, cancellations that zero monthly, etc.).
+- `tokens_monthly`
+  - `int8` signed value representing the **delta** applied to `tokens_monthly`.
+  - **Positive** for additions (subscription created, renewal top-ups).
+  - **Negative** for deductions (API usage that consumed monthly tokens).
+- `tokens_added`
+  - `int8` signed value representing the **delta** applied to `tokens_added`.
+  - **Positive** for additions (bonuses, one-time purchases).
+  - **Negative** for deductions (API usage that spilled over from monthly).
 - `user_id`
   - `text` – foreign key to `users.id` (the user row the change was applied to).
 - `note`
   - `text` – short human-readable description of what happened.
   - Examples:
     - `"New anon user initial tokens"`
-    - `"API usage (DeepSeek)"`
-    - `"Auth upgrade bonus"`
-    - `"Dev burn tokens"`
-    - `"Subscription created (tier basic)"`
+    - `"API usage"`
+    - `"Auth upgrade bonus (link anon → auth)"`
+    - `"Stripe subscription created"`
+    - `"Stripe subscription renewal"`
+
+#### Example Log Entries
+
+| tokens_monthly | tokens_added | note |
+|----------------|--------------|------|
+| 0 | +5000 | New anon user initial tokens |
+| 0 | +10000 | Auth upgrade bonus (link anon → auth) |
+| +500000 | 0 | Stripe subscription created |
+| -1200 | -800 | API usage |
+| +500000 | 0 | Stripe subscription renewal |
 
 The log is **best-effort**:
 
 - If logging fails, token updates must still succeed.
 - Token accounting remains authoritative on the `users` row; `token_log` is purely observational.
 
-### 1.4 Deprecated/Unused Fields
+### 1.4 Unified Token Change Function
+
+**All token modifications MUST go through the `applyTokenChange()` function in `server.js`.**
+
+This function:
+1. Fetches current user token state
+2. Calculates new values based on deltas or absolute values
+3. Updates the `users` table
+4. Writes an audit row to `token_log` with separate `tokens_monthly` and `tokens_added` deltas
+5. Returns the result
+
+```javascript
+async function applyTokenChange({
+  userId,
+  deltaMonthly = 0,       // Change to tokens_monthly (+/-)
+  deltaAdded = 0,         // Change to tokens_added (+/-)
+  note = null,            // Description for token_log
+  incrementUsageCounters = false,  // Increment tokens_used and tokens_used_all_time
+  resetTokensUsed = false,         // Reset tokens_used to 0 (for renewals)
+  setMonthlyAbsolute = null,       // Set tokens_monthly to this exact value
+  setAddedAbsolute = null,         // Set tokens_added to this exact value
+})
+```
+
+#### Usage Examples
+
+**API usage deduction (from updateUserTokens):**
+```javascript
+await applyTokenChange({
+  userId: user.id,
+  deltaMonthly: -1200,  // Used 1200 from monthly
+  deltaAdded: -800,     // Used 800 from added (overflow)
+  note: 'API usage',
+  incrementUsageCounters: true,
+});
+```
+
+**Subscription created:**
+```javascript
+await applyTokenChange({
+  userId: user.id,
+  setMonthlyAbsolute: 500000,  // Set to tier limit
+  resetTokensUsed: true,
+  note: 'Stripe subscription created',
+});
+```
+
+**Auth bonus grant:**
+```javascript
+await applyTokenChange({
+  userId: user.id,
+  deltaAdded: 10000,  // Add bonus tokens
+  note: 'Auth upgrade bonus (link anon → auth)',
+});
+```
+
+### 1.5 Deprecated/Unused Fields
 
 These columns remain in the DB for now but **must not be referenced** by new code:
 
 - `token_limit` (no longer used; tier JSON defines limits).
 - `reset_date` (legacy; unused).
 - `billing_cycle_day` (to be removed from DB; **must not** appear in code).
+- `tokens` in `token_log` (replaced by `tokens_monthly` and `tokens_added`).
 
 ---
 
