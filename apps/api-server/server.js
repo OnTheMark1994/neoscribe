@@ -661,6 +661,73 @@ app.get('/api/releases', async (req, res) => {
   }
 });
 
+/**
+ * Fetch token_log entries for a user.
+ * POST /api/user/token-log
+ * Body: { anonId, authId, limit?, offset? }
+ */
+app.post('/api/user/token-log', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    const { anonId, authId, limit, offset } = req.body || {};
+
+    if (!anonId && !authId) {
+      return res.status(400).json({ error: 'anonId or authId is required' });
+    }
+
+    const pageSize = Math.max(1, Math.min(Number(limit) || 50, 200));
+    const pageOffset = Math.max(0, Number(offset) || 0);
+
+    // Find user by authId (preferred) or anonId
+    let userQuery = supabase.from('users').select('id').limit(1);
+
+    if (authId) {
+      userQuery = userQuery.eq('auth_id', authId);
+    } else {
+      userQuery = userQuery.eq('anon_id', anonId);
+    }
+
+    const { data: users, error: userError } = await userQuery;
+
+    if (userError) {
+      console.error('[token-log] Error fetching user:', userError);
+      return res.status(500).json({ error: userError.message });
+    }
+
+    if (!users || users.length === 0) {
+      return res.json({ logs: [], hasMore: false });
+    }
+
+    const user = users[0];
+
+    // Fetch token_log rows
+    const { data: logs, error: logError } = await supabase
+      .from('token_log')
+      .select('*')
+      .eq('user_id', String(user.id))
+      .order('created_at', { ascending: false })
+      .range(pageOffset, pageOffset + pageSize - 1);
+
+    if (logError) {
+      console.error('[token-log] Error fetching logs:', logError);
+      return res.status(500).json({ error: logError.message });
+    }
+
+    const hasMore = logs && logs.length === pageSize;
+
+    return res.json({
+      logs: logs || [],
+      hasMore,
+    });
+  } catch (error) {
+    console.error('[token-log] Unexpected error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Login to existing auth account and link to anon user without bonus tokens
 app.post('/api/users/login', async (req, res) => {
   try {
