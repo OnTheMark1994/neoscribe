@@ -64,10 +64,10 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initial
           if (typeof data.availableTokens === 'number') {
             effectiveAvailable = data.availableTokens;
           } else {
-            const limit = data.tokenLimit ?? data.token_limit ?? 0;
-            const used = data.tokensUsed ?? data.tokens_used ?? 0;
+            // New formula: available = tokens_monthly + tokens_added
+            const monthly = data.tokensMonthly ?? data.tokens_monthly ?? 0;
             const added = data.tokensAdded ?? data.tokens_added ?? 0;
-            effectiveAvailable = limit - used + added;
+            effectiveAvailable = monthly + added;
           }
           console.log('[AI] Refresh updated availableTokens to:', effectiveAvailable, 'raw data:', data);
           setAvailableTokens(effectiveAvailable);
@@ -389,10 +389,10 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initial
             if (typeof tokenData.availableTokens === 'number') {
               setAvailableTokens(tokenData.availableTokens);
             } else {
-              const limit = tokenData.tokenLimit ?? tokenData.token_limit ?? 0;
-              const used = tokenData.tokensUsed ?? tokenData.tokens_used ?? 0;
+              // New formula: available = tokens_monthly + tokens_added
+              const monthly = tokenData.tokensMonthly ?? tokenData.tokens_monthly ?? 0;
               const added = tokenData.tokensAdded ?? tokenData.tokens_added ?? 0;
-              setAvailableTokens(limit - used + added);
+              setAvailableTokens(monthly + added);
             }
           }
         }

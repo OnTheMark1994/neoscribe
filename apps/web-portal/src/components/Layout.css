@@ -55,6 +55,22 @@
   color: #fbbf24;
 }
 
+.sf-nav-link-dev {
+  color: #a78bfa;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.sf-nav-link-dev:hover {
+  color: #c4b5fd;
+  opacity: 1;
+}
+
+.sf-nav-link-dev.active {
+  color: #a78bfa;
+  border-bottom-color: #a78bfa;
+}
+
 .sf-auth-menu {
   display: flex;
   align-items: center;

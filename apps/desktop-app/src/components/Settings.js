@@ -202,11 +202,13 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
   };
 
   const normalizedTokens = tokenStats;
-  const tokenLimit = normalizedTokens ? normalizedTokens.tokenLimit : null;
+  // New token tracking model fields
+  const tokensMonthly = normalizedTokens ? normalizedTokens.tokensMonthly : null;
   const tokensUsed = normalizedTokens ? normalizedTokens.tokensUsed : null;
   const tokensAdded = normalizedTokens ? normalizedTokens.tokensAdded : null;
   const tokensUsedAllTime = normalizedTokens ? normalizedTokens.tokensUsedAllTime : null;
-  const subscriptionType = normalizedTokens ? normalizedTokens.subscriptionType : null;
+  const availableTokens = normalizedTokens ? normalizedTokens.availableTokens : null;
+  const tierName = normalizedTokens ? normalizedTokens.tierName : null;
   const nextBillingDate = normalizedTokens ? normalizedTokens.nextBillingDate : null;
   const accountEmail = accountData && accountData.email ? accountData.email : '';
   const accountPassword = accountData && accountData.password ? accountData.password : '';
@@ -489,9 +491,9 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
               <span className="stat-value token-count">{tokenCount.toLocaleString()}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Monthly Allowance</span>
+              <span className="stat-label">Monthly Balance</span>
               <span className="stat-value">
-                {tokenLimit != null ? tokenLimit.toLocaleString() : 'Loading...'}
+                {tokensMonthly != null ? tokensMonthly.toLocaleString() : 'Loading...'}
               </span>
             </div>
             <div className="stat-item">
@@ -501,7 +503,7 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
               </span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Tokens Added This Month</span>
+              <span className="stat-label">Tokens Added</span>
               <span className="stat-value">
                 {tokensAdded != null ? tokensAdded.toLocaleString() : 'Loading...'}
               </span>
@@ -531,6 +533,7 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
               if (result && result.user) {
                 setAccountData(result.user);
                 const normalized = normalizeUserTokenData(result.user || {});
+                setTokenStats(normalized);
                 setTokenCount(normalized.availableTokens > 0 ? normalized.availableTokens : 0);
               } else {
                 loadAccountData();
@@ -547,7 +550,7 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
             }}
             initialEmail={accountEmail}
             initialPassword={accountPassword}
-            subscriptionType={subscriptionType}
+            subscriptionType={tierName}
             nextBillingDate={nextBillingDate}
           />
 

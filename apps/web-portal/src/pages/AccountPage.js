@@ -217,11 +217,11 @@ const AccountPage = () => {
   }, [user]);
 
   useEffect(() => {
-    if (stats && stats.subscription_type != null && Array.isArray(plans) && plans.length) {
+    if (stats && stats.tier_id != null && Array.isArray(plans) && plans.length) {
       const match = plans.find(
         (plan) =>
           plan.tier_id != null &&
-          Number(plan.tier_id) === Number(stats.subscription_type),
+          Number(plan.tier_id) === Number(stats.tier_id),
       );
       if (match) {
         setSelectedPlanId(match.id);
@@ -732,22 +732,22 @@ const AccountPage = () => {
                       return stats.availableTokens.toLocaleString();
                     }
 
-                    const tokenLimit = stats.tokenLimit ?? stats.token_limit ?? 0;
-                    const tokensUsed = stats.tokensUsed ?? stats.tokens_used ?? 0;
+                    // New formula: available = tokens_monthly + tokens_added
+                    const tokensMonthly = stats.tokensMonthly ?? stats.tokens_monthly ?? 0;
                     const tokensAdded = stats.tokensAdded ?? stats.tokens_added ?? 0;
-                    const remaining = Math.max(0, tokenLimit - tokensUsed + tokensAdded);
+                    const remaining = Math.max(0, tokensMonthly + tokensAdded);
                     return Number.isFinite(remaining) ? remaining.toLocaleString() : 'n/a';
                   })()}
             </span>
           </div>
           <div className="sf-stat-card">
-            <span className="sf-stat-label">Monthly Allowance</span>
+            <span className="sf-stat-label">Monthly Balance</span>
             <span className="sf-stat-value">
               {!stats
                 ? 'Loading...'
                 : (() => {
-                    const tokenLimit = stats.tokenLimit ?? stats.token_limit;
-                    return tokenLimit != null ? Number(tokenLimit).toLocaleString() : 'n/a';
+                    const tokensMonthly = stats.tokensMonthly ?? stats.tokens_monthly;
+                    return tokensMonthly != null ? Number(tokensMonthly).toLocaleString() : 'n/a';
                   })()}
             </span>
           </div>
@@ -810,9 +810,9 @@ const AccountPage = () => {
             const isSelected = plan.id === selectedPlanId;
             const isCurrentPlan =
               stats &&
-              stats.subscription_type != null &&
+              stats.tier_id != null &&
               plan.tier_id != null &&
-              Number(plan.tier_id) === Number(stats.subscription_type);
+              Number(plan.tier_id) === Number(stats.tier_id);
             return (
               <button
                 key={plan.id}
@@ -869,20 +869,20 @@ const AccountPage = () => {
               className="sf-primary-btn sf-plans-subscribe-btn"
               disabled={(
                 stats &&
-                stats.subscription_type != null &&
+                stats.tier_id != null &&
                 selectedPlan &&
                 selectedPlan.tier_id != null &&
-                Number(selectedPlan.tier_id) === Number(stats.subscription_type)
+                Number(selectedPlan.tier_id) === Number(stats.tier_id)
               ) || subscriptionLoading}
               onClick={handleSubscribeWithStripe}
             >
               {subscriptionLoading
                 ? 'Processing...'
                 : stats &&
-                    stats.subscription_type != null &&
+                    stats.tier_id != null &&
                     selectedPlan &&
                     selectedPlan.tier_id != null &&
-                    Number(selectedPlan.tier_id) === Number(stats.subscription_type)
+                    Number(selectedPlan.tier_id) === Number(stats.tier_id)
                   ? `You are currently subscribed to ${selectedPlan.name}`
                   : `Subscribe to ${selectedPlan.name}`}
             </button>

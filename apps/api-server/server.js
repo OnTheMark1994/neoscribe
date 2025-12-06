@@ -10,8 +10,16 @@ const PORT = process.env.PORT || 3000;
 
 // Token and messaging configuration
 const NEW_ANON_TOKENS = 15000;           // Tokens for anon users (default + bonus for new anon)
-const NEW_AUTH_TOKENS = 25000;                // Bonus tokens for brand new auth user
-const NEW_MONTHLY_TOKENS = 15000;                // Bonus tokens for brand new auth user
+const NEW_AUTH_TOKENS = 25000;           // Bonus tokens for brand new auth user (used on upgrade)
+const NEW_MONTHLY_TOKENS = 15000;        // Monthly refill amount for paid tiers
+
+// Auth account status messages (keep here so they stay in sync with token constants)
+const AUTH_CREATE_NEW_USER_MESSAGE =
+  `Created new auth account and user record; added ${NEW_ANON_TOKENS.toLocaleString()} bonus tokens.`;
+const AUTH_LINK_EXISTING_ANON_MESSAGE =
+  `Created new auth account and linked to existing anon user; added ${NEW_ANON_TOKENS.toLocaleString()} bonus tokens.`;
+const AUTH_REPEAT_ACCOUNT_MESSAGE =
+  'Created repeat auth account; added 0 bonus tokens because this anon ID already has an account.';
 
 const OUT_OF_TOKENS_MESSAGE_ANON = 'All tokens have been used! Click the button below or check File => settings => account to create an account for ' + NEW_AUTH_TOKENS + " tokens now, " + NEW_MONTHLY_TOKENS + " per month, and to view more options.";
 const OUT_OF_TOKENS_MESSAGE_AUTH = 'All tokens have been used! Click the button below or check File => settings => account to manage your account to see options for more tokens.';
@@ -289,9 +297,9 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
         const { data: updated } = await supabase
           .from('users')
           .update({ 
-            auth_id: authId,
-            token_limit: 2000000 // Upgrade to 2M monthly limit
-            // Keep tokens_added and tokens_used as-is (preserve bonus tokens and usage)
+            auth_id: authId
+            // Keep tokens_monthly, tokens_added and tokens_used as-is
+            // Monthly allowance is set via Stripe webhook when subscription is created
           })
           .eq('id', anonUser.id)
           .select()
@@ -308,7 +316,7 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
 
     // Create new user (no existing rows for this anon_id/auth_id combination)
     // console.log('  → Creating new user in database');
-    // New users: anon gets 0 limit + NEW_ANON_TOKENS bonus, auth gets 0 limit + NEW_AUTH_TOKENS (will be set on upgrade)
+    // New users: anon gets 0 monthly + NEW_ANON_TOKENS bonus, auth gets 0 monthly + NEW_AUTH_TOKENS (will be set on upgrade)
     const isNewAnon = !authId;
     const initialTokensAdded = isNewAnon ? NEW_ANON_TOKENS : NEW_AUTH_TOKENS;
     const { data: newUser, error: createError } = await supabase
@@ -316,11 +324,10 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
       .insert({
         anon_id: anonId,
         auth_id: authId || null,
-        token_limit: 0,              // No monthly limit initially
+        tokens_monthly: 0,           // No monthly allowance initially (set via Stripe webhook)
         tokens_used: 0,              // No tokens used yet
         tokens_added: initialTokensAdded,  // Bonus for anon vs auth defined by constants
-        tokens_used_all_time: 0,     // No lifetime usage yet
-        reset_date: new Date().toISOString()
+        tokens_used_all_time: 0      // No lifetime usage yet
       })
       .select()
       .single();
@@ -341,26 +348,26 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
 
 /**
  * Calculate available tokens for a user
- * Formula: (token_limit - tokens_used) + tokens_added
+ * NEW FORMULA: tokens_monthly + tokens_added
+ * - tokens_monthly: Current monthly allowance balance (decreases as used)
+ * - tokens_added: Long-lived carry-over bucket (bonuses, top-ups)
  * All fields are coerced to numbers to avoid string concatenation issues
  * when Supabase returns BIGINT / int8 as strings.
  * @param {Object} user - User object with token fields
  * @returns {number} - Available tokens
  */
 function calculateAvailableTokens(user) {
-  const tokenLimit = Number(user.token_limit) || 0;
-  const tokensUsed = Number(user.tokens_used) || 0;
+  const tokensMonthly = Number(user.tokens_monthly) || 0;
   const tokensAdded = Number(user.tokens_added) || 0;
 
-  const limitRemaining = tokenLimit - tokensUsed;
-  const available = limitRemaining + tokensAdded;
+  const available = tokensMonthly + tokensAdded;
   return Math.max(0, available); // Never negative
 }
 
 const DEFAULT_USER_TEMPLATE = {
   anon_id: null,
   auth_id: null,
-  token_limit: 0,
+  tokens_monthly: 0,
   tokens_used: 0,
   tokens_added: NEW_ANON_TOKENS,
   tokens_used_all_time: 0,
@@ -368,33 +375,33 @@ const DEFAULT_USER_TEMPLATE = {
 
 /**
  * Update user token usage
- * New system:
- * - token_limit: Monthly limit (0 for anon, 500k/2M for paid)
- * - tokens_used: Used this month (resets monthly)
- * - tokens_added: Bonus tokens (500k for new anon, never resets until used)
- * - tokens_used_all_time: Lifetime usage (never resets)
+ * NEW TOKEN TRACKING SYSTEM:
+ * - tokens_monthly: Current monthly allowance BALANCE (decreases as used)
+ * - tokens_used: Tokens used in current billing period (counter, resets monthly)
+ * - tokens_added: Long-lived bonus tokens (never reset by month)
+ * - tokens_used_all_time: Lifetime usage counter (never resets)
  * 
- * Logic:
- * 1. Check if (limit - used) > 0, if yes, deduct from monthly limit
- * 2. If monthly limit exhausted, deduct from tokens_added
- * 3. Allow query even with 1 token difference
- * 4. Only block if no tokens available at all
+ * DEDUCTION ORDER (per TOKEN_TRACKING.md Section 4.2):
+ * 1. Use monthly allowance first: tokens_monthly decreases
+ * 2. Then use from added: tokens_added decreases
+ * 3. tokens_used and tokens_used_all_time increment as counters
+ * 4. Allow request if totalAvailable > 0 (even if N > totalAvailable)
+ * 5. Never set balances below 0
  * 
  * @param {string} userId - User database ID
- * @param {number} tokensToUse - Number of tokens to use
+ * @param {number} tokensToUse - Number of tokens to use (N)
  * @returns {Promise<Object>} - { success, availableTokens, error }
  */
 async function updateUserTokens(userId, tokensToUse) {
   if (!supabase || !userId) return { success: false, error: 'No database connection' };
 
   try {
-    // console.log('[updateUserTokens] User ID:', userId);
-    // console.log('[updateUserTokens] Tokens to use:', tokensToUse);
+    const N = tokensToUse;
     
     // Get current user data
     const { data: user, error: fetchError } = await supabase
       .from('users')
-      .select('token_limit, tokens_used, tokens_added, tokens_used_all_time')
+      .select('tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
       .eq('id', userId)
       .single();
     
@@ -404,30 +411,17 @@ async function updateUserTokens(userId, tokensToUse) {
     }
     
     // Coerce all token fields to numbers in case Supabase returns strings for int8
-    const tokenLimit = Number(user.token_limit) || 0;
+    const monthly = Math.max(Number(user.tokens_monthly) || 0, 0);
+    const added = Math.max(Number(user.tokens_added) || 0, 0);
     const tokensUsed = Number(user.tokens_used) || 0;
-    const tokensAdded = Number(user.tokens_added) || 0;
     const tokensUsedAllTime = Number(user.tokens_used_all_time) || 0;
-
-    // console.log('[updateUserTokens] Current state:');
-    // console.log('  - token_limit:', tokenLimit);
-    // console.log('  - tokens_used:', tokensUsed);
-    // console.log('  - tokens_added:', tokensAdded);
-    // console.log('  - tokens_used_all_time:', tokensUsedAllTime);
     
-    // Calculate available tokens BEFORE applying this usage
-    const limitRemaining = tokenLimit - tokensUsed;
-    const available = calculateAvailableTokens({
-      token_limit: tokenLimit,
-      tokens_used: tokensUsed,
-      tokens_added: tokensAdded
-    });
+    // Calculate total available BEFORE this usage
+    const totalAvailable = monthly + added;
     
-    // console.log('  - limit_remaining:', limitRemaining);
-    // console.log('  - available_total:', available);
-    
-    // Check if user has ANY tokens (even 1 token allows the query)
-    if (available <= 0) {
+    // ELIGIBILITY CHECK (Section 4.1)
+    // Block if totalAvailable <= 0, allow even if N > totalAvailable
+    if (totalAvailable <= 0) {
       console.error('[updateUserTokens] No tokens available');
       return { 
         success: false, 
@@ -436,41 +430,29 @@ async function updateUserTokens(userId, tokensToUse) {
       };
     }
     
-    // Allow query even if not enough for full amount
-    // User gets response as long as they have at least 1 token
-    // console.log('[updateUserTokens] ✓ User has tokens, allowing query');
+    // DEDUCTION ORDER (Section 4.2)
+    // Step 1: Use monthly allowance first
+    const useFromMonthly = Math.min(N, monthly);
+    const remaining = N - useFromMonthly;
+    let newTokensMonthly = monthly - useFromMonthly;
     
-    // New logic:
-    // - Always increment tokens_used by tokensToUse (monthly usage counter)
-    // - Always increment tokens_used_all_time by tokensToUse (lifetime)
-    // - Only subtract from tokens_added for the portion of usage beyond token_limit
-
-    // Increment monthly and all-time usage
-    const newTokensUsed = tokensUsed + tokensToUse;
-    const newTokensUsedAllTime = tokensUsedAllTime + tokensToUse;
-
-    // Calculate how much of this new usage is beyond the monthly limit
-    const previousOverLimit = Math.max(0, tokensUsed - tokenLimit);
-    const newOverLimit = Math.max(0, newTokensUsed - tokenLimit);
-    const additionalOverLimit = newOverLimit - previousOverLimit;
-
-    let newTokensAdded = tokensAdded;
-
-    if (additionalOverLimit > 0 && newTokensAdded > 0) {
-      const fromBonus = Math.min(newTokensAdded, additionalOverLimit);
-      newTokensAdded -= fromBonus;
-      // console.log('[updateUserTokens] Deducted', fromBonus, 'from bonus tokens due to over-limit usage');
-    }
+    // Step 2: Then use from added
+    const useFromAdded = Math.min(remaining, added);
+    let newTokensAdded = added - useFromAdded;
     
-    // console.log('[updateUserTokens] New state:');
-    // console.log('  - tokens_used:', newTokensUsed);
-    // console.log('  - tokens_added:', newTokensAdded);
-    // console.log('  - tokens_used_all_time:', newTokensUsedAllTime);
+    // Step 3: No negative balances (safety)
+    newTokensMonthly = Math.max(0, newTokensMonthly);
+    newTokensAdded = Math.max(0, newTokensAdded);
+    
+    // Step 4: Usage counters (always increment by N)
+    const newTokensUsed = tokensUsed + N;
+    const newTokensUsedAllTime = tokensUsedAllTime + N;
     
     // Update database
     const { error: updateError } = await supabase
       .from('users')
       .update({
+        tokens_monthly: newTokensMonthly,
         tokens_used: newTokensUsed,
         tokens_added: newTokensAdded,
         tokens_used_all_time: newTokensUsedAllTime
@@ -483,14 +465,9 @@ async function updateUserTokens(userId, tokensToUse) {
     }
     
     // Calculate new available tokens
-    const newAvailable = calculateAvailableTokens({
-      token_limit: tokenLimit,
-      tokens_used: newTokensUsed,
-      tokens_added: newTokensAdded
-    });
+    const newAvailable = newTokensMonthly + newTokensAdded;
     
-    // console.log('[updateUserTokens] ✓ Tokens updated successfully');
-    // console.log('[updateUserTokens] Available after deduction:', newAvailable);
+    console.log(`[updateUserTokens] Deducted ${N} tokens: monthly ${monthly}->${newTokensMonthly}, added ${added}->${newTokensAdded}, available ${totalAvailable}->${newAvailable}`);
     
     return {
       success: true,
@@ -696,17 +673,15 @@ app.post('/api/users/login', async (req, res) => {
 
     if (!existingUsers || existingUsers.length === 0) {
       // No existing anon row: create a user row with no bonus tokens
-      const now = new Date().toISOString();
       const { data: inserted, error: insertError } = await supabase
         .from('users')
         .insert({
           anon_id: anonId,
           auth_id: authId,
-          token_limit: 0,
+          tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: 0,
-          tokens_used_all_time: 0,
-          reset_date: now
+          tokens_used_all_time: 0
         })
         .select()
         .single();
@@ -748,7 +723,6 @@ app.post('/api/users/login', async (req, res) => {
       message = 'Logged in and linked to existing anon user; no bonus tokens awarded on login.';
     } else {
       // Multiple rows or at least one already has auth_id, create a new row with no bonus tokens
-      const now = new Date().toISOString();
       const { data: repeatUser, error: repeatError } = await supabase
         .from('users')
         .insert({
@@ -756,11 +730,10 @@ app.post('/api/users/login', async (req, res) => {
           auth_id: authId,
           email,
           password,
-          token_limit: 0,
+          tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: 0,
-          tokens_used_all_time: 0,
-          reset_date: now
+          tokens_used_all_time: 0
         })
         .select()
         .single();
@@ -860,7 +833,6 @@ app.post('/api/users/create-account', async (req, res) => {
 
     if (!existingUsers || existingUsers.length === 0) {
       // No existing anon row: treat as new account with bonus
-      const now = new Date().toISOString();
       const { data: inserted, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -868,11 +840,10 @@ app.post('/api/users/create-account', async (req, res) => {
           auth_id: authId,
           email,
           password,
-          token_limit: 0,
+          tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: BONUS_TOKENS,
-          tokens_used_all_time: 0,
-          reset_date: now
+          tokens_used_all_time: 0
         })
         .select()
         .single();
@@ -887,7 +858,7 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = inserted;
-      message = 'Created new auth account and user record; added 500,000 bonus tokens.';
+      message = AUTH_CREATE_NEW_USER_MESSAGE;
     } else if (existingUsers.length === 1 && !existingUsers[0].auth_id) {
       // Single anon row without auth_id: link and add bonus tokens
       const row = existingUsers[0];
@@ -916,21 +887,19 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = updated;
-      message = 'Created new auth account and linked to existing anon user; added 500,000 bonus tokens.';
+      message = AUTH_LINK_EXISTING_ANON_MESSAGE;
     } else {
       // Multiple rows with this anon_id or at least one already has auth_id
       // Treat as repeat account: create a fresh row with 0 new tokens
-      const now = new Date().toISOString();
       const { data: repeatUser, error: repeatError } = await supabase
         .from('users')
         .insert({
           anon_id: anonId,
           auth_id: authId,
-          token_limit: 0,
+          tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: 0,
-          tokens_used_all_time: 0,
-          reset_date: now
+          tokens_used_all_time: 0
         })
         .select()
         .single();
@@ -945,7 +914,7 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = repeatUser;
-      message = 'Created repeat auth account; added 0 bonus tokens because this anon ID already has an account.';
+      message = AUTH_REPEAT_ACCOUNT_MESSAGE;
     }
 
     // console.log('✓ Create-account completed:', message);
@@ -1042,7 +1011,7 @@ app.post('/api/deepseek/query', async (req, res) => {
             input: inputTokens,
             output: 0,
             total: inputTokens,
-            tokenLimit: user.token_limit || 0,
+            tokensMonthly: user.tokens_monthly || 0,
             tokensUsed: user.tokens_used || 0,
             tokensAdded: user.tokens_added || 0,
             tokensUsedAllTime: user.tokens_used_all_time || 0,
@@ -1132,13 +1101,13 @@ app.post('/api/deepseek/query', async (req, res) => {
       // Fetch complete user token data for response
       const { data: currentUser } = await supabase
         .from('users')
-        .select('token_limit, tokens_used, tokens_added, tokens_used_all_time')
+        .select('tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
         .eq('id', user.id)
         .single();
       
       userTokenData = currentUser;
       console.log('✓ User token state:');
-      console.log('  - token_limit:', currentUser?.token_limit);
+      console.log('  - tokens_monthly:', currentUser?.tokens_monthly);
       console.log('  - tokens_used:', currentUser?.tokens_used);
       console.log('  - tokens_added:', currentUser?.tokens_added);
       console.log('  - tokens_used_all_time:', currentUser?.tokens_used_all_time);
@@ -1170,7 +1139,7 @@ app.post('/api/deepseek/query', async (req, res) => {
         output: responseTokens,
         total: totalTokens,
         // New token system fields
-        tokenLimit: userTokenData?.token_limit || 0,
+        tokensMonthly: userTokenData?.tokens_monthly || 0,
         tokensUsed: userTokenData?.tokens_used || 0,
         tokensAdded: userTokenData?.tokens_added || 0,
         tokensUsedAllTime: userTokenData?.tokens_used_all_time || 0,
@@ -1245,7 +1214,7 @@ app.post('/api/user/initialize', async (req, res) => {
     // Fetch updated user data with new token fields
     const { data: updatedUser, error } = await supabase
       .from('users')
-      .select('id, auth_id, token_limit, tokens_used, tokens_added, tokens_used_all_time, reset_date')
+      .select('id, auth_id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
       .eq('id', user.id)
       .single();
 
@@ -1261,24 +1230,22 @@ app.post('/api/user/initialize', async (req, res) => {
     const availableTokens = calculateAvailableTokens(updatedUser);
 
     console.log('✓ User data retrieved');
-    console.log('  - Token Limit:', updatedUser.token_limit);
+    console.log('  - Tokens Monthly:', updatedUser.tokens_monthly);
     console.log('  - Tokens Used:', updatedUser.tokens_used);
     console.log('  - Tokens Added:', updatedUser.tokens_added);
     console.log('  - Tokens Used All Time:', updatedUser.tokens_used_all_time);
     console.log('  - Available:', availableTokens);
-    console.log('  - Last Reset:', updatedUser.reset_date);
     console.log('===============================\n');
 
     res.json({
       success: true,
       userId: updatedUser.id,
-      tokenLimit: updatedUser.token_limit || 0,
+      tokensMonthly: updatedUser.tokens_monthly || 0,
       tokensUsed: updatedUser.tokens_used || 0,
       tokensAdded: updatedUser.tokens_added || 0,
       tokensUsedAllTime: updatedUser.tokens_used_all_time || 0,
       availableTokens: availableTokens,
-      isAnonymous: !updatedUser.auth_id,
-      lastReset: updatedUser.reset_date
+      isAnonymous: !updatedUser.auth_id
     });
 
   } catch (error) {
@@ -1310,7 +1277,7 @@ app.post('/api/user/tokens/', async (req, res) => {
     // Find user(s) by anon_id or auth_id (do NOT use .single() so multiples don't throw)
     let query = supabase
       .from('users')
-      .select('token_limit, tokens_used, tokens_added, tokens_used_all_time, subscription_type, stripe_subscription_id, subscription_status, stripe_customer_id, email, next_billing_date');
+      .select('tokens_monthly, tokens_used, tokens_added, tokens_used_all_time, tier_id, stripe_subscription_id, subscription_status, stripe_customer_id, email, next_billing_date');
 
     if (authId) {
       // console.log('[/api/user/tokens] Querying by auth_id:', authId);
@@ -1337,41 +1304,35 @@ app.post('/api/user/tokens/', async (req, res) => {
     const user = users[0];
     // console.log('[/api/user/tokens] User data from DB:');
     // console.log('[/api/user/tokens]   - email:', user.email);
-    // console.log('[/api/user/tokens]   - subscription_type:', user.subscription_type);
+    // console.log('[/api/user/tokens]   - tier_id:', user.tier_id);
     // console.log('[/api/user/tokens]   - subscription_status:', user.subscription_status);
     // console.log('[/api/user/tokens]   - stripe_subscription_id:', user.stripe_subscription_id);
     // console.log('[/api/user/tokens]   - stripe_customer_id:', user.stripe_customer_id);
-    // console.log('[/api/user/tokens]   - token_limit:', user.token_limit);
+    // console.log('[/api/user/tokens]   - tokens_monthly:', user.tokens_monthly);
     // console.log('[/api/user/tokens]   - tokens_used:', user.tokens_used);
     // console.log('[/api/user/tokens]   - tokens_added:', user.tokens_added);
 
-    // Note: Monthly reset would be handled by a cron job or database trigger
-
-    // Use the stored token_limit directly - it's set by webhooks based on subscription changes
-    // This allows downgrades to keep higher token access until the next billing period
-    const effectiveTokenLimit = Number(user.token_limit) || 0;
-
-    const userForCalc = {
-      ...user,
-      token_limit: effectiveTokenLimit
-    };
-
-    // Calculate available tokens
-    const availableTokens = calculateAvailableTokens(userForCalc);
+    // Calculate available tokens using new model
+    const tokensMonthly = Number(user.tokens_monthly) || 0;
+    const tokensAdded = Number(user.tokens_added) || 0;
+    const availableTokens = tokensMonthly + tokensAdded;
     
-    // Get tier name for display - subscription_type now stores tier_id (1-4)
-    const tierId = Number(user.subscription_type) || null;
+    // Get tier name for display - tier_id stores numeric ID (1-4)
+    const tierId = Number(user.tier_id) || null;
     const tierData = tierId ? getTierById(tierId) : null;
     const tierName = tierData?.title || null;
 
     const responseData = {
       availableTokens: availableTokens,
-      tokenLimit: effectiveTokenLimit,
-      token_limit: effectiveTokenLimit,
+      tokens_monthly: tokensMonthly,
+      tokensMonthly: tokensMonthly,
       tokens_used: user.tokens_used || 0,
-      tokens_added: user.tokens_added || 0,
+      tokensUsed: user.tokens_used || 0,
+      tokens_added: tokensAdded,
+      tokensAdded: tokensAdded,
       tokens_used_all_time: user.tokens_used_all_time || 0,
-      subscription_type: user.subscription_type || null, // tier_id (1-4)
+      tokensUsedAllTime: user.tokens_used_all_time || 0,
+      tier_id: tierId,
       subscription_tier_id: tierId, // Explicit tier_id field
       subscription_tier_name: tierName, // Display name (e.g., 'Light', 'Basic', 'Standard', 'Heavy')
       stripe_subscription_id: user.stripe_subscription_id || null,
@@ -1394,8 +1355,7 @@ app.post('/api/user/tokens/', async (req, res) => {
 
 // Update user subscription tier by authId and return updated token info
 // NOTE: This is a legacy/dev endpoint and does NOT create real Stripe subscriptions.
-// It now stores the numeric tier_id (1-4) in subscription_type to stay consistent
-// with webhook and sync handlers.
+// It stores the numeric tier_id (1-4) in tier_id column.
 app.post('/api/user/subscription', async (req, res) => {
   try {
     const { authId, subscriptionType } = req.body || {};
@@ -1440,7 +1400,7 @@ app.post('/api/user/subscription', async (req, res) => {
 
     const { error: updateError } = await supabase
       .from('users')
-      .update({ subscription_type: tierId })
+      .update({ tier_id: tierId })
       .eq('auth_id', authId);
 
     if (updateError) {
@@ -1454,7 +1414,7 @@ app.post('/api/user/subscription', async (req, res) => {
     // Re-query user and compute updated token info (same shape as /api/user/tokens/)
     const { data: users, error } = await supabase
       .from('users')
-      .select('token_limit, tokens_used, tokens_added, tokens_used_all_time, subscription_type')
+      .select('tokens_monthly, tokens_used, tokens_added, tokens_used_all_time, tier_id')
       .eq('auth_id', authId);
 
     if (error || !users || users.length === 0) {
@@ -1466,19 +1426,19 @@ app.post('/api/user/subscription', async (req, res) => {
 
     const user = users[0];
 
-    // Use stored token_limit directly
-    const effectiveTokenLimit = Number(user.token_limit) || 0;
-    const userForCalc = { ...user, token_limit: effectiveTokenLimit };
-    const availableTokens = calculateAvailableTokens(userForCalc);
+    // Calculate available tokens using new model
+    const tokensMonthly = Number(user.tokens_monthly) || 0;
+    const tokensAdded = Number(user.tokens_added) || 0;
+    const availableTokens = tokensMonthly + tokensAdded;
 
     return res.json({
       availableTokens,
-      tokenLimit: effectiveTokenLimit,
-      token_limit: effectiveTokenLimit,
+      tokens_monthly: tokensMonthly,
+      tokensMonthly: tokensMonthly,
       tokens_used: user.tokens_used || 0,
-      tokens_added: user.tokens_added || 0,
+      tokens_added: tokensAdded,
       tokens_used_all_time: user.tokens_used_all_time || 0,
-      subscription_type: user.subscription_type || null
+      tier_id: user.tier_id || null
     });
   } catch (error) {
     console.error('Error in /api/user/subscription:', error);
@@ -1490,6 +1450,7 @@ app.post('/api/user/subscription', async (req, res) => {
 });
 
 // Add one-time tokens for a user by authId and return updated token info
+// Per TOKEN_TRACKING.md: One-time purchases/bonuses go to tokens_added, NOT tokens_monthly
 app.post('/api/user/add-tokens', async (req, res) => {
   try {
     const { authId, tokensToAdd } = req.body || {};
@@ -1508,7 +1469,7 @@ app.post('/api/user/add-tokens', async (req, res) => {
 
     const { data: users, error: fetchError } = await supabase
       .from('users')
-      .select('id, token_limit, tokens_used, tokens_added, tokens_used_all_time, subscription_type')
+      .select('id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time, tier_id')
       .eq('auth_id', authId);
 
     if (fetchError || !users || users.length === 0) {
@@ -1535,25 +1496,18 @@ app.post('/api/user/add-tokens', async (req, res) => {
       });
     }
 
-    // Recompute token info with updated tokens_added
-    const updatedUser = {
-      ...user,
-      tokens_added: newTokensAdded
-    };
-
-    // Use stored token_limit directly
-    const effectiveTokenLimit = Number(updatedUser.token_limit) || 0;
-    const userForCalc = { ...updatedUser, token_limit: effectiveTokenLimit };
-    const availableTokens = calculateAvailableTokens(userForCalc);
+    // Calculate available tokens using new model
+    const tokensMonthly = Number(user.tokens_monthly) || 0;
+    const availableTokens = tokensMonthly + newTokensAdded;
 
     return res.json({
       availableTokens,
-      tokenLimit: effectiveTokenLimit,
-      token_limit: effectiveTokenLimit,
-      tokens_used: updatedUser.tokens_used || 0,
-      tokens_added: updatedUser.tokens_added || 0,
-      tokens_used_all_time: updatedUser.tokens_used_all_time || 0,
-      subscription_type: updatedUser.subscription_type || null
+      tokens_monthly: tokensMonthly,
+      tokensMonthly: tokensMonthly,
+      tokens_used: user.tokens_used || 0,
+      tokens_added: newTokensAdded,
+      tokens_used_all_time: user.tokens_used_all_time || 0,
+      tier_id: user.tier_id || null
     });
   } catch (error) {
     console.error('Error in /api/user/add-tokens:', error);
@@ -1929,7 +1883,7 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
   console.log('[handleSubscriptionUpdate] Looking up user by stripe_customer_id:', customerId);
   const { data: usersByCustomer, error: customerError } = await supabase
     .from('users')
-    .select('id, auth_id, email, tokens_used, token_limit, stripe_customer_id, subscription_type')
+    .select('id, auth_id, email, tokens_used, tokens_monthly, stripe_customer_id, tier_id')
     .eq('stripe_customer_id', customerId);
 
   if (customerError) {
@@ -1947,7 +1901,7 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
     console.log('[handleSubscriptionUpdate] Looking up user by auth_id:', metadata.authId);
     const { data: usersByAuth, error: authError } = await supabase
       .from('users')
-      .select('id, auth_id, email, tokens_used, token_limit, stripe_customer_id, subscription_type')
+      .select('id, auth_id, email, tokens_used, tokens_monthly, stripe_customer_id, tier_id')
       .eq('auth_id', metadata.authId);
 
     if (authError) {
@@ -1966,7 +1920,7 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
     console.log('[handleSubscriptionUpdate] Looking up user by email:', metadata.customerEmail);
     const { data: usersByEmail, error: emailError } = await supabase
       .from('users')
-      .select('id, auth_id, email, tokens_used, token_limit, stripe_customer_id, subscription_type')
+      .select('id, auth_id, email, tokens_used, tokens_monthly, stripe_customer_id, tier_id')
       .eq('email', metadata.customerEmail);
 
     if (emailError) {
@@ -1990,7 +1944,7 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
       if (customer.email) {
         const { data: usersByStripeEmail, error: stripeEmailError } = await supabase
           .from('users')
-          .select('id, auth_id, email, tokens_used, token_limit, stripe_customer_id, subscription_type')
+          .select('id, auth_id, email, tokens_used, tokens_monthly, stripe_customer_id, tier_id')
           .eq('email', customer.email);
 
         if (!stripeEmailError && usersByStripeEmail && usersByStripeEmail.length > 0) {
@@ -2025,10 +1979,10 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
   console.log('  - Billing cycle day:', billingCycleDay);
 
   // Determine if this is an upgrade, downgrade, or same tier using tier_id (1-4)
-  const currentTierId = Number(user.subscription_type) || null; // subscription_type now stores tier_id
+  const currentTierId = Number(user.tier_id) || null;
   const newTierId = tierIdFromStripe;
   
-  // Get tier data for logging and token_limit lookup
+  // Get tier data for logging and tokens_monthly lookup
   const currentTierData = currentTierId ? getTierById(currentTierId) : null;
   const newTierData = getTierById(newTierId);
   
@@ -2049,57 +2003,56 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
   console.log('  - Cancel at period end:', cancelAtPeriodEnd);
 
   // Update user subscription data
-  // Store tier_id (1-4) in subscription_type column
-  // Only update token_limit on upgrade or new subscription
-  // For downgrades, keep current token_limit until next billing period
+  // Per TOKEN_TRACKING.md:
+  // - NEW SUBSCRIPTION: tokens_monthly = max(current, tierLimit), tokens_used = 0
+  // - UPGRADE: tokens_monthly = max(current, newTierLimit) - user paid extra
+  // - DOWNGRADE: Don't reduce tokens_monthly until renewal
+  // - SAME TIER: Don't touch tokens_monthly
   const updateData = {
     stripe_customer_id: customerId,
     stripe_subscription_id: stripeSubscriptionId,
-    subscription_type: newTierId, // Store tier_id (1-4) not tier name
+    tier_id: newTierId,
     subscription_status: status,
-    billing_cycle_day: billingCycleDay,
     subscription_end_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null,
     next_billing_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null
   };
 
-  // Get current user's token_limit from DB
-  const currentTokenLimit = Number(user.token_limit) || 0;
+  // Get current user's tokens_monthly from DB
+  const currentTokensMonthly = Number(user.tokens_monthly) || 0;
 
-  // Handle token_limit changes based on upgrade vs downgrade
-  // - NEW SUBSCRIPTION: Set token_limit to new tier's allowance
-  // - UPGRADE: Immediately increase token_limit (user paid extra)
-  // - DOWNGRADE: Keep current token_limit until renewal (user paid for this month)
-  // - SAME TIER: Don't touch token_limit
+  // Handle tokens_monthly changes based on upgrade vs downgrade
+  // Per TOKEN_TRACKING.md Section 3:
+  // - NEW SUBSCRIPTION: tokens_monthly = max(currentMonthly, tierLimit), tokens_used = 0
+  // - RENEWAL: tokens_monthly = max(tokens_monthly, tierLimit) - never reduced by renewal
+  // - UPGRADE: Immediately set tokens_monthly = max(current, newAllowance)
+  // - DOWNGRADE: Keep current tokens_monthly until next billing
   if (currentTierId === null) {
-    // New subscription - set token_limit immediately
-    updateData.token_limit = newAllowance;
+    // New subscription - set tokens_monthly to max(current, tierLimit)
+    updateData.tokens_monthly = Math.max(currentTokensMonthly, newAllowance);
     updateData.tokens_used = 0;
-    updateData.reset_date = new Date().toISOString();
-    console.log('[handleSubscriptionUpdate] New subscription - setting token_limit to:', newAllowance);
+    console.log('[handleSubscriptionUpdate] New subscription - setting tokens_monthly to:', updateData.tokens_monthly);
   } else if (isUpgrade) {
-    // Upgrade - increase token_limit immediately (Stripe charges prorated difference)
-    updateData.token_limit = newAllowance;
-    console.log('[handleSubscriptionUpdate] Upgrade - immediately updating token_limit to:', newAllowance);
+    // Upgrade - set tokens_monthly to max(current, newAllowance)
+    updateData.tokens_monthly = Math.max(currentTokensMonthly, newAllowance);
+    console.log('[handleSubscriptionUpdate] Upgrade - updating tokens_monthly to:', updateData.tokens_monthly);
   } else if (isDowngrade) {
-    // Downgrade - keep current token_limit until next billing
-    // When invoice.payment_succeeded fires, it will have the new price ID
-    // and we'll set token_limit based on what they were actually billed for
-    // Don't change token_limit - user keeps their paid tokens until period ends
-    console.log('[handleSubscriptionUpdate] Downgrade - keeping token_limit at:', currentTokenLimit);
-    console.log('[handleSubscriptionUpdate] Token limit will update when next invoice is paid');
+    // Downgrade - keep current tokens_monthly until next billing
+    // When invoice.payment_succeeded fires, renewal logic will apply
+    console.log('[handleSubscriptionUpdate] Downgrade - keeping tokens_monthly at:', currentTokensMonthly);
+    console.log('[handleSubscriptionUpdate] tokens_monthly will update at renewal via max(current, newTierLimit)');
   } else if (isSameTier) {
-    // Same tier - don't change token_limit, just update other subscription data
-    console.log('[handleSubscriptionUpdate] Same tier - keeping token_limit at:', currentTokenLimit);
+    // Same tier - don't change tokens_monthly
+    console.log('[handleSubscriptionUpdate] Same tier - keeping tokens_monthly at:', currentTokensMonthly);
   } else {
     // This should never happen with tier_id comparison, but log it for safety
     console.warn('[handleSubscriptionUpdate] WARNING: Unexpected tier comparison state');
     console.warn('[handleSubscriptionUpdate] Current:', currentTierId, 'New:', newTierId);
   }
 
-  console.log('[handleSubscriptionUpdate] Token limit behavior:');
-  console.log('  - Current token_limit in DB:', currentTokenLimit);
+  console.log('[handleSubscriptionUpdate] Token behavior:');
+  console.log('  - Current tokens_monthly in DB:', currentTokensMonthly);
   console.log('  - New tier allowance:', newAllowance);
-  console.log('  - Will set token_limit to:', updateData.token_limit ?? '(unchanged)');
+  console.log('  - Will set tokens_monthly to:', updateData.tokens_monthly ?? '(unchanged)');
 
   console.log('[handleSubscriptionUpdate] Update data:', JSON.stringify(updateData, null, 2));
 
@@ -2123,6 +2076,9 @@ async function handleSubscriptionUpdate(subscription, metadata = {}) {
  * Helper: Handle subscription cancellation
  * This is called when subscription.deleted fires - meaning the subscription has ACTUALLY ended
  * (either immediate cancel or cancel_at_period_end has reached its end date)
+ * 
+ * Per TOKEN_TRACKING.md: Keep remaining tokens_monthly until spent, then only use tokens_added
+ * For now, we set tokens_monthly to 0 on cancel (exact behavior can be refined later)
  */
 async function handleSubscriptionCancellation(subscription) {
   if (!supabase) return;
@@ -2136,7 +2092,7 @@ async function handleSubscriptionCancellation(subscription) {
   // Find user by Stripe customer ID or subscription ID
   const { data: users, error: findError } = await supabase
     .from('users')
-    .select('id, subscription_type')
+    .select('id, tier_id, tokens_monthly')
     .or(`stripe_customer_id.eq.${customerId},stripe_subscription_id.eq.${stripeSubscriptionId}`);
 
   if (findError || !users || users.length === 0) {
@@ -2145,21 +2101,21 @@ async function handleSubscriptionCancellation(subscription) {
   }
 
   const user = users[0];
-  console.log('[handleSubscriptionCancellation] User had tier:', user.subscription_type);
+  console.log('[handleSubscriptionCancellation] User had tier_id:', user.tier_id);
+  console.log('[handleSubscriptionCancellation] User had tokens_monthly:', user.tokens_monthly);
 
   // Subscription has actually ended - now remove access
-  // This happens either:
-  // 1. Immediate cancellation (rare - we configure portal for cancel_at_period_end)
-  // 2. cancel_at_period_end reached its end date
+  // Per TOKEN_TRACKING.md: On cancel, we zero out tokens_monthly (they lose monthly allowance)
+  // tokens_added remains intact for use
   const { error: updateError } = await supabase
     .from('users')
     .update({
-      subscription_type: null,
+      tier_id: null,
       subscription_status: 'canceled',
       stripe_subscription_id: null,
       subscription_end_date: null,
       next_billing_date: null,
-      token_limit: 0 // Remove monthly token allowance
+      tokens_monthly: 0 // Remove monthly token allowance
     })
     .eq('id', user.id);
 
@@ -2172,7 +2128,11 @@ async function handleSubscriptionCancellation(subscription) {
 
 /**
  * Helper: Handle subscription renewal (monthly payment)
- * This is where downgrades take effect - when the new billing period starts
+ * Per TOKEN_TRACKING.md Section 5:
+ * - tokens_used = 0 (reset monthly usage counter)
+ * - tokens_monthly = max(tokens_monthly, tierLimit) (never reduce, only top-up)
+ * - tokens_added unchanged
+ * - tokens_used_all_time unchanged
  */
 async function handleSubscriptionRenewal(subscription) {
   if (!supabase) return;
@@ -2194,12 +2154,13 @@ async function handleSubscriptionRenewal(subscription) {
   }
   
   const newTierData = getTierById(newTierId);
-  console.log('[handleSubscriptionRenewal] New billing period tier_id:', newTierId, newTierData?.title || 'unknown');
+  const tierLimit = newTierData?.monthly_allowance || 0;
+  console.log('[handleSubscriptionRenewal] Renewal tier_id:', newTierId, newTierData?.title || 'unknown', 'tierLimit:', tierLimit);
 
   // Find user by Stripe customer ID
   const { data: users, error: findError } = await supabase
     .from('users')
-    .select('id, subscription_type, token_limit')
+    .select('id, tier_id, tokens_monthly')
     .eq('stripe_customer_id', customerId);
 
   if (findError || !users || users.length === 0) {
@@ -2208,29 +2169,28 @@ async function handleSubscriptionRenewal(subscription) {
   }
 
   const user = users[0];
-  const currentTierId = Number(user.subscription_type) || null;
-  const currentTierData = currentTierId ? getTierById(currentTierId) : null;
+  const currentTierId = Number(user.tier_id) || null;
+  const currentTokensMonthly = Number(user.tokens_monthly) || 0;
   
-  console.log('[handleSubscriptionRenewal] Current DB tier_id:', currentTierId, currentTierData?.title || 'none');
-  console.log('[handleSubscriptionRenewal] Current DB token_limit:', user.token_limit);
+  console.log('[handleSubscriptionRenewal] Current DB tier_id:', currentTierId);
+  console.log('[handleSubscriptionRenewal] Current DB tokens_monthly:', currentTokensMonthly);
 
   // Calculate next billing date from subscription
   const periodEndTs = getSubscriptionCurrentPeriodEndTimestamp(subscription);
   const currentPeriodEnd = periodEndTs ? new Date(periodEndTs * 1000) : null;
 
-  // The price ID in the webhook tells us exactly which tier they were billed for
-  // This is the source of truth - set token_limit to match
-  const newTokenLimit = newTierData?.monthly_allowance || 0;
+  // Per TOKEN_TRACKING.md Section 5:
+  // tokens_monthly = max(tokens_monthly, tierLimit) - never reduce, only top-up
+  const newTokensMonthly = Math.max(currentTokensMonthly, tierLimit);
 
-  console.log('[handleSubscriptionRenewal] Billed tier_id from Stripe:', newTierId, newTierData?.title || 'unknown');
-  console.log('[handleSubscriptionRenewal] New token_limit:', newTokenLimit);
+  console.log('[handleSubscriptionRenewal] Tier limit from Stripe:', tierLimit);
+  console.log('[handleSubscriptionRenewal] New tokens_monthly (max of current and tierLimit):', newTokensMonthly);
 
-  // Build update data - reset tokens and set token_limit to match what they were billed for
+  // Build update data
   const updateData = {
-    tokens_used: 0,
-    token_limit: newTokenLimit,
-    subscription_type: newTierId, // Store tier_id (1-4)
-    reset_date: new Date().toISOString(),
+    tokens_used: 0, // Reset monthly usage counter
+    tokens_monthly: newTokensMonthly,
+    tier_id: newTierId,
     next_billing_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null
   };
 
@@ -2244,9 +2204,8 @@ async function handleSubscriptionRenewal(subscription) {
     console.error('[handleSubscriptionRenewal] Failed to reset tokens:', updateError);
   } else {
     console.log('[handleSubscriptionRenewal] Monthly tokens reset successfully');
-    if (updateData.subscription_type) {
-      console.log('[handleSubscriptionRenewal] Tier updated to:', updateData.subscription_type);
-    }
+    console.log('[handleSubscriptionRenewal] tokens_monthly:', currentTokensMonthly, '->', newTokensMonthly);
+    console.log('[handleSubscriptionRenewal] tokens_used: reset to 0');
   }
 }
 
@@ -2316,7 +2275,7 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
     // Get user's subscription data
     const { data: users, error: userError } = await supabase
       .from('users')
-      .select('subscription_type, subscription_status, stripe_subscription_id, subscription_end_date, billing_cycle_day, next_billing_date')
+      .select('tier_id, subscription_status, stripe_subscription_id, subscription_end_date, next_billing_date')
       .eq('auth_id', authId);
 
     if (userError || !users || users.length === 0) {
@@ -2324,13 +2283,15 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
     }
 
     const user = users[0];
+    const tierId = Number(user.tier_id) || null;
+    const tierData = tierId ? getTierById(tierId) : null;
 
     res.json({
-      subscriptionType: user.subscription_type,
+      tier_id: tierId,
+      tierName: tierData?.title || null,
       subscriptionStatus: user.subscription_status,
       stripeSubscriptionId: user.stripe_subscription_id,
       subscriptionEndDate: user.subscription_end_date,
-      billingCycleDay: user.billing_cycle_day,
       nextBillingDate: user.next_billing_date,
       hasActiveSubscription: user.subscription_status === 'active' && user.stripe_subscription_id
     });
@@ -2520,39 +2481,46 @@ app.post('/api/stripe/sync', async (req, res) => {
       const billingStartDate = periodStartTs ? new Date(periodStartTs * 1000) : currentPeriodEnd;
       const billingCycleDay = billingStartDate ? billingStartDate.getUTCDate() : null;
 
+      // Get tier data for monthly allowance
+      const tierData = tierIdFromSync ? getTierById(tierIdFromSync) : null;
+      const tierLimit = tierData?.monthly_allowance || 0;
+
       updateData = {
         ...updateData,
         stripe_subscription_id: subscription.id,
-        subscription_type: tierIdFromSync, // Store tier_id (1-4)
+        tier_id: tierIdFromSync, // Store tier_id (1-4)
         subscription_status: subscription.status,
-        billing_cycle_day: billingCycleDay,
         subscription_end_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null,
         next_billing_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null
       };
 
-      // Only reset tokens_used if this is a NEW subscription (user didn't have one before)
-      // or if the subscription ID changed (user got a completely new subscription)
+      // Per TOKEN_TRACKING.md: Apply max(tokens_monthly, tierLimit) logic
+      const currentTokensMonthly = Number(user.tokens_monthly) || 0;
       const isNewSubscription = !user.stripe_subscription_id;
       const isSubscriptionChanged = user.stripe_subscription_id && user.stripe_subscription_id !== subscription.id;
       
       if (isNewSubscription) {
-        console.log('[STRIPE SYNC] First subscription for user - resetting tokens_used');
+        console.log('[STRIPE SYNC] First subscription for user');
+        // New subscription: tokens_monthly = max(current, tierLimit), tokens_used = 0
+        updateData.tokens_monthly = Math.max(currentTokensMonthly, tierLimit);
         updateData.tokens_used = 0;
-        updateData.reset_date = new Date().toISOString();
+        console.log('[STRIPE SYNC] Setting tokens_monthly to:', updateData.tokens_monthly);
       } else if (isSubscriptionChanged) {
         console.log('[STRIPE SYNC] Subscription ID changed from', user.stripe_subscription_id, 'to', subscription.id);
-        // Don't reset tokens for plan changes - only for truly new subscriptions
-        // Plan changes via Customer Portal keep the same subscription ID
-        console.log('[STRIPE SYNC] Not resetting tokens - this may be a resubscription');
+        // Resubscription: apply max logic
+        updateData.tokens_monthly = Math.max(currentTokensMonthly, tierLimit);
+        console.log('[STRIPE SYNC] Setting tokens_monthly to:', updateData.tokens_monthly);
       } else {
-        console.log('[STRIPE SYNC] Same subscription, not resetting tokens_used');
+        console.log('[STRIPE SYNC] Same subscription, applying max(current, tierLimit)');
+        updateData.tokens_monthly = Math.max(currentTokensMonthly, tierLimit);
+        console.log('[STRIPE SYNC] Setting tokens_monthly to:', updateData.tokens_monthly);
       }
     } else {
       console.log('[STRIPE SYNC] No active subscription, clearing subscription data');
       updateData = {
         ...updateData,
         stripe_subscription_id: null,
-        subscription_type: null,
+        tier_id: null,
         subscription_status: null
       };
     }
@@ -2578,15 +2546,289 @@ app.post('/api/stripe/sync', async (req, res) => {
     res.json({
       message: 'Subscription synced successfully',
       synced: true,
-      subscriptionType: updateData.subscription_type,
+      tier_id: updateData.tier_id,
       subscriptionStatus: updateData.subscription_status,
       stripeCustomerId: updateData.stripe_customer_id,
-      stripeSubscriptionId: updateData.stripe_subscription_id
+      stripeSubscriptionId: updateData.stripe_subscription_id,
+      tokens_monthly: updateData.tokens_monthly
     });
 
   } catch (error) {
     console.error('[STRIPE SYNC] ERROR:', error);
     console.error('[STRIPE SYNC] Stack:', error.stack);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// DEVELOPER-ONLY ENDPOINTS
+// Per TOKEN_TRACKING.md Section 7: Simulate Stripe webhook scenarios for testing
+// These bypass Stripe signature validation and call the same business logic
+// ============================================================================
+
+/**
+ * Reusable function: Apply subscription created logic
+ * @param {string} authId - User's auth ID
+ * @param {number} tierId - Subscription tier ID (1-4)
+ * @returns {Promise<Object>} - Result with updated user data
+ */
+async function applySubscriptionCreated(authId, tierId) {
+  if (!supabase) throw new Error('Database not configured');
+  
+  const tierData = getTierById(tierId);
+  if (!tierData) throw new Error(`Invalid tier_id: ${tierId}`);
+  
+  const tierLimit = tierData.monthly_allowance || 0;
+  
+  // Find user
+  const { data: users, error: findError } = await supabase
+    .from('users')
+    .select('id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
+    .eq('auth_id', authId);
+  
+  if (findError || !users || users.length === 0) {
+    throw new Error('User not found');
+  }
+  
+  const user = users[0];
+  const currentTokensMonthly = Number(user.tokens_monthly) || 0;
+  
+  // Per TOKEN_TRACKING.md Section 3.1: tokens_monthly = max(current, tierLimit), tokens_used = 0
+  const updateData = {
+    tier_id: tierId,
+    subscription_status: 'active',
+    tokens_monthly: Math.max(currentTokensMonthly, tierLimit),
+    tokens_used: 0
+  };
+  
+  const { error: updateError } = await supabase
+    .from('users')
+    .update(updateData)
+    .eq('id', user.id);
+  
+  if (updateError) throw new Error(`Failed to update user: ${updateError.message}`);
+  
+  // Return updated user data
+  const { data: updatedUser } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+  
+  return { success: true, user: updatedUser, applied: updateData };
+}
+
+/**
+ * Reusable function: Apply subscription renewed logic
+ * @param {string} authId - User's auth ID
+ * @param {number} tierId - Subscription tier ID (1-4)
+ * @returns {Promise<Object>} - Result with updated user data
+ */
+async function applySubscriptionRenewed(authId, tierId) {
+  if (!supabase) throw new Error('Database not configured');
+  
+  const tierData = getTierById(tierId);
+  if (!tierData) throw new Error(`Invalid tier_id: ${tierId}`);
+  
+  const tierLimit = tierData.monthly_allowance || 0;
+  
+  // Find user
+  const { data: users, error: findError } = await supabase
+    .from('users')
+    .select('id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
+    .eq('auth_id', authId);
+  
+  if (findError || !users || users.length === 0) {
+    throw new Error('User not found');
+  }
+  
+  const user = users[0];
+  const currentTokensMonthly = Number(user.tokens_monthly) || 0;
+  
+  // Per TOKEN_TRACKING.md Section 3.2/5: tokens_monthly = max(current, tierLimit), tokens_used = 0
+  const updateData = {
+    tier_id: tierId,
+    tokens_monthly: Math.max(currentTokensMonthly, tierLimit),
+    tokens_used: 0 // Reset monthly usage counter
+  };
+  
+  const { error: updateError } = await supabase
+    .from('users')
+    .update(updateData)
+    .eq('id', user.id);
+  
+  if (updateError) throw new Error(`Failed to update user: ${updateError.message}`);
+  
+  // Return updated user data
+  const { data: updatedUser } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+  
+  return { success: true, user: updatedUser, applied: updateData };
+}
+
+/**
+ * Reusable function: Apply subscription canceled logic
+ * @param {string} authId - User's auth ID
+ * @returns {Promise<Object>} - Result with updated user data
+ */
+async function applySubscriptionCanceled(authId) {
+  if (!supabase) throw new Error('Database not configured');
+  
+  // Find user
+  const { data: users, error: findError } = await supabase
+    .from('users')
+    .select('id, tokens_monthly, tokens_added')
+    .eq('auth_id', authId);
+  
+  if (findError || !users || users.length === 0) {
+    throw new Error('User not found');
+  }
+  
+  const user = users[0];
+  
+  // Per TOKEN_TRACKING.md: On cancel, set tokens_monthly to 0, keep tokens_added
+  const updateData = {
+    tier_id: null,
+    subscription_status: 'canceled',
+    stripe_subscription_id: null,
+    subscription_end_date: null,
+    next_billing_date: null,
+    tokens_monthly: 0
+  };
+  
+  const { error: updateError } = await supabase
+    .from('users')
+    .update(updateData)
+    .eq('id', user.id);
+  
+  if (updateError) throw new Error(`Failed to update user: ${updateError.message}`);
+  
+  // Return updated user data
+  const { data: updatedUser } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+  
+  return { success: true, user: updatedUser, applied: updateData };
+}
+
+/**
+ * DEV ONLY: Simulate subscription created
+ * POST /api/dev/stripe/simulate-subscription-created
+ * Body: { authId, tierId }
+ */
+app.post('/api/dev/stripe/simulate-subscription-created', async (req, res) => {
+  console.log('[DEV] Simulating subscription created');
+  try {
+    const { authId, tierId } = req.body;
+    
+    if (!authId || !tierId) {
+      return res.status(400).json({ error: 'authId and tierId are required' });
+    }
+    
+    const result = await applySubscriptionCreated(authId, Number(tierId));
+    console.log('[DEV] Subscription created simulation result:', result);
+    res.json(result);
+  } catch (error) {
+    console.error('[DEV] Simulation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DEV ONLY: Simulate subscription renewed
+ * POST /api/dev/stripe/simulate-subscription-renewed
+ * Body: { authId, tierId }
+ */
+app.post('/api/dev/stripe/simulate-subscription-renewed', async (req, res) => {
+  console.log('[DEV] Simulating subscription renewed');
+  try {
+    const { authId, tierId } = req.body;
+    
+    if (!authId || !tierId) {
+      return res.status(400).json({ error: 'authId and tierId are required' });
+    }
+    
+    const result = await applySubscriptionRenewed(authId, Number(tierId));
+    console.log('[DEV] Subscription renewed simulation result:', result);
+    res.json(result);
+  } catch (error) {
+    console.error('[DEV] Simulation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DEV ONLY: Simulate subscription canceled
+ * POST /api/dev/stripe/simulate-subscription-canceled
+ * Body: { authId }
+ */
+app.post('/api/dev/stripe/simulate-subscription-canceled', async (req, res) => {
+  console.log('[DEV] Simulating subscription canceled');
+  try {
+    const { authId } = req.body;
+    
+    if (!authId) {
+      return res.status(400).json({ error: 'authId is required' });
+    }
+    
+    const result = await applySubscriptionCanceled(authId);
+    console.log('[DEV] Subscription canceled simulation result:', result);
+    res.json(result);
+  } catch (error) {
+    console.error('[DEV] Simulation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DEV ONLY: Set user tokens directly for testing
+ * POST /api/dev/set-tokens
+ * Body: { authId, tokens_monthly, tokens_added, tokens_used, tokens_used_all_time }
+ */
+app.post('/api/dev/set-tokens', async (req, res) => {
+  console.log('[DEV] Setting user tokens directly');
+  try {
+    const { authId, tokens_monthly, tokens_added, tokens_used, tokens_used_all_time } = req.body;
+    
+    if (!authId) {
+      return res.status(400).json({ error: 'authId is required' });
+    }
+    
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+    
+    const updateData = {};
+    if (tokens_monthly !== undefined) updateData.tokens_monthly = Number(tokens_monthly);
+    if (tokens_added !== undefined) updateData.tokens_added = Number(tokens_added);
+    if (tokens_used !== undefined) updateData.tokens_used = Number(tokens_used);
+    if (tokens_used_all_time !== undefined) updateData.tokens_used_all_time = Number(tokens_used_all_time);
+    
+    const { error: updateError } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('auth_id', authId);
+    
+    if (updateError) {
+      throw new Error(`Failed to update user: ${updateError.message}`);
+    }
+    
+    // Return updated user data
+    const { data: updatedUser } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', authId)
+      .single();
+    
+    console.log('[DEV] User tokens set:', updatedUser);
+    res.json({ success: true, user: updatedUser, applied: updateData });
+  } catch (error) {
+    console.error('[DEV] Set tokens error:', error);
     res.status(500).json({ error: error.message });
   }
 });

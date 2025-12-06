@@ -36,6 +36,11 @@ const Layout = ({ children }) => {
           <NavLink to="/help" className="sf-nav-link">
             Help
           </NavLink>
+          {user && (
+            <NavLink to="/dev" className="sf-nav-link sf-nav-link-dev">
+              Dev
+            </NavLink>
+          )}
         </nav>
         <div className="sf-auth-menu">
           {user ? (

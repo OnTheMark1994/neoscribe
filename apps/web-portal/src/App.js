@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import DownloadsPage from './pages/DownloadsPage';
 import AccountPage from './pages/AccountPage';
 import HelpPage from './pages/HelpPage';
+import DeveloperPage from './pages/DeveloperPage';
 import './App.css';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/account" element={<AccountPage />} />
         <Route path="/auto-login" element={<AccountPage />} />
         <Route path="/help" element={<HelpPage />} />
+        <Route path="/dev" element={<DeveloperPage />} />
       </Routes>
     </Layout>
   );

@@ -167,6 +167,19 @@ function AccountAuthSection({
             </span>
           </div>
 
+          {status && (
+            <div
+              style={{
+                textAlign: 'center',
+                marginTop: '10px',
+                marginBottom: '10px',
+                color: '#4CAF50',
+              }}
+            >
+              {status}
+            </div>
+          )}
+
           <div style={{ marginTop: '20px', marginBottom: '20px' }}>
             <button 
               onClick={() => openExternalLink(buildWebPortalAutoLoginUrl(authEmail, authPassword))}
@@ -256,9 +269,8 @@ function AccountAuthSection({
         </>
       )}
 
-      {status && (
+      {status && !isSignedIn && (
         <div className="setting-item">
-          <span className="stat-label">Status</span>
           <span className="stat-value">{status}</span>
         </div>
       )}

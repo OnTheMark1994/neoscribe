@@ -371,11 +371,16 @@ export async function loginUserAccount(anonId, { email, password }) {
 }
 
 // Normalize token-related fields from backend (handles int8/BIGINT as strings)
-// Accepts both camelCase and snake_case field names
+// NEW TOKEN TRACKING MODEL:
+// - tokens_monthly: Current monthly allowance BALANCE (decreases as used)
+// - tokens_added: Long-lived carry-over bucket (bonuses, top-ups)
+// - tokens_used: Tokens used in current billing period (counter, resets monthly)
+// - tokens_used_all_time: Lifetime usage counter
+// FORMULA: availableTokens = tokens_monthly + tokens_added
 export function normalizeUserTokenData(data) {
   if (!data) {
     return {
-      tokenLimit: 0,
+      tokensMonthly: 0,
       tokensUsed: 0,
       tokensAdded: 0,
       tokensUsedAllTime: 0,
@@ -383,34 +388,40 @@ export function normalizeUserTokenData(data) {
     };
   }
 
-  const tokenLimit = Number(data.tokenLimit ?? data.token_limit ?? 0) || 0;
+  // New token fields (prefer new names, fall back to legacy)
+  const tokensMonthly = Number(data.tokensMonthly ?? data.tokens_monthly ?? data.tokenLimit ?? data.token_limit ?? 0) || 0;
   const tokensUsed = Number(data.tokensUsed ?? data.tokens_used ?? 0) || 0;
   const tokensAdded = Number(data.tokensAdded ?? data.tokens_added ?? 0) || 0;
   const tokensUsedAllTime = Number(data.tokensUsedAllTime ?? data.tokens_used_all_time ?? 0) || 0;
 
+  // New formula: available = tokens_monthly + tokens_added
   let availableTokens;
   if (data.availableTokens != null) {
     availableTokens = Number(data.availableTokens) || 0;
   } else {
-    availableTokens = Math.max(0, tokenLimit - tokensUsed + tokensAdded);
+    availableTokens = Math.max(0, tokensMonthly + tokensAdded);
   }
 
   // Extract subscription-related fields
-  // Use subscription_tier_name for display (e.g., 'Light', 'Standard')
-  // subscription_type now stores tier_id (1-4) on backend
-  const subscriptionType = data.subscription_tier_name ?? data.subscriptionTierName ?? null;
+  // tier_id stores numeric ID (1-4), subscription_tier_name has display name
+  const tierId = Number(data.tier_id ?? data.subscription_tier_id ?? null) || null;
+  const tierName = data.subscription_tier_name ?? data.subscriptionTierName ?? null;
   const subscriptionStatus = data.subscriptionStatus ?? data.subscription_status ?? null;
   const nextBillingDate = data.nextBillingDate ?? data.next_billing_date ?? null;
 
   return {
-    tokenLimit,
+    tokensMonthly,
     tokensUsed,
     tokensAdded,
     tokensUsedAllTime,
     availableTokens,
-    subscriptionType, // Now contains display name ('Light', 'Basic', 'Standard', 'Heavy')
+    tierId, // Numeric tier ID (1-4)
+    tierName, // Display name ('Light', 'Basic', 'Standard', 'Heavy')
     subscriptionStatus,
-    nextBillingDate
+    nextBillingDate,
+    // Legacy aliases for backward compatibility
+    tokenLimit: tokensMonthly,
+    subscriptionType: tierName
   };
 }
 
