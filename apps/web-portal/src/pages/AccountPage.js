@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
@@ -63,6 +63,8 @@ const AccountPage = () => {
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+  const [isAutoLogin, setIsAutoLogin] = useState(false);
+  const autoLoginAttemptedRef = useRef(false); // Rate limit: only attempt once per page load
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState('basic');
@@ -116,22 +118,72 @@ const AccountPage = () => {
     return `Tier ${numericId}`;
   };
 
-  // Auto-login route: /account?email=...&password=...
+  // Auto-login route: /auto-login?email=...&password=...
+  // Handles:
+  // - Prefilling email/password fields
+  // - Showing "Signing you in..." message
+  // - If logged-in user matches, redirect to account
+  // - If different user logged in, log them out first, wait 500ms, then log in new user
+  // - Rate limited to one attempt per page load
   useEffect(() => {
     const urlEmail = query.get('email');
     const urlPassword = query.get('password');
-    if (urlEmail && urlPassword && !user && !loading) {
-      (async () => {
-        try {
-          setStatus('Signing you in...');
-          await signInWithEmail(urlEmail, urlPassword);
-          setStatus('');
-          navigate('/account', { replace: true });
-        } catch (err) {
-          setStatus(err.message || 'Auto sign-in failed');
+    
+    // Check if this is an auto-login route
+    const isAutoLoginRoute = window.location.hash.includes('/auto-login');
+    
+    if (!urlEmail || !urlPassword || !isAutoLoginRoute) return;
+    
+    // Prefill the form fields
+    setEmail(urlEmail);
+    setPassword(urlPassword);
+    setIsAutoLogin(true);
+    setStatus('Signing you in...');
+    
+    // Don't proceed until loading is complete
+    if (loading) return;
+    
+    // Rate limit: only attempt once per page load
+    if (autoLoginAttemptedRef.current) return;
+    autoLoginAttemptedRef.current = true;
+    
+    const performAutoLogin = async () => {
+      try {
+        // If user is already logged in
+        if (user) {
+          // Check if the logged-in user matches the auto-login email
+          if (user.email?.toLowerCase() === urlEmail.toLowerCase()) {
+            // Same user, just redirect to account page
+            setStatus('');
+            setIsAutoLogin(false);
+            navigate('/account', { replace: true });
+            return;
+          }
+          
+          // Different user is logged in - log them out first
+          setStatus('Switching accounts...');
+          await signOut();
+          
+          // Wait 500ms before logging in the new user
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
-      })();
-    }
+        
+        // Log in the new user
+        setStatus('Signing you in...');
+        await signInWithEmail(urlEmail, urlPassword);
+        setStatus('');
+        setIsAutoLogin(false);
+        navigate('/account', { replace: true });
+      } catch (err) {
+        // Handle various error formats from Supabase
+        const errorMessage = err?.message || err?.error_description || err?.error || 'Auto sign-in failed';
+        console.error('[WEB] Auto-login error:', err);
+        setStatus(errorMessage);
+        setIsAutoLogin(false);
+      }
+    };
+    
+    performAutoLogin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, user, loading]);
 
@@ -571,6 +623,7 @@ const AccountPage = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isAutoLogin}
             />
           </div>
           <div className="sf-form-row">
@@ -581,11 +634,12 @@ const AccountPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isAutoLogin}
             />
           </div>
           {status && <div className="sf-status-message">{status}</div>}
           <div className="sf-auth-actions">
-            <button type="submit" className="sf-primary-btn">
+            <button type="submit" className="sf-primary-btn" disabled={isAutoLogin}>
               {authMode === 'login' ? 'Sign In' : 'Create Account'}
             </button>
           </div>
