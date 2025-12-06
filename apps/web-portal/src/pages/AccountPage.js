@@ -78,6 +78,8 @@ const AccountPage = () => {
   const [addonLoading, setAddonLoading] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState(null); // 'success' | 'cancel' | null
   const [showUsageInfo, setShowUsageInfo] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelStatusMsg, setCancelStatusMsg] = useState('');
 
   const navigate = useNavigate();
   const query = useQuery();
@@ -492,6 +494,48 @@ const AccountPage = () => {
       console.error('Customer portal error:', err);
       setSubscriptionStatusMsg(`Failed to open subscription management: ${err.message}`);
       setSubscriptionLoading(false);
+    }
+  };
+
+  // Handle canceling all subscriptions directly via API (bypasses Stripe portal)
+  const handleCancelAllSubscriptions = async () => {
+    if (!user) return;
+
+    // Confirm with user before proceeding
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel ALL your subscriptions?\n\n' +
+      'This will immediately cancel any active subscriptions associated with your email address. ' +
+      'This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setCancelLoading(true);
+      setCancelStatusMsg('Canceling subscriptions...');
+
+      const response = await fetch(`${SERVER_URL}/api/stripe/cancel-all-subscriptions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authId: user.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to cancel subscriptions');
+      }
+
+      setCancelStatusMsg(`✓ ${data.message}`);
+
+      // Refresh stats to reflect the cancellation
+      handleRefreshStats();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Cancel subscriptions error:', err);
+      setCancelStatusMsg(`✗ ${err.message}`);
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -1094,6 +1138,31 @@ const AccountPage = () => {
             {passwordStatusMsg}
           </div>
         )}
+
+        {/* Cancel All Subscriptions - dangerous action, shown at bottom in red */}
+        <div style={{ marginTop: '24px', borderTop: '1px solid var(--sf-border-color, #333)', paddingTop: '16px' }}>
+          <button
+            className="sf-secondary-btn sf-secondary-btn-danger"
+            type="button"
+            onClick={handleCancelAllSubscriptions}
+            disabled={cancelLoading}
+            style={{
+              backgroundColor: '#dc3545',
+              borderColor: '#dc3545',
+              color: '#fff',
+            }}
+          >
+            {cancelLoading ? 'Canceling...' : 'Cancel All Subscriptions'}
+          </button>
+          {cancelStatusMsg && (
+            <div
+              className="sf-status-message"
+              style={{ marginTop: '8px', textAlign: 'center' }}
+            >
+              {cancelStatusMsg}
+            </div>
+          )}
+        </div>
       </section>
       </div>
     </div>

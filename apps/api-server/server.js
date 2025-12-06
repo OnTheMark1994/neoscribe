@@ -2406,6 +2406,166 @@ app.post('/api/stripe/customer-portal', async (req, res) => {
 });
 
 /**
+ * Cancel all Stripe subscriptions for a user by email
+ * POST /api/stripe/cancel-all-subscriptions
+ * Body: { authId }
+ * 
+ * This endpoint allows users to cancel all their Stripe subscriptions without
+ * needing access to the Stripe customer portal (useful if they used a fake email).
+ * It finds all Stripe customers with the user's email and cancels all active subscriptions.
+ */
+app.post('/api/stripe/cancel-all-subscriptions', async (req, res) => {
+  console.log('[CANCEL SUBS] ========================================');
+  console.log('[CANCEL SUBS] Cancel all subscriptions requested');
+
+  try {
+    const { authId } = req.body;
+
+    if (!authId) {
+      console.log('[CANCEL SUBS] ERROR: authId is required');
+      return res.status(400).json({ error: 'authId is required' });
+    }
+
+    if (!stripe) {
+      console.log('[CANCEL SUBS] ERROR: Stripe not configured');
+      return res.status(503).json({ error: 'Stripe not configured' });
+    }
+
+    console.log('[CANCEL SUBS] authId:', authId);
+
+    // Get user's email from database
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('auth_id', authId);
+
+    if (userError || !users || users.length === 0) {
+      console.log('[CANCEL SUBS] ERROR: User not found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = users[0];
+    const email = user.email;
+
+    if (!email) {
+      console.log('[CANCEL SUBS] ERROR: User has no email on file');
+      return res.status(400).json({ error: 'User has no email on file' });
+    }
+
+    console.log('[CANCEL SUBS] Found user:', user.id, email);
+    console.log('[CANCEL SUBS] Searching Stripe for customers with email:', email);
+
+    // Step 1: Find ALL customers with this email (Stripe allows duplicates)
+    let allCustomers = [];
+    let hasMore = true;
+    let startingAfter = null;
+
+    while (hasMore) {
+      const params = {
+        email: email,
+        limit: 100,
+      };
+      if (startingAfter) params.starting_after = startingAfter;
+
+      const page = await stripe.customers.list(params);
+      allCustomers.push(...page.data);
+
+      hasMore = page.has_more;
+      startingAfter = page.data.length > 0 ? page.data[page.data.length - 1].id : null;
+    }
+
+    console.log('[CANCEL SUBS] Found', allCustomers.length, 'Stripe customer(s) with email:', email);
+
+    if (allCustomers.length === 0) {
+      return res.status(404).json({ 
+        error: 'No Stripe customers found with that email',
+        message: 'You may not have any active subscriptions, or your subscription was created with a different email.'
+      });
+    }
+
+    let totalCanceled = 0;
+    const results = [];
+
+    // Step 2: For each customer, find and cancel all active/trialing subscriptions
+    for (const customer of allCustomers) {
+      let subscriptionsCanceled = 0;
+
+      let hasMoreSubs = true;
+      let subStartingAfter = null;
+
+      while (hasMoreSubs) {
+        const subParams = {
+          customer: customer.id,
+          status: 'all',
+          limit: 100,
+        };
+        if (subStartingAfter) subParams.starting_after = subStartingAfter;
+
+        const subList = await stripe.subscriptions.list(subParams);
+
+        for (const sub of subList.data) {
+          // Only cancel if it's not already canceled or incomplete_expired
+          if (!['canceled', 'incomplete_expired', 'unpaid'].includes(sub.status)) {
+            console.log('[CANCEL SUBS] Canceling subscription:', sub.id, 'status:', sub.status);
+            await stripe.subscriptions.cancel(sub.id, {
+              prorate: false,
+            });
+            subscriptionsCanceled++;
+            totalCanceled++;
+          }
+        }
+
+        hasMoreSubs = subList.has_more;
+        subStartingAfter = subList.data.length > 0 ? subList.data[subList.data.length - 1].id : null;
+      }
+
+      results.push({
+        customerId: customer.id,
+        subscriptionsCanceled,
+      });
+    }
+
+    console.log('[CANCEL SUBS] Total subscriptions canceled:', totalCanceled);
+
+    // Step 3: Update user record in database to reflect cancellation
+    if (totalCanceled > 0) {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          subscription_status: 'canceled',
+          tier_id: null,
+        })
+        .eq('auth_id', authId);
+
+      if (updateError) {
+        console.error('[CANCEL SUBS] Warning: Failed to update user record:', updateError);
+      } else {
+        console.log('[CANCEL SUBS] Updated user record to canceled status');
+      }
+    }
+
+    console.log('[CANCEL SUBS] ========================================');
+
+    res.json({
+      success: true,
+      message: `Canceled ${totalCanceled} subscription(s) across ${allCustomers.length} customer(s) with email: ${email}`,
+      totalCanceled,
+      customersProcessed: allCustomers.length,
+      details: results,
+    });
+
+  } catch (error) {
+    console.error('[CANCEL SUBS] ERROR:', error);
+    console.log('[CANCEL SUBS] Stack:', error.stack);
+    console.log('[CANCEL SUBS] ========================================');
+    res.status(500).json({
+      error: 'Failed to cancel subscriptions',
+      message: error.message,
+    });
+  }
+});
+
+/**
  * Get subscription status
  * POST /api/stripe/subscription-status
  * Body: { authId }
