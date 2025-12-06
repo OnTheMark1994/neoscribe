@@ -300,6 +300,20 @@ h1 {
   font-weight: 500;
 }
 
+/* Auth helper message for anon users */
+.auth-info-message {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #ffffff;
+  text-align: center;
+  line-height: 1.5;
+  background-color: rgba(76, 175, 80, 0.4);
+  border-radius: 6px;
+  font-weight: 500;
+}
+
 .anon-id-box {
   background-color: rgba(76, 175, 80, 0.1);
   padding: 15px;

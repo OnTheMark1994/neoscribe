@@ -151,6 +151,13 @@ function AccountAuthSection({
         </div>
       )}
 
+      {/* Prompt anon users to create a free account for extra tokens and subscription options */}
+      {!isSignedIn && (
+        <div className="auth-info-message">
+          Create a free one click account for additional free tokens and to see subscription options.
+        </div>
+      )}
+
       {isSignedIn ? (
         <>
           <div className="stat-item">

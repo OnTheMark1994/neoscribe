@@ -17,12 +17,12 @@ const NEW_MONTHLY_TOKENS = 15000;        // Monthly refill amount for paid tiers
 const AUTH_CREATE_NEW_USER_MESSAGE =
   `Created new auth account and user record; added ${NEW_AUTH_TOKENS.toLocaleString()} bonus tokens.`;
 const AUTH_LINK_EXISTING_ANON_MESSAGE =
-  `Created new auth account and linked to existing anon user; added ${NEW_AUTH_TOKENS.toLocaleString()} bonus tokens.`;
+  `Success! Created new account and added ${NEW_AUTH_TOKENS.toLocaleString()} free tokens! To see all subscription options please click "Account Portal"`;
 const AUTH_REPEAT_ACCOUNT_MESSAGE =
   'Created repeat auth account; added 0 bonus tokens because this anon ID already has an account.';
 
-const OUT_OF_TOKENS_MESSAGE_ANON = 'All tokens have been used! Click the button below or check File => settings => account to create an account for ' + NEW_AUTH_TOKENS + " tokens now, " + NEW_MONTHLY_TOKENS + " per month, and to view more options.";
-const OUT_OF_TOKENS_MESSAGE_AUTH = 'All tokens have been used! Click the button below or check File => settings => account to manage your account to see options for more tokens.';
+const OUT_OF_TOKENS_MESSAGE_ANON = 'All tokens have been used! Click the button below to create an account for ' + NEW_AUTH_TOKENS + " free tokens now and to view more options.";
+const OUT_OF_TOKENS_MESSAGE_AUTH = 'All tokens have been used! Click the buttons below to see options in the portal or view your accout in settings.';
 // Subscription tiers configuration
 // - tier_id: Stable numeric ID (1-4) stored in DB, won't change if titles change
 // - The object key (light/basic/full/heavy) is the internal ID used in code

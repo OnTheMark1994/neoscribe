@@ -64,7 +64,8 @@ const AccountPage = () => {
   const [status, setStatus] = useState('');
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [isAutoLogin, setIsAutoLogin] = useState(false);
-  const autoLoginAttemptedRef = useRef(false); // Rate limit: only attempt once per page load
+  const autoLoginAttemptedRef = useRef(false); // Rate limit: only attempt once per email per SPA session
+  const lastAutoLoginEmailRef = useRef(null);
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState('basic');
@@ -139,11 +140,18 @@ const AccountPage = () => {
     setPassword(urlPassword);
     setIsAutoLogin(true);
     setStatus('Signing you in...');
-    
+
+    // If the email in the URL has changed since the last auto-login,
+    // reset the rate-limit so each distinct email gets one attempt.
+    if (lastAutoLoginEmailRef.current !== urlEmail) {
+      autoLoginAttemptedRef.current = false;
+      lastAutoLoginEmailRef.current = urlEmail;
+    }
+
     // Don't proceed until loading is complete
     if (loading) return;
-    
-    // Rate limit: only attempt once per page load
+
+    // Rate limit: only attempt once per email per SPA session
     if (autoLoginAttemptedRef.current) return;
     autoLoginAttemptedRef.current = true;
     
