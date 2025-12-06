@@ -437,6 +437,52 @@
   animation: sf-spin 1s linear infinite;
 }
 
+/* Circular info button next to refresh */
+.sf-info-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.sf-info-btn-icon:hover {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: #e5e7eb;
+  transform: scale(1.05);
+}
+
+.sf-info-btn-icon:active {
+  transform: scale(0.95);
+}
+
+.sf-usage-info-panel {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  font-size: 0.9rem;
+  color: #e5e7eb;
+  line-height: 1.5;
+}
+
+.sf-usage-info-panel p {
+  margin-bottom: 6px;
+}
+
+.sf-usage-info-panel p:last-child {
+  margin-bottom: 0;
+}
+
 @keyframes sf-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

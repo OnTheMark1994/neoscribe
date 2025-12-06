@@ -91,6 +91,7 @@ function AccountAuthSection({
   };
 
   const isSignedIn = !!authId;
+  const isFreePlan = !subscriptionType || String(subscriptionType).toLowerCase() === 'free';
 
   const openExternalLink = async (url) => {
     try {
@@ -150,11 +151,17 @@ function AccountAuthSection({
           </span>
         </div>
       )}
-
-      {/* Prompt anon users to create a free account for extra tokens and subscription options */}
+      {/* Helper banners under subscription summary */}
+      {/* 1) Anon users: prompt to create a free account */}
       {!isSignedIn && (
         <div className="auth-info-message">
           Create a free one click account for additional free tokens and to see subscription options.
+        </div>
+      )}
+      {/* 2) Signed-in users on Free plan: prompt to open Account Portal for subscription options */}
+      {isSignedIn && isFreePlan && (
+        <div className="auth-info-message">
+          Click Account Portal to view subscription options.
         </div>
       )}
 

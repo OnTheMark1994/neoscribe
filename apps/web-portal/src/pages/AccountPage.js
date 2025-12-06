@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
 import { API_BASE_URL, STRIPE_CUSTOMER_PORTAL_URL } from '../constants';
+import TokenUsageLog from '../components/TokenUsageLog';
 import './AccountPage.css';
 
 // Initial client-side plans: correct IDs/names but placeholder values so we never
@@ -76,6 +77,7 @@ const AccountPage = () => {
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [addonLoading, setAddonLoading] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState(null); // 'success' | 'cancel' | null
+  const [showUsageInfo, setShowUsageInfo] = useState(false);
 
   const navigate = useNavigate();
   const query = useQuery();
@@ -744,16 +746,20 @@ const AccountPage = () => {
               <span style={{ fontSize: '0.8em', opacity: 0.7 }}>{stats.stripe_subscription_id}</span>
             </div>
           )}
-          {stats && stats.next_billing_date && (
-            <div className="sf-account-detail-row">
-              <span>Next Billing Date</span>
-              <span>{new Date(stats.next_billing_date).toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}</span>
-            </div>
-          )}
+          <div className="sf-account-detail-row">
+            <span>Next Billing Date</span>
+            <span>
+              {!stats
+                ? 'Loading...'
+                : stats.next_billing_date
+                  ? new Date(stats.next_billing_date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })
+                  : 'N/A'}
+            </span>
+          </div>
         </div>
         </section>
 
@@ -774,8 +780,27 @@ const AccountPage = () => {
               <path d="M16 21h5v-5"/>
             </svg>
           </button>
+          <button
+            type="button"
+            className="sf-info-btn-icon"
+            onClick={() => setShowUsageInfo((prev) => !prev)}
+            title="What do these numbers mean?"
+          >
+            <span style={{ fontSize: '16px', fontWeight: 600 }}>i</span>
+          </button>
         </div>
+        {showUsageInfo && (
+          <div className="sf-usage-info-panel">
+            <p><strong>Available Tokens</strong> = Monthly Tokens + Added Tokens you still have left to use.</p>
+            <p><strong>Monthly Tokens Remaining</strong> are your current monthly allowance from your subscription plan. They refill on your billing date and decrease first as you use AI.</p>
+            <p><strong>Added Tokens Remaining</strong> are extra, long-lived tokens (bonuses or one-time packs). They are only used after Monthly Tokens reach zero and never reset each month.</p>
+            <p><strong>Tokens Used This Month</strong> is how many tokens you have spent in the current billing period. This counter resets when your subscription renews.</p>
+            <p><strong>Tokens Used All Time</strong> is your lifetime total tokens used and never resets.</p>
+            <p><strong>Tokens Added Monthly</strong> shows how many Monthly Tokens will be topped up on your next billing date based on your current plan.</p>
+          </div>
+        )}
         <div className="sf-stats-grid">
+          {/* Row 1: Available + Used This Month */}
           <div className="sf-stat-card">
             <span className="sf-stat-label">Available Tokens</span>
             <span className="sf-stat-value">
@@ -796,17 +821,6 @@ const AccountPage = () => {
             </span>
           </div>
           <div className="sf-stat-card">
-            <span className="sf-stat-label">Monthly Balance</span>
-            <span className="sf-stat-value">
-              {!stats
-                ? 'Loading...'
-                : (() => {
-                    const tokensMonthly = stats.tokensMonthly ?? stats.tokens_monthly;
-                    return tokensMonthly != null ? Number(tokensMonthly).toLocaleString() : 'n/a';
-                  })()}
-            </span>
-          </div>
-          <div className="sf-stat-card">
             <span className="sf-stat-label">Tokens Used This Month</span>
             <span className="sf-stat-value">
               {!stats
@@ -817,6 +831,32 @@ const AccountPage = () => {
                   })()}
             </span>
           </div>
+
+          {/* Row 2: Monthly Tokens + Added Tokens */}
+          <div className="sf-stat-card">
+            <span className="sf-stat-label">Monthly Tokens Remaining</span>
+            <span className="sf-stat-value">
+              {!stats
+                ? 'Loading...'
+                : (() => {
+                    const tokensMonthly = stats.tokensMonthly ?? stats.tokens_monthly;
+                    return tokensMonthly != null ? Number(tokensMonthly).toLocaleString() : 'n/a';
+                  })()}
+            </span>
+          </div>
+          <div className="sf-stat-card">
+            <span className="sf-stat-label">Added Tokens Remaining</span>
+            <span className="sf-stat-value">
+              {!stats
+                ? 'Loading...'
+                : (() => {
+                    const tokensAdded = stats.tokensAdded ?? stats.tokens_added;
+                    return tokensAdded != null ? Number(tokensAdded).toLocaleString() : 'n/a';
+                  })()}
+            </span>
+          </div>
+
+          {/* Row 3: Used All Time + Tokens Added Monthly (with next billing date note) */}
           <div className="sf-stat-card">
             <span className="sf-stat-label">Tokens Used All Time</span>
             <span className="sf-stat-value">
@@ -828,7 +868,28 @@ const AccountPage = () => {
                   })()}
             </span>
           </div>
+          <div className="sf-stat-card">
+            <span className="sf-stat-label">Tokens Added Monthly</span>
+            <span className="sf-stat-value">
+              {!stats
+                ? 'Loading...'
+                : (() => {
+                    const tokensMonthly = stats.tokensMonthly ?? stats.tokens_monthly;
+                    return tokensMonthly != null ? Number(tokensMonthly).toLocaleString() : 'n/a';
+                  })()}
+            </span>
+            {stats && stats.next_billing_date && (
+              <div style={{ fontSize: '0.8em', opacity: 0.8, marginTop: '4px' }}>
+                On {new Date(stats.next_billing_date).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </div>
+            )}
+          </div>
         </div>
+        <TokenUsageLog authId={user.id} />
         </section>
 
         <section className="sf-plans-section">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { API_BASE_URL } from '../constants';
 import './DeveloperPage.css';
@@ -13,6 +13,7 @@ const DeveloperPage = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [lastResult, setLastResult] = useState(null);
+  const [tiers, setTiers] = useState([]);
 
   // Custom token values
   const [tokensMonthly, setTokensMonthly] = useState('');
@@ -21,12 +22,44 @@ const DeveloperPage = () => {
 
   const SERVER_URL = API_BASE_URL;
 
-  const tiers = [
-    { id: 1, name: 'Light', allowance: 500000 },
-    { id: 2, name: 'Basic', allowance: 2000000 },
-    { id: 3, name: 'Standard', allowance: 5000000 },
-    { id: 4, name: 'Heavy', allowance: 10000000 },
-  ];
+  // Load subscription tiers from server so this page stays in sync with server-side JSON
+  useEffect(() => {
+    const loadTiers = async () => {
+      try {
+        const url = `${SERVER_URL}/api/subscription-tiers`;
+        // eslint-disable-next-line no-console
+        console.log('[DEV] Fetching subscription tiers from:', url);
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Subscription tiers endpoint error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const mapped = Object.entries(data || {}).map(([key, tier]) => ({
+          id: tier.tier_id ?? tier.tierId ?? null,
+          name: tier.title || key,
+          allowance: tier.monthly_allowance ?? tier.token_limit ?? 0,
+        })).filter(t => t.id != null);
+
+        if (mapped.length > 0) {
+          setTiers(mapped);
+          // Default tierId to first mapped tier if current tierId is not valid
+          if (!mapped.some(t => Number(t.id) === Number(tierId))) {
+            setTierId(Number(mapped[0].id));
+          }
+        } else {
+          setTiers([]);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[DEV] Failed to load subscription tiers from server:', err);
+        setTiers([]);
+      }
+    };
+
+    loadTiers();
+  }, [SERVER_URL]);
 
   const handleSimulateCreated = async () => {
     if (!user) {
@@ -196,9 +229,16 @@ const DeveloperPage = () => {
               value={tierId}
               onChange={(e) => setTierId(Number(e.target.value))}
             >
+              {tiers.length === 0 && (
+                <option value={tierId}>Loading tiers...</option>
+              )}
               {tiers.map((tier) => (
                 <option key={tier.id} value={tier.id}>
-                  {tier.name} ({tier.allowance.toLocaleString()} tokens/month)
+                  {tier.name} (
+                  {typeof tier.allowance === 'number'
+                    ? tier.allowance.toLocaleString()
+                    : 'n/a'}
+                  {' '}tokens/month)
                 </option>
               ))}
             </select>
