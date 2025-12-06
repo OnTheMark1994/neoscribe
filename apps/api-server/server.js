@@ -2809,7 +2809,6 @@ app.post('/api/dev/set-tokens', async (req, res) => {
       throw new Error(`Failed to update user: ${updateError.message}`);
     }
     
-    // Return updated user data
     const { data: updatedUser } = await supabase
       .from('users')
       .select('*')
@@ -2820,6 +2819,85 @@ app.post('/api/dev/set-tokens', async (req, res) => {
     res.json({ success: true, user: updatedUser, applied: updateData });
   } catch (error) {
     console.error('[DEV] Set tokens error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DEV ONLY: Burn tokens for a user using the standard token tracking model
+ * POST /api/dev/burn-tokens
+ * Body: { anonId, authId, amount }
+ */
+app.post('/api/dev/burn-tokens', async (req, res) => {
+  console.log('[DEV] Burning tokens for user');
+  try {
+    const { anonId, authId, amount } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    const burnAmount = Number(amount) || 0;
+    if (!anonId && !authId) {
+      return res.status(400).json({ error: 'anonId or authId is required' });
+    }
+    if (burnAmount <= 0) {
+      return res.status(400).json({ error: 'amount must be a positive number' });
+    }
+
+    let query = supabase
+      .from('users')
+      .select('id, tokens_monthly, tokens_added, tokens_used, tokens_used_all_time, tier_id');
+
+    if (authId) {
+      query = query.eq('auth_id', authId);
+    } else {
+      query = query.eq('anon_id', anonId);
+    }
+
+    const { data: users, error: userError } = await query;
+
+    if (userError || !users || users.length === 0) {
+      return res.status(404).json({ error: userError?.message || 'User not found' });
+    }
+
+    const user = users[0];
+
+    const burnResult = await updateUserTokens(user.id, burnAmount);
+    if (!burnResult.success) {
+      return res.status(400).json({ error: burnResult.error || 'Failed to burn tokens' });
+    }
+
+    const { data: updatedUsers, error: updatedError } = await supabase
+      .from('users')
+      .select('tokens_monthly, tokens_used, tokens_added, tokens_used_all_time, tier_id')
+      .eq('id', user.id);
+
+    if (updatedError || !updatedUsers || updatedUsers.length === 0) {
+      return res.status(500).json({ error: updatedError?.message || 'Failed to fetch updated user' });
+    }
+
+    const updatedUser = updatedUsers[0];
+    const tokensMonthly = Number(updatedUser.tokens_monthly) || 0;
+    const tokensAdded = Number(updatedUser.tokens_added) || 0;
+    const tokensUsed = Number(updatedUser.tokens_used) || 0;
+    const tokensUsedAllTime = Number(updatedUser.tokens_used_all_time) || 0;
+    const availableTokens = Math.max(0, tokensMonthly + tokensAdded);
+
+    const responseData = {
+      tokens_monthly: tokensMonthly,
+      tokens_used: tokensUsed,
+      tokens_added: tokensAdded,
+      tokens_used_all_time: tokensUsedAllTime,
+      availableTokens,
+      tier_id: updatedUser.tier_id || null,
+      burned: burnAmount
+    };
+
+    console.log('[DEV] Burn tokens result:', responseData);
+    res.json(responseData);
+  } catch (error) {
+    console.error('[DEV] Burn tokens error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -293,6 +293,46 @@ export async function fetchUserTokens(anonId, authId = null) {
   return { ...data, ...normalized };
 }
 
+// Dev-only helper: burn a fixed number of tokens for the current user
+export async function devBurnTokens(anonId, authId = null, amount) {
+  if (!anonId && !authId) {
+    throw new Error('anonId or authId is required to burn tokens');
+  }
+
+  const serverUrl = API_BASE_URL;
+  const url = `${serverUrl}/api/dev/burn-tokens`;
+
+  const body = {
+    anonId: anonId || null,
+    authId: authId || null,
+    amount
+  };
+
+  console.log('[DEV] Burning tokens via:', url, 'with body:', body);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    let errorPayload = null;
+    try {
+      errorPayload = await response.json();
+    } catch (_) {
+      // ignore
+    }
+    throw new Error(errorPayload?.error || `Burn tokens endpoint error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  console.log('[DEV] Burn tokens result:', data);
+  return data;
+}
+
 // Create a new auth account and link it to the anon user
 export async function createUserAccount(anonId, { name, email, password }) {
   if (!anonId) {

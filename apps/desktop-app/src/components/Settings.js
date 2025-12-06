@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Settings.css';
-import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData } from '../utils/aiService';
+import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData, devBurnTokens } from '../utils/aiService';
 import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
 
@@ -239,6 +239,19 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
     }
   };
 
+  const handleDeveloperBurnTokens = async () => {
+    if (!anonId && !authId) {
+      return;
+    }
+
+    try {
+      await devBurnTokens(anonId, authId, 14000);
+      await loadAccountData();
+    } catch (error) {
+      console.error('[SETTINGS] Failed to burn tokens:', error);
+    }
+  };
+
   return (
     <div className="settings-container">
       <div className="settings-header">
@@ -471,13 +484,31 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
                 </div>
 
                 <div className="stat-item">
-                  <span className="stat-label">Developer Tools</span>
+                  <span
+                    className="stat-label"
+                    style={{ display: 'block', width: '100%', textAlign: 'center' }}
+                  >
+                    Developer Tools
+                  </span>
+                </div>
+
+                <div
+                  className="stat-item"
+                  style={{ justifyContent: 'center', gap: '10px' }}
+                >
                   <button
                     type="button"
                     className="btn-secondary"
                     onClick={handleDeveloperResetIds}
                   >
                     Reset local anon/auth IDs
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleDeveloperBurnTokens}
+                  >
+                    -14k tokens
                   </button>
                 </div>
               </>
