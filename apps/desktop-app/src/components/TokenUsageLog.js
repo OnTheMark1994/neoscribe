@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './TokenUsageLog.css';
 import { API_BASE_URL } from '../utils/constants';
+import RefreshButton from './RefreshButton';
 
 // Number of token_log entries to fetch per page (initial load and each "Load More" click)
 const TOKEN_LOG_PAGE_SIZE = 4;
@@ -83,6 +84,12 @@ function TokenUsageLog({ anonId, authId }) {
     }
   };
 
+  const handleRefresh = () => {
+    if (!loading) {
+      loadLogs(true);
+    }
+  };
+
   // Filter logic supporting both old and new schema
   const displayedLogs = onlyAdditions
     ? logs.filter((entry) => {
@@ -97,7 +104,18 @@ function TokenUsageLog({ anonId, authId }) {
   return (
     <div className="token-usage-log">
       <div className="token-usage-log-header">
-        <span className="token-usage-log-title">Transaction Log</span>
+        <div className="token-usage-log-title-row">
+          <span className="token-usage-log-title">Transaction Log</span>
+          {isOpen && (
+            <RefreshButton
+              onClick={handleRefresh}
+              disabled={!anonId && !authId}
+              loading={loading}
+              title="Refresh transaction log"
+              size="small"
+            />
+          )}
+        </div>
         <button
           type="button"
           className="token-usage-log-toggle-btn"

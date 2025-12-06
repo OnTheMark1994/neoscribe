@@ -78,6 +78,12 @@ function TokenUsageLog({ authId }) {
     }
   };
 
+  const handleRefresh = () => {
+    if (!loading) {
+      loadLogs(true);
+    }
+  };
+
   // Filter logic supporting both old and new schema
   const displayedLogs = onlyAdditions
     ? logs.filter((entry) => {
@@ -92,7 +98,25 @@ function TokenUsageLog({ authId }) {
   return (
     <div className="sf-token-usage-log">
       <div className="sf-token-usage-log-header">
-        <span className="sf-token-usage-log-title">Transaction Log</span>
+        <div className="sf-token-usage-log-title-row">
+          <span className="sf-token-usage-log-title">Transaction Log</span>
+          {isOpen && (
+            <button
+              type="button"
+              className={`sf-refresh-btn-icon ${loading ? 'sf-spinning' : ''}`}
+              onClick={handleRefresh}
+              disabled={!authId || loading}
+              title="Refresh transaction log"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 21h5v-5" />
+              </svg>
+            </button>
+          )}
+        </div>
         <button
           type="button"
           className="sf-token-usage-log-toggle-btn"

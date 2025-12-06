@@ -3080,7 +3080,7 @@ async function applySubscriptionRenewed(authId, tierId) {
     userId: user.id,
     setMonthlyAbsolute: newTokensMonthly,
     resetTokensUsed: true,
-    note: 'Stripe subscription renewed',
+    note: 'Stripe subscription renewal top up',
   });
   
   if (!tokenResult.success) {
