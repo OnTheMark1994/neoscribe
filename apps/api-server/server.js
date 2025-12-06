@@ -247,6 +247,8 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
   try {
     // First try to find user by auth_id if provided
     if (authId) {
+      // NOTE: We assume auth_id is effectively unique (at most one row per auth user).
+      // If this ever returns multiple rows, we may need to revisit user schema/merging.
       const { data: authUsers, error: authError } = await supabase
         .from('users')
         .select('*')
@@ -275,7 +277,9 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
       }
     }
 
-    // Try to find user(s) by anon_id (do NOT use .single() so multiple rows don't throw)
+    // Try to find user(s) by anon_id (do NOT use .single() so multiple rows don't throw).
+    // NOTE: Data model allows multiple rows with the same anon_id (historical/edge cases),
+    // so we intentionally handle an array here.
     const { data: anonUsers, error: anonError } = await supabase
       .from('users')
       .select('*')
@@ -2302,12 +2306,26 @@ app.post('/api/stripe/subscription-status', async (req, res) => {
 });
 
 /**
- * Manual Stripe Sync - Sync subscription from Stripe to database
+ * Manual Stripe Sync - DEV/ADMIN ONLY
  * POST /api/stripe/sync
  * Body: { authId, email }
- * 
- * Use this endpoint when webhooks aren't working (e.g., local development)
- * It will look up the customer in Stripe by email and sync their subscription status
+ *
+ * This endpoint is intended for:
+ *   - Local development when webhooks are not configured.
+ *   - Rare admin/support cases where a Stripe webhook failed and an operator
+ *     needs to manually reconcile subscription metadata.
+ *
+ * IMPORTANT:
+ *   - This endpoint should NOT be called as part of normal user flows or
+ *     routine refreshes in the web portal.
+ *   - It does NOT modify token buckets (tokens_monthly, tokens_added,
+ *     tokens_used, tokens_used_all_time). Tokens are managed exclusively by
+ *     the Stripe webhook handlers and dev simulation endpoints.
+ *
+ * Behavior:
+ *   - Looks up the Stripe customer/subscription by email.
+ *   - Updates stripe_customer_id, stripe_subscription_id, tier_id,
+ *     subscription_status, and billing dates on the user row.
  */
 app.post('/api/stripe/sync', async (req, res) => {
   console.log('\n[STRIPE SYNC] ========================================');
@@ -2474,16 +2492,12 @@ app.post('/api/stripe/sync', async (req, res) => {
 
       console.log('[STRIPE SYNC] Determined tier_id:', tierIdFromSync);
 
-      const periodStartTs = getSubscriptionCurrentPeriodStartTimestamp(subscription);
       const periodEndTs = getSubscriptionCurrentPeriodEndTimestamp(subscription);
       const currentPeriodEnd = periodEndTs ? new Date(periodEndTs * 1000) : null;
 
-      const billingStartDate = periodStartTs ? new Date(periodStartTs * 1000) : currentPeriodEnd;
-      const billingCycleDay = billingStartDate ? billingStartDate.getUTCDate() : null;
-
-      // Get tier data for monthly allowance
-      const tierData = tierIdFromSync ? getTierById(tierIdFromSync) : null;
-      const tierLimit = tierData?.monthly_allowance || 0;
+      // NOTE: Manual sync only aligns subscription metadata; it does NOT touch
+      // token buckets. Token refills and usage resets are handled solely by
+      // the real webhook handlers and dev simulation endpoints.
 
       updateData = {
         ...updateData,
@@ -2493,28 +2507,6 @@ app.post('/api/stripe/sync', async (req, res) => {
         subscription_end_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null,
         next_billing_date: currentPeriodEnd ? currentPeriodEnd.toISOString() : null
       };
-
-      // Per TOKEN_TRACKING.md: Apply max(tokens_monthly, tierLimit) logic
-      const currentTokensMonthly = Number(user.tokens_monthly) || 0;
-      const isNewSubscription = !user.stripe_subscription_id;
-      const isSubscriptionChanged = user.stripe_subscription_id && user.stripe_subscription_id !== subscription.id;
-      
-      if (isNewSubscription) {
-        console.log('[STRIPE SYNC] First subscription for user');
-        // New subscription: tokens_monthly = max(current, tierLimit), tokens_used = 0
-        updateData.tokens_monthly = Math.max(currentTokensMonthly, tierLimit);
-        updateData.tokens_used = 0;
-        console.log('[STRIPE SYNC] Setting tokens_monthly to:', updateData.tokens_monthly);
-      } else if (isSubscriptionChanged) {
-        console.log('[STRIPE SYNC] Subscription ID changed from', user.stripe_subscription_id, 'to', subscription.id);
-        // Resubscription: apply max logic
-        updateData.tokens_monthly = Math.max(currentTokensMonthly, tierLimit);
-        console.log('[STRIPE SYNC] Setting tokens_monthly to:', updateData.tokens_monthly);
-      } else {
-        console.log('[STRIPE SYNC] Same subscription, applying max(current, tierLimit)');
-        updateData.tokens_monthly = Math.max(currentTokensMonthly, tierLimit);
-        console.log('[STRIPE SYNC] Setting tokens_monthly to:', updateData.tokens_monthly);
-      }
     } else {
       console.log('[STRIPE SYNC] No active subscription, clearing subscription data');
       updateData = {
@@ -2549,8 +2541,7 @@ app.post('/api/stripe/sync', async (req, res) => {
       tier_id: updateData.tier_id,
       subscriptionStatus: updateData.subscription_status,
       stripeCustomerId: updateData.stripe_customer_id,
-      stripeSubscriptionId: updateData.stripe_subscription_id,
-      tokens_monthly: updateData.tokens_monthly
+      stripeSubscriptionId: updateData.stripe_subscription_id
     });
 
   } catch (error) {

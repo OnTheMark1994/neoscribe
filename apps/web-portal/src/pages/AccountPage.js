@@ -248,21 +248,12 @@ const AccountPage = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const isCheckoutSuccess = urlParams.get('checkout') === 'success';
 
-  useEffect(() => {
-    if (isCheckoutSuccess && user) {
-      console.log('Returning from Stripe checkout, auto-syncing subscription status');
-      handleSyncStripe();
-    }
-  }, [isCheckoutSuccess, user]);
+  // NOTE: We intentionally do NOT auto-call the Stripe sync API here.
+  // Webhooks should be the primary source of truth.
+  // If a webhook fails, an admin/developer can trigger a manual sync explicitly.
 
-  // Handle explicit refresh cases (e.g., /account/refresh)
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('force_refresh') === 'true') {
-      handleSyncStripe();
-      navigate('/account', { replace: true });
-    }
-  }, []);
+  // Previously we auto-synced after checkout success and with a force_refresh URL param.
+  // That behavior has been removed to avoid unintentionally refilling tokens.
 
   // Manual refresh function
   const handleRefreshStats = async () => {
@@ -289,7 +280,9 @@ const AccountPage = () => {
     }
   };
 
-  // Sync subscription from Stripe - use when webhook didn't update the database
+  // Sync subscription from Stripe - ADMIN/DEV ONLY.
+  // Use this ONLY when webhooks failed and an admin needs to manually reconcile
+  // subscription status for a user (e.g. support ticket or local testing).
   const handleSyncStripe = async () => {
     if (!user) return;
     
@@ -653,9 +646,9 @@ const AccountPage = () => {
             <button 
               type="button" 
               className={`sf-refresh-btn-icon ${statsLoading ? 'sf-spinning' : ''}`}
-              onClick={() => { handleRefreshStats(); handleSyncStripe(); }}
+              onClick={handleRefreshStats}
               disabled={statsLoading}
-              title="Refresh account details and sync Stripe"
+              title="Refresh account details from ScribeFold database"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -785,7 +778,7 @@ const AccountPage = () => {
               className={`sf-refresh-btn-icon ${statsLoading ? 'sf-spinning' : ''}`}
               onClick={handleSyncStripe}
               disabled={statsLoading}
-              title="Sync subscription from Stripe"
+              title="Admin/Dev: Manually sync subscription from Stripe only if webhooks failed"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
