@@ -343,6 +343,14 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
 
     const totalTokens = initialTokensAdded;
     // console.log('  → New user created with', totalTokens, 'tokens (bonus)');
+
+    // Best-effort log of initial bonus tokens
+    try {
+      const note = isNewAnon ? 'New anon user initial tokens' : 'New auth user initial tokens';
+      await logTokenChange(newUser.id, initialTokensAdded, note);
+    } catch (logError) {
+      console.error('[getOrCreateUser] Failed to log initial token grant:', logError);
+    }
     return newUser;
   } catch (error) {
     console.error('❌ Error in getOrCreateUser:', error);
@@ -394,9 +402,10 @@ const DEFAULT_USER_TEMPLATE = {
  * 
  * @param {string} userId - User database ID
  * @param {number} tokensToUse - Number of tokens to use (N)
+ * @param {string} [note] - Optional note for token_log (e.g., 'API usage (DeepSeek)')
  * @returns {Promise<Object>} - { success, availableTokens, error }
  */
-async function updateUserTokens(userId, tokensToUse) {
+async function updateUserTokens(userId, tokensToUse, note = null) {
   if (!supabase || !userId) return { success: false, error: 'No database connection' };
 
   try {
@@ -472,7 +481,17 @@ async function updateUserTokens(userId, tokensToUse) {
     const newAvailable = newTokensMonthly + newTokensAdded;
     
     console.log(`[updateUserTokens] Deducted ${N} tokens: monthly ${monthly}->${newTokensMonthly}, added ${added}->${newTokensAdded}, available ${totalAvailable}->${newAvailable}`);
-    
+
+    // Best-effort audit log to token_log (negative for deductions)
+    try {
+      const delta = -Math.abs(N);
+      const logNote = note || 'API usage';
+      await logTokenChange(userId, delta, logNote);
+    } catch (logError) {
+      console.error('[updateUserTokens] Failed to log token change:', logError);
+      // Do not fail the main operation if logging fails
+    }
+
     return {
       success: true,
       availableTokens: newAvailable
@@ -509,6 +528,30 @@ async function logApiRequest(requestData) {
       });
   } catch (error) {
     console.error('Error logging API request:', error);
+  }
+}
+
+/**
+ * Log a token change to token_log (best-effort)
+ * @param {string} userId - User ID from users table
+ * @param {number} tokensDelta - Signed delta (+ for additions, - for deductions)
+ * @param {string} note - Human-readable description of the event
+ */
+async function logTokenChange(userId, tokensDelta, note) {
+  if (!supabase) return;
+  if (!userId) return;
+  if (!tokensDelta || Number(tokensDelta) === 0) return;
+
+  try {
+    await supabase
+      .from('token_log')
+      .insert({
+        user_id: String(userId),
+        tokens: Number(tokensDelta),
+        note: note || null,
+      });
+  } catch (error) {
+    console.error('[logTokenChange] Failed to insert token_log row:', error);
   }
 }
 
@@ -863,6 +906,13 @@ app.post('/api/users/create-account', async (req, res) => {
 
       userRow = inserted;
       message = AUTH_CREATE_NEW_USER_MESSAGE;
+
+      // Log bonus tokens for brand new auth user
+      try {
+        await logTokenChange(userRow.id, BONUS_TOKENS, 'Auth create-account bonus (new user)');
+      } catch (logError) {
+        console.error('[create-account] Failed to log auth create bonus:', logError);
+      }
     } else if (existingUsers.length === 1 && !existingUsers[0].auth_id) {
       // Single anon row without auth_id: link and add bonus tokens
       const row = existingUsers[0];
@@ -892,6 +942,13 @@ app.post('/api/users/create-account', async (req, res) => {
 
       userRow = updated;
       message = AUTH_LINK_EXISTING_ANON_MESSAGE;
+
+      // Log auth upgrade bonus when linking anon -> auth
+      try {
+        await logTokenChange(userRow.id, BONUS_TOKENS, 'Auth upgrade bonus (link anon → auth)');
+      } catch (logError) {
+        console.error('[create-account] Failed to log auth upgrade bonus:', logError);
+      }
     } else {
       // Multiple rows with this anon_id or at least one already has auth_id
       // Treat as repeat account: create a fresh row with 0 new tokens
@@ -1069,7 +1126,7 @@ app.post('/api/deepseek/query', async (req, res) => {
     let userTokenData = null;
     
     if (user) {
-      tokenUpdateResult = await updateUserTokens(user.id, totalTokens);
+      tokenUpdateResult = await updateUserTokens(user.id, totalTokens, 'API usage (DeepSeek)');
       
       if (!tokenUpdateResult.success) {
         console.error('❌ All tokens used:', tokenUpdateResult.error);
@@ -2869,7 +2926,7 @@ app.post('/api/dev/burn-tokens', async (req, res) => {
 
     const user = users[0];
 
-    const burnResult = await updateUserTokens(user.id, burnAmount);
+    const burnResult = await updateUserTokens(user.id, burnAmount, 'Dev burn tokens');
     if (!burnResult.success) {
       return res.status(400).json({ error: burnResult.error || 'Failed to burn tokens' });
     }

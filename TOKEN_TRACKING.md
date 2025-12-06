@@ -44,7 +44,35 @@ All fields live on the `users` table.
   - Incremented by every AI request.
   - Never reset.
 
-### 1.3 Deprecated/Unused Fields
+### 1.3 Token Log Table (Audit Trail)
+
+All token-changing operations write an audit row to the `token_log` table. This table is **append-only** and is used for debugging and historical analysis.
+
+- `id`
+  - Primary key.
+- `created_at`
+  - Timestamp when the log row was created (DB default `now()`).
+- `tokens`
+  - `int8` signed value representing the **delta** applied to the user's balance.
+  - **Positive** for additions (bonuses, subscription refills, manual grants).
+  - **Negative** for deductions (per-request usage, dev burn, cancellations that zero monthly, etc.).
+- `user_id`
+  - `text` – foreign key to `users.id` (the user row the change was applied to).
+- `note`
+  - `text` – short human-readable description of what happened.
+  - Examples:
+    - `"New anon user initial tokens"`
+    - `"API usage (DeepSeek)"`
+    - `"Auth upgrade bonus"`
+    - `"Dev burn tokens"`
+    - `"Subscription created (tier basic)"`
+
+The log is **best-effort**:
+
+- If logging fails, token updates must still succeed.
+- Token accounting remains authoritative on the `users` row; `token_log` is purely observational.
+
+### 1.4 Deprecated/Unused Fields
 
 These columns remain in the DB for now but **must not be referenced** by new code:
 
@@ -120,7 +148,10 @@ On webhook for **subscription renewal** (including upgrades/downgrades):
   - Directly **increase** `tokens_added`.
   - Do **not** touch `tokens_monthly`.
 
-Later we may add a separate `token_logs` table to audit these events, but that is **not required now**.
+Every such event MUST also write a row to `token_log` with:
+
+- `tokens` = positive pack/bonus size.
+- `note` describing the source (e.g., `"One-time purchase 50k"`, `"Manual bonus"`).
 
 ---
 
