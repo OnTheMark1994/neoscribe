@@ -10,9 +10,13 @@ import './DeveloperPage.css';
 const DeveloperPage = () => {
   const { user } = useAuth();
   const [tierId, setTierId] = useState(2); // Default to Basic
-  const [statusMessage, setStatusMessage] = useState('');
+  const [statusMessage, setStatusMessage] = useState('')
   const [loading, setLoading] = useState(false);
   const [lastResult, setLastResult] = useState(null);
+  const [debugAuthId, setDebugAuthId] = useState('');
+  const [debugUserId, setDebugUserId] = useState('');
+  const [hasAutoFetched, setHasAutoFetched] = useState(false);
+  const [accountInfo, setAccountInfo] = useState(null);
   const [tiers, setTiers] = useState([]);
 
   // Custom token values
@@ -21,6 +25,23 @@ const DeveloperPage = () => {
   const [tokensUsed, setTokensUsed] = useState('');
 
   const SERVER_URL = API_BASE_URL;
+  
+  // Set default Auth ID from user on mount
+  useEffect(() => {
+    if (user && user.id && !debugAuthId) {
+      console.log('[DEV] Setting default Auth ID from user', user.id);
+      setDebugAuthId(user.id);
+    }
+  }, [user, debugAuthId]);
+
+  // Auto-fetch user data once on mount if Auth ID is available
+  useEffect(() => {
+    if (!user || !debugAuthId || hasAutoFetched) return;
+
+    console.log('[DEV] Auto-fetching user data on start with Auth ID', debugAuthId);
+    setHasAutoFetched(true);
+    handleLoadFromAuthId();
+  }, [user, debugAuthId, hasAutoFetched]);
 
   // Load subscription tiers from server so this page stays in sync with server-side JSON
   useEffect(() => {
@@ -87,6 +108,73 @@ const DeveloperPage = () => {
       setStatusMessage(`✓ Subscription created simulation successful! Tier: ${tierId}`);
     } catch (error) {
       setStatusMessage(`✗ Error: ${error.message}`);
+      setLastResult(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefreshUserInfo = async () => {
+    const targetId = debugUserId;
+
+    if (!targetId) {
+      setStatusMessage('Enter a user ID (from users.id) to load account info');
+      return;
+    }
+
+    setLoading(true);
+    setStatusMessage('Loading account info...');
+
+    try {
+      const response = await fetch(`${SERVER_URL}/api/dev/user-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: targetId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load account info');
+      }
+
+      setAccountInfo(data);
+      setStatusMessage('✓ Loaded account info. See JSON below.');
+    } catch (error) {
+      setStatusMessage(`✗ Account info error: ${error.message}`);
+      setAccountInfo(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncWithStripe = async () => {
+    if (!user) {
+      setStatusMessage('You must be logged in to sync with Stripe');
+      return;
+    }
+    const targetId = user.id;
+
+    setLoading(true);
+    setStatusMessage('Syncing with Stripe (manual dev sync)...');
+
+    try {
+      const response = await fetch(`${SERVER_URL}/api/stripe/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authId: targetId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Stripe sync failed');
+      }
+
+      setLastResult(data);
+      setStatusMessage('✓ Stripe sync completed. See detailed log below.');
+    } catch (error) {
+      setStatusMessage(`✗ Stripe sync error: ${error.message}`);
       setLastResult(null);
     } finally {
       setLoading(false);
@@ -194,6 +282,90 @@ const DeveloperPage = () => {
     }
   };
 
+  const handleLoadFromAuthId = async () => {
+    if (!debugAuthId) {
+      setStatusMessage('Enter an Auth ID to load account info');
+      return;
+    }
+
+    setLoading(true);
+    setStatusMessage('Loading account info from Auth ID...');
+    console.log('[DEV] Loading data from Auth ID', debugAuthId);
+
+    try {
+      const response = await fetch(`${SERVER_URL}/api/user/tokens/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authId: debugAuthId }),
+      });
+
+      console.log('[DEV] /api/user/tokens response status for Auth ID', response.status);
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[DEV] Non-OK response for Auth ID load', { status: response.status, body: text });
+        throw new Error(`Failed to load data: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[DEV] Data loaded from Auth ID', data);
+
+      setAccountInfo({ source: 'Auth ID', id: debugAuthId, data });
+      setStatusMessage('✓ Loaded account info from Auth ID. See JSON below.');
+
+      // If userId is in the response, set it as default for User ID input if empty
+      if (data && data.userId && !debugUserId) {
+        console.log('[DEV] Setting User ID from response', data.userId);
+        setDebugUserId(String(data.userId));
+      }
+    } catch (error) {
+      console.error('[DEV] Error loading from Auth ID', error);
+      setStatusMessage(`✗ Error loading from Auth ID: ${error.message}`);
+      setAccountInfo(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadFromUserId = async () => {
+    if (!debugUserId) {
+      setStatusMessage('Enter a User ID (from users.id) to load account info');
+      return;
+    }
+
+    setLoading(true);
+    setStatusMessage('Loading account info from User ID...');
+    console.log('[DEV] Loading data from User ID', debugUserId);
+
+    try {
+      const response = await fetch(`${SERVER_URL}/api/dev/user-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: debugUserId }),
+      });
+
+      console.log('[DEV] /api/dev/user-info response status for User ID', response.status);
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[DEV] Non-OK response for User ID load', { status: response.status, body: text });
+        throw new Error(`Failed to load data: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[DEV] Data loaded from User ID', data);
+
+      setAccountInfo({ source: 'User ID', id: debugUserId, data });
+      setStatusMessage('✓ Loaded account info from User ID. See JSON below.');
+    } catch (error) {
+      console.error('[DEV] Error loading from User ID', error);
+      setStatusMessage(`✗ Error loading from User ID: ${error.message}`);
+      setAccountInfo(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!user) {
     return (
       <div className="sf-page sf-developer-page">
@@ -214,6 +386,68 @@ const DeveloperPage = () => {
           <h1>Developer Tools</h1>
           <p>Test the token tracking system by simulating Stripe webhook events.</p>
         </header>
+
+        <section className="sf-dev-section">
+          <h2>Account Info</h2>
+          <p className="sf-dev-description">
+            Inspect raw user row(s) by Auth ID (Supabase UUID) or database User ID (users.id). Defaults to the current user when possible.
+          </p>
+
+          <div className="sf-dev-account-controls">
+            <div className="sf-dev-input-group">
+              <label htmlFor="debug-auth-id">Auth ID:</label>
+              <input
+                id="debug-auth-id"
+                type="text"
+                value={debugAuthId}
+                onChange={(e) => setDebugAuthId(e.target.value)}
+                placeholder="Supabase auth UUID"
+              />
+              <button
+                className="sf-dev-btn sf-dev-btn-renew"
+                type="button"
+                onClick={handleLoadFromAuthId}
+                disabled={loading}
+              >
+                Load from Auth ID
+              </button>
+            </div>
+            <div className="sf-dev-input-group">
+              <label htmlFor="debug-user-id">User ID:</label>
+              <input
+                id="debug-user-id"
+                type="text"
+                value={debugUserId}
+                onChange={(e) => setDebugUserId(e.target.value)}
+                placeholder="Database users.id"
+              />
+              <button
+                className="sf-dev-btn sf-dev-btn-renew"
+                type="button"
+                onClick={handleLoadFromUserId}
+                disabled={loading}
+              >
+                Load from User ID
+              </button>
+            </div>
+            <div className="sf-dev-buttons">
+              <button
+                className="sf-dev-btn sf-dev-btn-create"
+                type="button"
+                onClick={handleSyncWithStripe}
+                disabled={loading}
+              >
+                Sync with Stripe (Manual)
+              </button>
+            </div>
+          </div>
+
+          {accountInfo && (
+            <pre className="sf-dev-json">
+              {JSON.stringify(accountInfo, null, 2)}
+            </pre>
+          )}
+        </section>
 
         <section className="sf-dev-section">
           <h2>Simulate Stripe Webhooks</h2>

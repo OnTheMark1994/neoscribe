@@ -435,12 +435,31 @@ async function updateUserTokens(userId, tokensToUse, note = null) {
     // ELIGIBILITY CHECK (Section 4.1)
     // Block if totalAvailable <= 0, allow even if N > totalAvailable
     if (totalAvailable <= 0) {
-      console.error('[updateUserTokens] No tokens available');
-      return { 
-        success: false, 
-        availableTokens: 0,
-        error: 'All tokens used' 
-      };
+      console.error('❌ All tokens used:', tokenUpdateResult.error);
+      
+      // Log failed request
+      await logApiRequest({
+        userId: user.id,
+        anonId: userId,
+        authId: authId || null,
+        ipAddress: ipAddress,
+        endpoint: '/api/deepseek/query',
+        tokensInput: inputTokens,
+        tokensOutput: responseTokens,
+        tokensTotal: totalTokens,
+        model: apiResponse.model || model || 'deepseek-chat',
+        responseTime: responseTime,
+        success: false,
+        errorMessage: tokenUpdateResult.error
+      });
+      
+      // Return error response
+      return res.status(429).json({
+        success: false,
+        error: 'All tokens used',
+        message: 'You have used all your available tokens. Upgrade your account for more tokens.',
+        availableTokens: 0
+      });
     }
     
     // DEDUCTION ORDER (Section 4.2)
@@ -842,8 +861,6 @@ app.post('/api/users/login', async (req, res) => {
         .insert({
           anon_id: anonId,
           auth_id: authId,
-          email,
-          password,
           tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: 0,
@@ -954,10 +971,10 @@ app.post('/api/users/create-account', async (req, res) => {
           auth_id: authId,
           email,
           password,
-          tokens_monthly: 0,
-          tokens_used: 0,
-          tokens_added: BONUS_TOKENS,
-          tokens_used_all_time: 0
+          tokens_monthly: 0,           // No monthly allowance initially (set via Stripe webhook)
+          tokens_used: 0,              // No tokens used yet
+          tokens_added: BONUS_TOKENS,  // Bonus for auth defined by constants
+          tokens_used_all_time: 0      // No lifetime usage yet
         })
         .select()
         .single();
@@ -1405,7 +1422,7 @@ app.post('/api/user/tokens/', async (req, res) => {
     // Find user(s) by anon_id or auth_id (do NOT use .single() so multiples don't throw)
     let query = supabase
       .from('users')
-      .select('tokens_monthly, tokens_used, tokens_added, tokens_used_all_time, tier_id, stripe_subscription_id, subscription_status, stripe_customer_id, email, next_billing_date');
+      .select('id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time, tier_id, stripe_subscription_id, subscription_status, stripe_customer_id, email, next_billing_date');
 
     if (authId) {
       // console.log('[/api/user/tokens] Querying by auth_id:', authId);
@@ -1451,6 +1468,7 @@ app.post('/api/user/tokens/', async (req, res) => {
     const tierName = tierData?.title || null;
 
     const responseData = {
+      userId: user.id,
       availableTokens: availableTokens,
       tokens_monthly: tokensMonthly,
       tokensMonthly: tokensMonthly,
@@ -2458,11 +2476,6 @@ app.post('/api/stripe/sync', async (req, res) => {
   try {
     const { authId, email } = req.body;
 
-    if (!stripe) {
-      console.error('[STRIPE SYNC] ERROR: Stripe not configured');
-      return res.status(503).json({ error: 'Stripe not configured' });
-    }
-
     if (!authId && !email) {
       return res.status(400).json({ error: 'authId or email is required' });
     }
@@ -2695,7 +2708,7 @@ async function applySubscriptionCreated(authId, tierId) {
   
   const tierLimit = tierData.monthly_allowance || 0;
   
-  // Find user
+  // Find user by authId
   const { data: users, error: findError } = await supabase
     .from('users')
     .select('id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
@@ -2747,7 +2760,7 @@ async function applySubscriptionRenewed(authId, tierId) {
   
   const tierLimit = tierData.monthly_allowance || 0;
   
-  // Find user
+  // Find user by authId
   const { data: users, error: findError } = await supabase
     .from('users')
     .select('id, tokens_monthly, tokens_used, tokens_added, tokens_used_all_time')
@@ -2792,7 +2805,7 @@ async function applySubscriptionRenewed(authId, tierId) {
 async function applySubscriptionCanceled(authId) {
   if (!supabase) throw new Error('Database not configured');
   
-  // Find user
+  // Find user by authId
   const { data: users, error: findError } = await supabase
     .from('users')
     .select('id, tokens_monthly, tokens_added')
@@ -2840,14 +2853,54 @@ app.post('/api/dev/stripe/simulate-subscription-created', async (req, res) => {
   console.log('[DEV] Simulating subscription created');
   try {
     const { authId, tierId } = req.body;
-    
-    if (!authId || !tierId) {
-      return res.status(400).json({ error: 'authId and tierId are required' });
+    console.log('[DEV] Simulation request received', { authId, tierId });
+
+    if (!authId) {
+      console.error('[DEV] Simulation failed: authId is required');
+      return res.status(400).json({ error: 'authId is required' });
     }
-    
-    const result = await applySubscriptionCreated(authId, Number(tierId));
-    console.log('[DEV] Subscription created simulation result:', result);
-    res.json(result);
+
+    if (!tierId) {
+      console.error('[DEV] Simulation failed: tierId is required');
+      return res.status(400).json({ error: 'tierId is required' });
+    }
+
+    // Find user by authId
+    const { data: users, error } = await supabase.from('users').select('*').eq('auth_id', authId);
+    if (error || !users || users.length === 0) {
+      console.error('[DEV] Simulation failed: User not found', { error: error?.message, usersCount: users?.length });
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = users[0];
+    console.log('[DEV] Found user for simulation', { userId: user.id, authId });
+
+    // Update user with subscription details
+    const tierData = getTierById(Number(tierId));
+    if (!tierData) {
+      console.error('[DEV] Simulation failed: Invalid tierId', { tierId });
+      return res.status(400).json({ error: 'Invalid tierId' });
+    }
+
+    console.log('[DEV] Updating user with tier', { tierId, tierName: tierData.title });
+    const { data: updatedUser, error: updateError } = await supabase.from('users').update({
+      tier_id: tierId,
+      subscription_status: 'active',
+      tokens_monthly: tierData.monthly_allowance,
+      tokens_used: 0
+    }).eq('id', user.id).select('*').single();
+
+    if (updateError) {
+      console.error('[DEV] Simulation failed: Error updating user', { error: updateError.message });
+      return res.status(500).json({ error: 'Failed to update user subscription' });
+    }
+
+    console.log('[DEV] Simulation successful: Subscription created', { userId: user.id, tierId, tierName: tierData.title });
+    return res.json({
+      success: true,
+      message: `Subscription created for tier ${tierData.title}`,
+      user: updatedUser
+    });
   } catch (error) {
     console.error('[DEV] Simulation error:', error);
     res.status(500).json({ error: error.message });
@@ -2944,6 +2997,51 @@ app.post('/api/dev/set-tokens', async (req, res) => {
   } catch (error) {
     console.error('[DEV] Set tokens error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DEV ONLY: Fetch raw user info by user.id for debugging
+ * POST /api/dev/user-info
+ * Body: { userId }
+ */
+app.post('/api/dev/user-info', async (req, res) => {
+  console.log('[DEV] Fetching user info for debugging');
+
+  if (!supabase) {
+    return res.status(503).json({ error: 'Database not configured' });
+  }
+
+  try {
+    const { userId } = req.body || {};
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    console.log('[DEV] /api/dev/user-info userId:', userId);
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId);
+
+    if (error) {
+      console.error('[DEV] /api/dev/user-info query error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    const userCount = Array.isArray(users) ? users.length : 0;
+    console.log('[DEV] /api/dev/user-info user count:', userCount);
+
+    return res.json({
+      success: true,
+      userCount,
+      users: users || [],
+    });
+  } catch (err) {
+    console.error('[DEV] /api/dev/user-info unexpected error:', err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
