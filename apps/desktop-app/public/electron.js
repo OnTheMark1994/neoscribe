@@ -234,7 +234,22 @@ function createMenu() {
           label: 'Settings',
           accelerator: 'CmdOrCtrl+,',
           click: () => {
-            showSettingsWindow();
+            // File -> Settings should always open on the General tab,
+            // regardless of what tab was last requested by other entry points
+            const requestedTab = 'general';
+            lastSettingsTab = requestedTab;
+
+            if (!settingsWindow || settingsWindow.isDestroyed()) {
+              // Match the unified open-settings IPC behavior
+              pendingSettingsTab = requestedTab;
+              showSettingsWindow('#settings');
+            } else {
+              // Focus existing window and switch to the General tab
+              showSettingsWindow();
+              if (!settingsWindow.isDestroyed()) {
+                settingsWindow.webContents.send('requested-settings-tab', requestedTab);
+              }
+            }
           }
         },
         { type: 'separator' },
