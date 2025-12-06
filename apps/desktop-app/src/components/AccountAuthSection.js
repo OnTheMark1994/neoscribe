@@ -131,11 +131,7 @@ function AccountAuthSection({
   }, [initialPassword, authPassword]);
 
   return (
-    <div className="setting-section">
-      <div className="setting-section-header">
-        <h2>Authentication & Subscription</h2>
-      </div>
-
+    <>
       {/* Subscription summary (shared for signed-in and signed-out states) */}
       <div className="stat-item">
         <span className="stat-label">Current Plan</span>
@@ -274,7 +270,7 @@ function AccountAuthSection({
           <span className="stat-value">{status}</span>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

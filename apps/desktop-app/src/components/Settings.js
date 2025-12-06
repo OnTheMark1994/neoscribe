@@ -3,6 +3,7 @@ import './Settings.css';
 import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData, devBurnTokens } from '../utils/aiService';
 import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
+import TokenUsageLog from './TokenUsageLog';
 
 function Settings({ anonId, authId: authIdProp, userAccount }) {
   const [activeTab, setActiveTab] = useState('general');
@@ -485,7 +486,7 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
         <div className="tab-content active">
           <div className="setting-section">
             <div className="setting-section-header">
-              <h2>Account Information</h2>
+              <h2>Authentication & Subscription</h2>
               <RefreshButton
                 onClick={loadAccountData}
                 disabled={!anonId}
@@ -493,10 +494,48 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
                 title="Refresh account from server"
               />
             </div>
-            
+
+            <AccountAuthSection
+              anonId={anonId}
+              authId={authId}
+              onAccountUpdated={(result) => {
+                if (result && result.authUser && result.authUser.id) {
+                  const newAuthId = result.authUser.id;
+                  setAuthId(newAuthId);
+                  localStorage.setItem('authId', newAuthId);
+
+                  // Notify main window so primary App instance can update authId immediately
+                  if (window.electronAPI && window.electronAPI.settingsSaved) {
+                    window.electronAPI.settingsSaved({ authId: newAuthId });
+                  }
+                }
+                if (result && result.user) {
+                  setAccountData(result.user);
+                  const normalized = normalizeUserTokenData(result.user || {});
+                  setTokenStats(normalized);
+                  setTokenCount(normalized.availableTokens > 0 ? normalized.availableTokens : 0);
+                } else {
+                  loadAccountData();
+                }
+              }}
+              onAuthCleared={() => {
+                setAuthId(null);
+                localStorage.removeItem('authId');
+
+                // Notify main window so primary App instance can clear authId
+                if (window.electronAPI && window.electronAPI.settingsSaved) {
+                  window.electronAPI.settingsSaved({ authId: null });
+                }
+              }}
+              initialEmail={accountEmail}
+              initialPassword={accountPassword}
+              subscriptionType={tierName}
+              nextBillingDate={nextBillingDate}
+            />
+
             {developerMode && (
               <>
-                <div className="stat-item anon-id-box">
+                <div className="stat-item anon-id-box" style={{ marginTop: '12px' }}>
                   <span className="stat-label">🔑 Anonymous ID</span>
                   <span className="stat-value">{anonId || 'Loading...'}</span>
                 </div>
@@ -505,47 +544,20 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
                   <span className="stat-label">👤 Auth ID</span>
                   <span className="stat-value">{authId || 'Not logged in'}</span>
                 </div>
-
-                {developerToolsStatus && (
-                  <div className="stat-item">
-                    <span className="stat-label">{developerToolsStatus}</span>
-                  </div>
-                )}
-
-                <div className="stat-item">
-                  <span
-                    className="stat-label"
-                    style={{ display: 'block', width: '100%', textAlign: 'center' }}
-                  >
-                    Developer Tools
-                  </span>
-                </div>
-
-                <div
-                  className="stat-item"
-                  style={{ justifyContent: 'center', gap: '10px' }}
-                >
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={handleDeveloperResetIds}
-                  >
-                    Reset local anon/auth IDs
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={handleDeveloperBurnTokens}
-                  >
-                    -14k tokens
-                  </button>
-                </div>
               </>
             )}
           </div>
 
           <div className="setting-section">
-            <h2>Token Usage</h2>
+            <div className="setting-section-header">
+              <h2>Token Usage</h2>
+              <RefreshButton
+                onClick={loadAccountData}
+                disabled={!anonId}
+                loading={accountLoading}
+                title="Refresh token usage from server"
+              />
+            </div>
             <div className="stat-item">
               <span className="stat-label">Tokens Remaining This Month</span>
               <span className="stat-value token-count">{tokenCount.toLocaleString()}</span>
@@ -574,45 +586,9 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
                 {tokensUsedAllTime != null ? tokensUsedAllTime.toLocaleString() : 'Loading...'}
               </span>
             </div>
+
+            <TokenUsageLog anonId={anonId} authId={authId} />
           </div>
-
-          <AccountAuthSection
-            anonId={anonId}
-            authId={authId}
-            onAccountUpdated={(result) => {
-              if (result && result.authUser && result.authUser.id) {
-                const newAuthId = result.authUser.id;
-                setAuthId(newAuthId);
-                localStorage.setItem('authId', newAuthId);
-
-                // Notify main window so primary App instance can update authId immediately
-                if (window.electronAPI && window.electronAPI.settingsSaved) {
-                  window.electronAPI.settingsSaved({ authId: newAuthId });
-                }
-              }
-              if (result && result.user) {
-                setAccountData(result.user);
-                const normalized = normalizeUserTokenData(result.user || {});
-                setTokenStats(normalized);
-                setTokenCount(normalized.availableTokens > 0 ? normalized.availableTokens : 0);
-              } else {
-                loadAccountData();
-              }
-            }}
-            onAuthCleared={() => {
-              setAuthId(null);
-              localStorage.removeItem('authId');
-
-              // Notify main window so primary App instance can clear authId
-              if (window.electronAPI && window.electronAPI.settingsSaved) {
-                window.electronAPI.settingsSaved({ authId: null });
-              }
-            }}
-            initialEmail={accountEmail}
-            initialPassword={accountPassword}
-            subscriptionType={tierName}
-            nextBillingDate={nextBillingDate}
-          />
 
           {accountError && (
             <div className="setting-section">
@@ -624,15 +600,52 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
             </div>
           )}
 
-          {accountData && developerMode && (
+          {developerMode && (
             <div className="setting-section">
-              <h2>Backend User Data</h2>
-              <div className="stat-item">
-                <span className="stat-label">Raw User Record</span>
-                <pre className="user-account-json">
-                  {JSON.stringify(accountData, null, 2)}
-                </pre>
+              <div className="setting-section-header">
+                <h2>Developer Tools</h2>
+                <RefreshButton
+                  onClick={loadAccountData}
+                  disabled={!anonId}
+                  loading={accountLoading}
+                  title="Refresh developer data from server"
+                />
               </div>
+
+              {developerToolsStatus && (
+                <div className="stat-item">
+                  <span className="stat-label">{developerToolsStatus}</span>
+                </div>
+              )}
+
+              <div
+                className="stat-item"
+                style={{ justifyContent: 'center', gap: '10px' }}
+              >
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleDeveloperResetIds}
+                >
+                  Reset local anon/auth IDs
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleDeveloperBurnTokens}
+                >
+                  -14k tokens
+                </button>
+              </div>
+
+              {accountData && (
+                <div className="stat-item">
+                  <span className="stat-label">Raw User Record</span>
+                  <pre className="user-account-json">
+                    {JSON.stringify(accountData, null, 2)}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </div>

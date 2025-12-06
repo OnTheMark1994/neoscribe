@@ -143,6 +143,34 @@ function App() {
           setDeveloperMode(dev);
           localStorage.setItem('developerMode', dev ? 'true' : 'false');
         }
+        if (settings.authId !== undefined) {
+          const newAuthId = settings.authId || null;
+          console.log('[APP] Settings updated - authId:', newAuthId);
+          setAuthId(newAuthId);
+
+          if (newAuthId) {
+            localStorage.setItem('authId', newAuthId);
+          } else {
+            localStorage.removeItem('authId');
+          }
+
+          dispatch(setUserAuthId(newAuthId));
+
+          // When auth state changes, refresh token data for AISidebar
+          if (anonId) {
+            (async () => {
+              try {
+                const tokenData = await fetchUserTokens(anonId, newAuthId);
+                const normalized = normalizeUserTokenData(tokenData || {});
+                const refreshedAvailable = normalized.availableTokens > 0 ? normalized.availableTokens : 0;
+                console.log('[APP] Refreshed availableTokens after auth change:', refreshedAvailable, 'normalized:', normalized);
+                setAvailableTokens(refreshedAvailable);
+              } catch (err) {
+                console.error('[APP] Failed to refresh tokens after auth change:', err);
+              }
+            })();
+          }
+        }
         
         if (settings.requestCloseAfterSave) {
           window.close();
