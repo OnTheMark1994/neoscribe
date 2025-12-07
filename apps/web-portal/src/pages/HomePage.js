@@ -19,8 +19,22 @@ const HomePage = () => {
             <a
               href="https://scribefold-ai-monorepo-web-build.onrender.com/"
               className="sf-secondary-btn"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              Try Web App
+              <span style={{paddingRight: "5px"}}>Try Web App</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M14 3h7v7" />
+                <path d="M10 14L21 3" />
+                <path d="M5 5v16h16" />
+              </svg>
             </a>
             {/* Keep this Learn more button in the markup for later use when we add more marketing content */}
             {false && (

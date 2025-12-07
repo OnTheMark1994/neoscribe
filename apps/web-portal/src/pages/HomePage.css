@@ -42,6 +42,8 @@
   padding: 10px 20px;
   font-size: 0.95rem;
   text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
 }
 
 .sf-primary-btn {
@@ -52,6 +54,8 @@
 
 .sf-primary-btn:hover {
   background: #4ade80;
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 1px #fbbf24, 0 0 18px rgba(251, 191, 36, 0.85);
 }
 
 .sf-secondary-btn {
@@ -62,6 +66,7 @@
 .sf-secondary-btn:hover {
   border-color: #fbbf24;
   color: #fbbf24;
+  box-shadow: 0 0 0 1px #fbbf24, 0 0 18px rgba(251, 191, 36, 0.85);
 }
 
 .sf-hero-right {
