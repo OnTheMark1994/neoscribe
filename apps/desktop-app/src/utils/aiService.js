@@ -219,7 +219,8 @@ export function calculateFullTokenEstimate(lines) {
 }
 
 // Ensure user exists and fetch user account data by anonId
-export async function fetchUserAccount(anonId) {
+// deviceId is optional: when provided (from desktop Electron app), enables per-device token grants
+export async function fetchUserAccount(anonId, deviceId = null) {
   if (!anonId) {
     throw new Error('anonId is required to fetch user account');
   }
@@ -228,6 +229,9 @@ export async function fetchUserAccount(anonId) {
   const url = `${serverUrl}/api/users/ensure`;
 
   const requestBody = { anonId };
+  if (deviceId) {
+    requestBody.deviceId = deviceId;
+  }
 
   const fetchOptions = {
     method: 'POST',
@@ -237,7 +241,7 @@ export async function fetchUserAccount(anonId) {
     body: JSON.stringify(requestBody)
   };
 
-  console.log('[USER] Calling user ensure endpoint:', url, 'with anonId:', anonId);
+  console.log('[USER] Calling user ensure endpoint:', url, 'with anonId:', anonId, 'deviceId:', deviceId ? '(set)' : '(none)');
 
   const response = await fetch(url, fetchOptions);
 

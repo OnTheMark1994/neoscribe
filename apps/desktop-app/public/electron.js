@@ -4,6 +4,7 @@ const fs = require('fs');
 const Store = require('electron-store');
 const crypto = require('crypto');
 const isDev = require('electron-is-dev');
+const { machineIdSync } = require('node-machine-id');
 
 // Disable cache and GPU BEFORE anything else
 app.commandLine.appendSwitch('disable-http-cache');
@@ -18,6 +19,7 @@ const store = new Store({ cwd: userDataPath });
 console.log('[MAIN] electron-store initialized at:', userDataPath);
 
 let anonId = null;
+let deviceId = null;
 let mainWindow;
 let passwordDialogWindow = null;
 let settingsWindow = null;
@@ -53,6 +55,21 @@ function getOrCreateAnonId() {
   return anon_id;
 }
 
+// Generate a stable hashed device ID using node-machine-id
+// This is used for per-device free token grants
+const DEVICE_ID_SALT = 'scribefold-device-salt-2024';
+function getDeviceIdHash() {
+  try {
+    const rawMachineId = machineIdSync({ original: true });
+    const hash = crypto.createHash('sha256').update(rawMachineId + DEVICE_ID_SALT).digest('hex');
+    console.log('[MAIN] Generated device_id hash');
+    return hash;
+  } catch (error) {
+    console.error('[MAIN] Failed to generate device_id:', error);
+    return null;
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -80,13 +97,15 @@ function createWindow() {
   // DevTools will be opened by renderer if developerMode is enabled
   // Don't open automatically here since developerMode is stored in localStorage (renderer)
 
-  // Initialize anon_id
+  // Initialize anon_id and device_id
   anonId = getOrCreateAnonId();
+  deviceId = getDeviceIdHash();
   
-  // Send anon_id when ready
+  // Send anon_id and device_id when ready
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[MAIN] Window loaded, sending anon_id:', anonId);
+    console.log('[MAIN] Window loaded, sending anon_id:', anonId, 'device_id:', deviceId ? '(set)' : '(null)');
     mainWindow.webContents.send('anon-id-ready', anonId);
+    mainWindow.webContents.send('device-id-ready', deviceId);
   });
 
   mainWindow.on('closed', () => {
@@ -453,6 +472,7 @@ app.on('will-quit', () => {
 
 // IPC Handlers
 ipcMain.handle('get-anon-id', async () => anonId);
+ipcMain.handle('get-device-id', async () => deviceId);
 
 // Developer utility: reset anon_id so the next launch behaves like a first-time run
 ipcMain.handle('reset-anon-id', async () => {

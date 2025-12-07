@@ -1760,7 +1760,12 @@ app.post('/api/user/add-tokens', async (req, res) => {
 
 app.post('/api/users/ensure', async (req, res) => {
   try {
-    const { anonId } = req.body || {};
+    const { anonId, deviceId } = req.body || {};
+
+    console.log('\n[ensure] Incoming /api/users/ensure request:', {
+      anonId,
+      deviceId: deviceId ? '(provided)' : '(none)',
+    });
 
     if (!anonId) {
       return res.status(400).json({
@@ -1781,18 +1786,146 @@ app.post('/api/users/ensure', async (req, res) => {
     }
 
     const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-    const user = await getOrCreateUser(anonId, null, ipAddress);
+    console.log('[ensure] Resolved IP address:', ipAddress);
 
-    if (!user) {
-      return res.status(500).json({
-        error: 'Failed to get or create user'
-      });
+    // Check if this deviceId has already received a free device grant
+    let deviceAlreadyGranted = false;
+    if (deviceId) {
+      const { data: existingDeviceUsers, error: deviceError } = await supabase
+        .from('users')
+        .select('id, device_id, free_grant_used')
+        .eq('device_id', deviceId)
+        .eq('free_grant_used', true)
+        .limit(1);
+
+      if (!deviceError && existingDeviceUsers && existingDeviceUsers.length > 0) {
+        deviceAlreadyGranted = true;
+        console.log('[ensure] Device already granted free tokens for device_id:', deviceId, 'rows:', existingDeviceUsers.length);
+      }
     }
+
+    // Look for existing user by anonId
+    const { data: anonUsers, error: anonError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('anon_id', anonId);
+
+    if (anonError) {
+      console.error('[ensure] Error querying users by anon_id:', anonError);
+      return res.status(500).json({ error: 'Database query failed' });
+    }
+
+    let user = null;
+    let grantedDeviceTokens = false;
+
+    if (anonUsers && anonUsers.length > 0) {
+      // User exists, use first row
+      user = anonUsers[0];
+      console.log('[ensure] Found existing user by anonId:', anonId, 'userId:', user.id, 'device_id:', user.device_id, 'free_grant_used:', user.free_grant_used);
+
+      // If device grant available and user hasn't used their free grant yet, apply it
+      if (deviceId && !deviceAlreadyGranted && !user.free_grant_used) {
+        // Apply device grant: add NEW_ANON_TOKENS to tokens_added
+        console.log('[ensure] Applying device grant for existing user:', user.id, 'device_id:', deviceId);
+
+        const result = await applyTokenChange({
+          userId: user.id,
+          deltaAdded: NEW_ANON_TOKENS,
+          note: 'Device anon grant (first desktop install)',
+        });
+
+        if (result.success) {
+          // Mark free_grant_used and store device_id
+          console.log('[ensure] Marking user free_grant_used=true and linking device_id:', deviceId);
+
+          await supabase
+            .from('users')
+            .update({ device_id: deviceId, free_grant_used: true })
+            .eq('id', user.id);
+
+          console.log('[ensure] Applied device grant for user:', user.id, 'device_id:', deviceId);
+          grantedDeviceTokens = true;
+        }
+
+        // Re-fetch user after update
+        const { data: updatedUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        user = updatedUser || user;
+      } else if (deviceId && !user.device_id) {
+        // Just link the device_id even if no grant (device was already granted elsewhere)
+        console.log('[ensure] Linking device_id to existing user without grant (deviceAlreadyGranted =', deviceAlreadyGranted, '):', deviceId, 'userId:', user.id);
+
+        await supabase
+          .from('users')
+          .update({ device_id: deviceId })
+          .eq('id', user.id);
+      }
+    } else {
+      // Create new user
+      const shouldGrantDeviceTokens = deviceId && !deviceAlreadyGranted;
+      const initialTokensAdded = shouldGrantDeviceTokens ? NEW_ANON_TOKENS : 0;
+      console.log('[ensure] Creating new user for anonId:', anonId, 'deviceId:', deviceId, 'shouldGrantDeviceTokens:', shouldGrantDeviceTokens);
+
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          anon_id: anonId,
+          auth_id: null,
+          device_id: deviceId || null,
+          tokens_monthly: 0,
+          tokens_used: 0,
+          tokens_added: initialTokensAdded,
+          tokens_used_all_time: 0,
+          free_grant_used: shouldGrantDeviceTokens
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('[ensure] Error creating user:', createError);
+        return res.status(500).json({ error: 'Failed to create user' });
+      }
+
+      user = newUser;
+      grantedDeviceTokens = shouldGrantDeviceTokens;
+
+      // Log initial token grant
+      if (shouldGrantDeviceTokens) {
+        try {
+          console.log('[ensure] Logging initial device grant to token_log for user:', user.id, 'tokens_added:', initialTokensAdded);
+
+          await supabase
+            .from('token_log')
+            .insert({
+              user_id: String(user.id),
+              tokens_monthly: 0,
+              tokens_added: initialTokensAdded,
+              note: 'New desktop user device grant',
+            });
+        } catch (logError) {
+          console.error('[ensure] Failed to log device grant:', logError);
+        }
+      }
+
+      console.log('[ensure] Created new user:', user.id, 'device_id:', deviceId, 'grantedDeviceTokens:', grantedDeviceTokens);
+    }
+
+    console.log('[ensure] Final user payload:', {
+      userId: user.id,
+      anon_id: user.anon_id,
+      device_id: user.device_id,
+      free_grant_used: user.free_grant_used,
+      grantedDeviceTokens,
+    });
 
     return res.json({
       ...user,
       exists: true,
-      fromDatabase: true
+      fromDatabase: true,
+      grantedDeviceTokens
     });
   } catch (error) {
     console.error('Error in /api/users/ensure:', error);

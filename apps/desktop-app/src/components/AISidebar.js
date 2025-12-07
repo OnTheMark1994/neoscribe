@@ -7,6 +7,7 @@ import { callDeepSeekServerAPI, calculateFullTokenEstimate, processChanges, inte
 import { getLines, updateLinesFromText, getTextFromLines } from '../utils/editorEngine';
 import { isWeb } from '../utils/environment';
 import { openSettings } from '../store/uiSlice';
+import { WEB_PORTAL_BASE_URL } from '../utils/constants';
 
 // Duration to keep the refresh animation visible (ms)
 const REFRESH_ANIMATION_DURATION = 800;
@@ -567,6 +568,40 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initial
       )}
       
       <div className="ai-sidebar-content" id="aiMessages">
+        {/* Banner for non-authenticated web users explaining free token requirements */}
+        {isWeb() && !authId && (
+          <div className="ai-web-auth-banner">
+            <div className="ai-web-auth-banner-content">
+              <p><strong>Get 15,000 Free Tokens</strong></p>
+              <p>To prevent abuse, free tokens require:</p>
+              <ul>
+                <li>Creating a free account, <strong>or</strong></li>
+                <li>Downloading the desktop app</li>
+              </ul>
+              <div className="ai-web-auth-banner-buttons">
+                <button
+                  className="ai-settings-btn"
+                  onClick={openAccountSettings}
+                >
+                  Create Free Account
+                </button>
+                <a
+                  href={`${WEB_PORTAL_BASE_URL}/#/downloads`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ai-download-link"
+                >
+                  Download Desktop App
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '4px' }}>
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
         {messages.length === 0 ? (
           <p className="ai-placeholder">AI Assistant is ready. Type a prompt below to get started.</p>
         ) : (

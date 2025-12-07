@@ -23,6 +23,7 @@ function App() {
   const [isModified, setIsModified] = useState(false);
   const [anonId, setAnonId] = useState(null);
   const [authId, setAuthId] = useState(null);
+  const [deviceId, setDeviceId] = useState(null);
   const [userAccount, setUserAccount] = useState(null);
   const [availableTokens, setAvailableTokens] = useState(null);
   const [isSettingsView, setIsSettingsView] = useState(false);
@@ -177,6 +178,19 @@ function App() {
         dispatch(setUserAnonId(id));
       });
 
+      // Get device_id for per-device token grants (desktop only)
+      window.electronAPI.getDeviceId().then(id => {
+        console.log('[APP] getDeviceId() resolved with:', id ? '(set)' : '(null)');
+        setDeviceId(id);
+      }).catch(err => {
+        console.error('[APP] getDeviceId() failed:', err);
+      });
+
+      window.electronAPI.onDeviceIdReady((event, id) => {
+        console.log('[APP] device-id-ready event:', id ? '(set)' : '(null)');
+        setDeviceId(id);
+      });
+
       window.electronAPI.onAIEnabledChanged((event, enabled) => {
         console.log('[APP] AI enabled changed:', enabled);
         setIsAIEnabled(!!enabled);
@@ -281,17 +295,36 @@ function App() {
     }
   }, []);
 
-  // Once anonId is known, ensure user exists and load account data from backend
+  // Once anonId is known (and deviceId if in Electron), ensure user exists and load account data from backend
   useEffect(() => {
     if (!anonId) return;
+    // In Electron, wait for deviceId to be set (can be null if generation failed)
+    // In web mode, deviceId will always be null
+    if (isElectron() && deviceId === null) {
+      // deviceId hasn't been set yet, wait for it
+      // (Note: deviceId could be null string if generation failed, so we check for exactly null)
+      return;
+    }
 
     let cancelled = false;
 
     (async () => {
       try {
-        const data = await fetchUserAccount(anonId);
+        console.log('[APP] Calling fetchUserAccount with:', {
+          anonId,
+          deviceId: deviceId ? '(set)' : '(none)',
+        });
+
+        const data = await fetchUserAccount(anonId, deviceId);
         if (cancelled) return;
-        console.log('[APP] User account data loaded for anonId', anonId, ':', data);
+        console.log('[APP] User account data loaded:', {
+          anonId,
+          userId: data?.id,
+          authId: data?.auth_id || data?.authId || null,
+          device_id: data?.device_id || null,
+          free_grant_used: data?.free_grant_used,
+          grantedDeviceTokens: data?.grantedDeviceTokens,
+        });
         setUserAccount(data || null);
         dispatch(setUserData(data || null));
 
@@ -327,7 +360,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [anonId]);
+  }, [anonId, deviceId]);
 
   const setBackground = (imagePath) => {
     const backgroundContainer = document.getElementById('backgroundContainer');

@@ -79,6 +79,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAnonId: () => ipcRenderer.invoke('get-anon-id'),
   onAnonIdReady: (callback) => ipcRenderer.on('anon-id-ready', callback),
   resetAnonId: () => ipcRenderer.invoke('reset-anon-id'),
+  getDeviceId: () => ipcRenderer.invoke('get-device-id'),
+  onDeviceIdReady: (callback) => ipcRenderer.on('device-id-ready', callback),
   
   // Developer mode - controls DevTools visibility
   setDeveloperMode: (enabled) => ipcRenderer.send('set-developer-mode', enabled),
