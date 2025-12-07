@@ -1,5 +1,16 @@
 /* WebMenuBar - Styles for web browser menu bar */
 
+/* Outer shell: invisible hover area that never affects page layout */
+.web-menu-shell {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  z-index: 9999;
+  pointer-events: auto;
+}
+
 .web-menu-bar {
   display: flex;
   align-items: center;
@@ -8,17 +19,26 @@
   border-bottom: 1px solid #1a1a1a;
   height: 32px;
   padding: 0 8px;
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 9999;
   user-select: none;
+  transform: translateY(0);
+  transition: transform 0.5s ease;
+  width: 100%;
 }
 
-/* When AI sidebar is visible, stop the web menu bar at the editor edge (400px AISidebar width) */
+/* When AI sidebar is visible, stop the web menu shell and bar at the editor edge (400px AISidebar width) */
+.App.ai-sidebar-visible .web-menu-shell,
 .App.ai-sidebar-visible .web-menu-bar {
   right: 400px;
+}
+
+/* Inner bar hidden (slides up) in fullscreen when mouse leaves the shell */
+.web-menu-bar-hidden {
+  transform: translateY(-100%);
 }
 
 .web-menu-left {

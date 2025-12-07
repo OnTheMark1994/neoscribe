@@ -12,11 +12,16 @@ function WebMenuBar({
   onToggleAI,
   onFoldAll,
   onUnfoldAll,
+  onToggleFullscreen,
+  onToggleArrayView,
+  isFullscreen,
   isAIEnabled,
   currentFileName,
   isModified
 }) {
   const [activeMenu, setActiveMenu] = useState(null);
+  const [showBar, setShowBar] = useState(true);
+  const hideTimeoutRef = useRef(null);
   const menuRef = useRef(null);
 
   // Close menu when clicking outside
@@ -48,12 +53,48 @@ function WebMenuBar({
       } else if (ctrl && e.key === ',') {
         e.preventDefault();
         onSettings?.();
+      } else if (e.key === 'F11') {
+        // F11 toggles fullscreen behavior for the app
+        e.preventDefault();
+        onToggleFullscreen?.();
       }
     };
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onNew, onOpen, onDownloadInfo, onSettings]);
+  }, [onNew, onOpen, onDownloadInfo, onSettings, onToggleFullscreen]);
+
+  // Keep bar visibility in sync with fullscreen state
+  useEffect(() => {
+    if (isFullscreen) {
+      // When entering fullscreen, start with the bar hidden until hovered
+      setShowBar(false);
+    } else {
+      // When exiting fullscreen, always show the bar
+      setShowBar(true);
+    }
+  }, [isFullscreen]);
+
+  // In fullscreen mode, hide the inner bar when the mouse leaves the shell
+  const handleShellMouseEnter = () => {
+    if (!isFullscreen) return;
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setShowBar(true);
+  };
+
+  const handleShellMouseLeave = () => {
+    if (!isFullscreen) return;
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+    }
+    hideTimeoutRef.current = setTimeout(() => {
+      setShowBar(false);
+      hideTimeoutRef.current = null;
+    }, 500);
+  };
 
   const handleMenuClick = (action) => {
     setActiveMenu(null);
@@ -64,8 +105,15 @@ function WebMenuBar({
     ? `${isModified ? '* ' : ''}${currentFileName}`
     : (isModified ? '* Untitled' : 'Untitled');
 
+  const barClasses = `web-menu-bar ${isFullscreen && !showBar ? 'web-menu-bar-hidden' : ''}`;
+
   return (
-    <div className="web-menu-bar" ref={menuRef}>
+    <div
+      className="web-menu-shell"
+      onMouseEnter={handleShellMouseEnter}
+      onMouseLeave={handleShellMouseLeave}
+    >
+    <div className={barClasses} ref={menuRef}>
       <div className="web-menu-left">
         <img src="/app-images/scribefold-ai-icon-png.png" alt="" className="web-menu-logo" />
         
@@ -107,15 +155,28 @@ function WebMenuBar({
           </button>
           {activeMenu === 'view' && (
             <div className="web-menu-dropdown">
-              <button onClick={() => handleMenuClick(onToggleAI)}>
-                <span>{isAIEnabled ? 'Hide AI Panel' : 'Show AI Panel'}</span>
+              {/* Fullscreen at top */}
+              <button onClick={() => handleMenuClick(onToggleFullscreen)}>
+                <span>{isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'}</span>
+                <span className="shortcut">F11</span>
               </button>
               <div className="web-menu-divider" />
+
+              {/* Fold controls */}
               <button onClick={() => handleMenuClick(onFoldAll)}>
                 <span>Fold All</span>
               </button>
               <button onClick={() => handleMenuClick(onUnfoldAll)}>
                 <span>Unfold All</span>
+              </button>
+              <div className="web-menu-divider" />
+
+              {/* AI panel and array/textarea view */}
+              <button onClick={() => handleMenuClick(onToggleAI)}>
+                <span>{isAIEnabled ? 'Hide AI Panel' : 'Show AI Panel'}</span>
+              </button>
+              <button onClick={() => handleMenuClick(onToggleArrayView)}>
+                <span>Toggle Array View</span>
               </button>
             </div>
           )}
@@ -140,6 +201,7 @@ function WebMenuBar({
           <span>Desktop App</span>
         </a>
       </div>
+    </div>
     </div>
   );
 }

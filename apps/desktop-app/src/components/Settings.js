@@ -310,7 +310,7 @@ function Settings({ anonId, authId: authIdProp, userAccount, onClose, onThemeCha
   return (
     <div className="settings-container">
       <div className="settings-header">
-        <h1>Settings: KEYWORD: {requestedTabLabel}</h1>
+        <h1>Settings</h1>
         <img
           src="/app-images/scribefold-ai-icon-png.png"
           alt="ScribeFold AI Icon"

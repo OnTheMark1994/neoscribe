@@ -806,7 +806,6 @@ const AccountPage = () => {
           </div>
         </div>
         </section>
-        )}
         <div
           style={{
             borderTop: '1px solid var(--sf-border-color, #333)',
@@ -814,11 +813,9 @@ const AccountPage = () => {
           }}
         />
 
-        {/* Keep the one-time purchases / subscription management UI in this file for later.
-            We are temporarily hiding it in the portal until the Stripe flows are finalized. */}
-        {false && (
         <section className="sf-account-plans">
-        <div className="sf-section-header">
+        {/* We will add the one-time functionality later so just leave this commented out for now*/}
+        {/* <div className="sf-section-header">
           <h2>One-time Purchases</h2>
           <button 
             type="button" 
@@ -842,7 +839,7 @@ const AccountPage = () => {
           >
             <span style={{ fontSize: '16px', fontWeight: 600 }}>i</span>
           </button>
-        </div>
+        </div> */}
         {showUsageInfo && (
           <div className="sf-usage-info-panel">
             <p><strong>Available Tokens</strong> = Monthly Tokens + Added Tokens you still have left to use.</p>

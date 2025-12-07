@@ -23,7 +23,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
   const [currentFindIndex, setCurrentFindIndex] = useState(-1);
   const findInputRef = useRef(null);
 
-  // Expose updateLinesFromAI method to parent
+  // Expose imperative editor helpers to parent (App)
   useEffect(() => {
     if (onEditorReady) {
       onEditorReady({
@@ -32,6 +32,12 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
           const { setLines } = require('../utils/editorEngine');
           setLines(newLines);
           setRenderTrigger(prev => prev + 1); // Trigger re-render
+        },
+        toggleFoldView: () => {
+          toggleFoldView();
+        },
+        toggleArrayView: () => {
+          setIsArrayView(prev => !prev);
         }
       });
     }
@@ -70,7 +76,10 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
       window.electronAPI.onToggleFoldView && window.electronAPI.onToggleFoldView(() => toggleFoldView());
       window.electronAPI.onFoldAll(() => foldAll());
       window.electronAPI.onUnfoldAll(() => unfoldAll());
-      
+      window.electronAPI.onToggleArrayView && window.electronAPI.onToggleArrayView(() => {
+        setIsArrayView(prev => !prev);
+      });
+
       menuListenersSetupRef.current = true;
     }
 
