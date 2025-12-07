@@ -4,6 +4,8 @@ const cors = require('cors');
 const { encoding_for_model } = require('tiktoken');
 const { createClient } = require('@supabase/supabase-js');
 const Stripe = require('stripe');
+const jwt = require('jsonwebtoken');
+const { Resend } = require('resend');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -157,6 +159,119 @@ if (process.env.STRIPE_SECRET_KEY) {
   console.log('✓ Stripe client initialized');
 } else {
   console.warn('⚠ Stripe not configured - payment processing disabled');
+}
+
+// Initialize Resend client for email
+let resend = null;
+if (process.env.RESEND_KEY) {
+  resend = new Resend(process.env.RESEND_KEY);
+  console.log('✓ Resend client initialized');
+} else {
+  console.warn('⚠ Resend not configured - email sending disabled');
+}
+
+// Email confirmation settings
+const EMAIL_CONFIRM_SECRET = process.env.EMAIL_CONFIRM_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback-secret-change-me';
+const EMAIL_CONFIRM_EXPIRY = '24h'; // Token expires in 24 hours
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'ScribeFold AI <onboarding@resend.dev>';
+
+// Disposable email domain blocklist
+const DISPOSABLE_EMAIL_DOMAINS = [
+  'tempmail.com', 'temp-mail.org', 'guerrillamail.com', 'guerrillamail.org',
+  'mailinator.com', 'maildrop.cc', 'throwaway.email', '10minutemail.com',
+  'fakeinbox.com', 'trashmail.com', 'yopmail.com', 'getnada.com',
+  'tempail.com', 'dispostable.com', 'mailnesia.com', 'tempr.email',
+  'throwawaymail.com', 'mohmal.com', 'sharklasers.com', 'spam4.me',
+  'grr.la', 'guerrillamailblock.com', 'pokemail.net', 'spamgourmet.com'
+];
+
+/**
+ * Check if email domain is a known disposable email provider
+ * @param {string} email - Email address to check
+ * @returns {boolean} - True if disposable domain
+ */
+function isDisposableEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return false;
+  return DISPOSABLE_EMAIL_DOMAINS.includes(domain);
+}
+
+/**
+ * Generate a signed JWT token for email confirmation
+ * @param {string} usersTableId - The users table row ID
+ * @param {string} email - User's email
+ * @returns {string} - Signed JWT token
+ */
+function generateConfirmationToken(usersTableId, email) {
+  return jwt.sign(
+    { userId: usersTableId, email },
+    EMAIL_CONFIRM_SECRET,
+    { expiresIn: EMAIL_CONFIRM_EXPIRY }
+  );
+}
+
+/**
+ * Verify and decode a confirmation token
+ * @param {string} token - JWT token to verify
+ * @returns {{ userId: string, email: string } | null} - Decoded payload or null if invalid
+ */
+function verifyConfirmationToken(token) {
+  try {
+    const decoded = jwt.verify(token, EMAIL_CONFIRM_SECRET);
+    return decoded;
+  } catch (err) {
+    console.error('[verifyConfirmationToken] Invalid or expired token:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Send confirmation email via Resend
+ * @param {string} toEmail - Recipient email
+ * @param {string} confirmUrl - Full confirmation URL
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+async function sendConfirmationEmail(toEmail, confirmUrl) {
+  if (!resend) {
+    console.warn('[sendConfirmationEmail] Resend not configured, skipping email. Confirm URL:', confirmUrl);
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: toEmail,
+      subject: 'Confirm your ScribeFold AI account',
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #333;">Welcome to ScribeFold AI!</h1>
+          <p>Thank you for creating an account. Please confirm your email address to receive your free tokens.</p>
+          <p style="margin: 24px 0;">
+            <a href="${confirmUrl}" 
+               style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Confirm Email
+            </a>
+          </p>
+          <p style="color: #666; font-size: 14px;">Or copy and paste this link into your browser:</p>
+          <p style="color: #666; font-size: 14px; word-break: break-all;">${confirmUrl}</p>
+          <p style="color: #999; font-size: 12px; margin-top: 32px;">This link expires in 24 hours.</p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('[sendConfirmationEmail] Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('[sendConfirmationEmail] Email sent successfully, id:', data?.id);
+    return { success: true };
+  } catch (err) {
+    console.error('[sendConfirmationEmail] Exception:', err);
+    return { success: false, error: err.message };
+  }
 }
 
 // Middleware
@@ -978,7 +1093,8 @@ app.post('/api/users/login', async (req, res) => {
   }
 });
 
-// Create auth account and link to anon user with token bonus logic
+// Create auth account and link to anon user
+// NOTE: Tokens are NOT granted here. User must confirm email first via /api/email/confirm
 app.post('/api/users/create-account', async (req, res) => {
   try {
     const { anonId, name, email, password } = req.body || {};
@@ -997,15 +1113,22 @@ app.post('/api/users/create-account', async (req, res) => {
       });
     }
 
-    // console.log('=== Create Account Request ===');
-    // console.log('anonId:', anonId);
-    // console.log('email:', email);
+    // Block disposable email domains
+    if (isDisposableEmail(email)) {
+      console.warn('[create-account] Blocked disposable email:', email);
+      return res.status(400).json({
+        success: false,
+        error: 'Disposable email addresses are not allowed. Please use a permanent email address.'
+      });
+    }
 
-    // Create Supabase auth user
+    console.log('[create-account] Creating account for email:', email);
+
+    // Create Supabase auth user (email_confirm: false since we handle confirmation ourselves)
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: false, // We handle email confirmation ourselves
       user_metadata: name ? { name } : undefined
     });
 
@@ -1020,7 +1143,6 @@ app.post('/api/users/create-account', async (req, res) => {
 
     const authUser = authData.user;
     const authId = authUser.id;
-    const BONUS_TOKENS = NEW_AUTH_TOKENS;
 
     // Find all user rows with this anon_id
     const { data: existingUsers, error: existingError } = await supabase
@@ -1041,7 +1163,7 @@ app.post('/api/users/create-account', async (req, res) => {
     let userRow = null;
 
     if (!existingUsers || existingUsers.length === 0) {
-      // No existing anon row: treat as new account with bonus
+      // No existing anon row: create new user row with 0 tokens (tokens granted on email confirm)
       const { data: inserted, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -1049,10 +1171,10 @@ app.post('/api/users/create-account', async (req, res) => {
           auth_id: authId,
           email,
           password,
-          tokens_monthly: 0,           // No monthly allowance initially (set via Stripe webhook)
-          tokens_used: 0,              // No tokens used yet
-          tokens_added: BONUS_TOKENS,  // Bonus for auth defined by constants
-          tokens_used_all_time: 0      // No lifetime usage yet
+          tokens_monthly: 0,
+          tokens_used: 0,
+          tokens_added: 0,  // NO bonus yet - granted on email confirmation
+          tokens_used_all_time: 0
         })
         .select()
         .single();
@@ -1067,26 +1189,11 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = inserted;
-      message = AUTH_CREATE_NEW_USER_MESSAGE;
-
-      // Log bonus tokens for brand new auth user using new schema
-      try {
-        await supabase
-          .from('token_log')
-          .insert({
-            user_id: String(userRow.id),
-            tokens_monthly: 0,
-            tokens_added: BONUS_TOKENS,
-            note: 'Auth create-account bonus (new user)',
-          });
-      } catch (logError) {
-        console.error('[create-account] Failed to log auth create bonus:', logError);
-      }
+      message = `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`;
     } else if (existingUsers.length === 1 && !existingUsers[0].auth_id) {
-      // Single anon row without auth_id: link and add bonus tokens
+      // Single anon row without auth_id: link auth_id (no tokens yet)
       const row = existingUsers[0];
 
-      // First update auth fields
       const { data: updated, error: updateError } = await supabase
         .from('users')
         .update({
@@ -1107,34 +1214,18 @@ app.post('/api/users/create-account', async (req, res) => {
         });
       }
 
-      // Then add bonus tokens using the unified function
-      const tokenResult = await applyTokenChange({
-        userId: row.id,
-        deltaAdded: BONUS_TOKENS,
-        note: 'Auth upgrade bonus (link anon → auth)',
-      });
-
-      if (!tokenResult.success) {
-        console.error('[create-account] Failed to apply auth upgrade bonus:', tokenResult.error);
-      }
-
-      // Fetch updated user
-      const { data: finalUser } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', row.id)
-        .single();
-
-      userRow = finalUser || updated;
-      message = AUTH_LINK_EXISTING_ANON_MESSAGE;
+      userRow = updated;
+      message = `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`;
     } else {
       // Multiple rows with this anon_id or at least one already has auth_id
-      // Treat as repeat account: create a fresh row with 0 new tokens
+      // Treat as repeat account: create a fresh row with 0 tokens
       const { data: repeatUser, error: repeatError } = await supabase
         .from('users')
         .insert({
           anon_id: anonId,
           auth_id: authId,
+          email,
+          password,
           tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: 0,
@@ -1153,22 +1244,207 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = repeatUser;
-      message = AUTH_REPEAT_ACCOUNT_MESSAGE;
+      message = 'Account created. This device already has an account, so no bonus tokens will be awarded.';
     }
 
-    // console.log('✓ Create-account completed:', message);
+    // Generate confirmation token and store it
+    const confirmationToken = generateConfirmationToken(String(userRow.id), email);
+    
+    // Store confirmation token in user row
+    const { error: tokenUpdateError } = await supabase
+      .from('users')
+      .update({ confirmation_token: confirmationToken })
+      .eq('id', userRow.id);
+
+    if (tokenUpdateError) {
+      console.error('[create-account] Failed to store confirmation token:', tokenUpdateError);
+      // Continue anyway - user can request a new confirmation email later
+    }
+
+    // Build confirmation URL
+    const confirmUrl = `${FRONTEND_URL}/#/confirm?token=${encodeURIComponent(confirmationToken)}`;
+    console.log('[create-account] Confirmation URL:', confirmUrl);
+
+    // Send confirmation email
+    const emailResult = await sendConfirmationEmail(email, confirmUrl);
+    
+    if (!emailResult.success) {
+      console.warn('[create-account] Failed to send confirmation email:', emailResult.error);
+      // Don't fail the request - account is created, user can request resend
+    }
+
+    console.log('✓ Create-account completed, awaiting email confirmation');
 
     return res.json({
       success: true,
       message,
       authUser,
-      user: userRow
+      user: userRow,
+      emailSent: emailResult.success,
+      // Include confirmUrl in response for dev/testing when Resend is not configured
+      ...(resend ? {} : { confirmationUrl: confirmUrl })
     });
   } catch (error) {
     console.error('Error in /api/users/create-account:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create account',
+      details: error.message
+    });
+  }
+});
+
+// Email confirmation endpoint - verifies token, sets email_confirmed_at, grants NEW_AUTH_TOKENS
+app.post('/api/email/confirm', async (req, res) => {
+  try {
+    const { token } = req.body || {};
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Confirmation token is required'
+      });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    // Verify the JWT token
+    const decoded = verifyConfirmationToken(token);
+    if (!decoded) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired confirmation link. Please request a new confirmation email.'
+      });
+    }
+
+    const { userId, email } = decoded;
+    console.log('[email/confirm] Confirming email for userId:', userId, 'email:', email);
+
+    // Find the user row
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !user) {
+      console.error('[email/confirm] User not found:', fetchError);
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Check if already confirmed
+    if (user.email_confirmed_at) {
+      console.log('[email/confirm] Email already confirmed for user:', userId);
+      return res.json({
+        success: true,
+        message: 'Your email has already been confirmed.',
+        alreadyConfirmed: true,
+        tokensAdded: 0
+      });
+    }
+
+    // Verify the token matches what we stored (extra security)
+    if (user.confirmation_token && user.confirmation_token !== token) {
+      console.warn('[email/confirm] Token mismatch for user:', userId);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid confirmation link. Please request a new confirmation email.'
+      });
+    }
+
+    // Determine if this user is eligible for the auth bonus
+    // They get NEW_AUTH_TOKENS if this is their first confirmed account for this anon_id
+    // Check if any other user row with the same anon_id has already been confirmed
+    let tokensToGrant = NEW_AUTH_TOKENS;
+    
+    if (user.anon_id) {
+      const { data: otherConfirmed } = await supabase
+        .from('users')
+        .select('id')
+        .eq('anon_id', user.anon_id)
+        .not('id', 'eq', userId)
+        .not('email_confirmed_at', 'is', null)
+        .limit(1);
+
+      if (otherConfirmed && otherConfirmed.length > 0) {
+        // Another account with this anon_id was already confirmed - no bonus
+        tokensToGrant = 0;
+        console.log('[email/confirm] Another account already confirmed for this anon_id, no bonus');
+      }
+    }
+
+    // Update user: set email_confirmed_at, clear confirmation_token
+    const now = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        email_confirmed_at: now,
+        confirmation_token: null
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('[email/confirm] Failed to update user:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to confirm email'
+      });
+    }
+
+    // Grant bonus tokens if eligible
+    if (tokensToGrant > 0) {
+      const tokenResult = await applyTokenChange({
+        userId: userId,
+        deltaAdded: tokensToGrant,
+        note: 'Email confirmation bonus',
+      });
+
+      if (!tokenResult.success) {
+        console.error('[email/confirm] Failed to apply token bonus:', tokenResult.error);
+        // Don't fail the confirmation, just log the error
+      } else {
+        console.log('[email/confirm] Granted', tokensToGrant, 'tokens to user:', userId);
+      }
+    }
+
+    // Also update Supabase auth to mark email as confirmed
+    if (user.auth_id) {
+      try {
+        await supabase.auth.admin.updateUserById(user.auth_id, {
+          email_confirm: true
+        });
+        console.log('[email/confirm] Updated Supabase auth email_confirm for auth_id:', user.auth_id);
+      } catch (authUpdateError) {
+        console.error('[email/confirm] Failed to update Supabase auth:', authUpdateError);
+        // Don't fail - our users table is the source of truth
+      }
+    }
+
+    const message = tokensToGrant > 0
+      ? `Thank you for confirming your email! You have received ${tokensToGrant.toLocaleString()} free tokens.`
+      : 'Thank you for confirming your email!';
+
+    console.log('[email/confirm] Email confirmed successfully for user:', userId);
+
+    return res.json({
+      success: true,
+      message,
+      tokensAdded: tokensToGrant,
+      alreadyConfirmed: false
+    });
+  } catch (error) {
+    console.error('Error in /api/email/confirm:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to confirm email',
       details: error.message
     });
   }

@@ -180,6 +180,47 @@ For React apps, remember that only variables prefixed with `REACT_APP_` are expo
 
 ---
 
+## `RESEND_KEY`
+
+- **Used by**: `apps/api-server`
+- **Where in code**: `apps/api-server/server.js`
+  - `if (process.env.RESEND_KEY) { resend = new Resend(process.env.RESEND_KEY); }`
+- **Purpose**: API key for Resend email service, used to send email confirmation emails.
+- **Where to get it**: Resend dashboard → API Keys.
+- **Security**: Server-only, must not be exposed to clients.
+- **Notes**:
+  - If not configured, confirmation emails won't be sent but the confirmation URL will be logged to console and returned in the API response (for dev/testing).
+  - Required for production email confirmation flow.
+
+---
+
+## `EMAIL_CONFIRM_SECRET`
+
+- **Used by**: `apps/api-server`
+- **Where in code**: `apps/api-server/server.js`
+  - `const EMAIL_CONFIRM_SECRET = process.env.EMAIL_CONFIRM_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback-secret-change-me';`
+- **Purpose**: Secret key used to sign JWT tokens for email confirmation links.
+- **Where to get it**: Generate a random secure string (e.g., `openssl rand -base64 32`).
+- **Security**: Server-only, must not be exposed to clients.
+- **Notes**:
+  - Falls back to `SUPABASE_SERVICE_ROLE_KEY` if not set.
+  - Recommended to set a dedicated secret in production.
+
+---
+
+## `EMAIL_FROM`
+
+- **Used by**: `apps/api-server`
+- **Where in code**: `apps/api-server/server.js`
+  - `const EMAIL_FROM = process.env.EMAIL_FROM || 'ScribeFold AI <onboarding@resend.dev>';`
+- **Purpose**: The "from" address for confirmation emails sent via Resend.
+- **Where to get it**: Configure in Resend dashboard (must be a verified domain or use Resend's default).
+- **Notes**:
+  - Default uses Resend's shared domain for testing.
+  - For production, use your own verified domain (e.g., `noreply@scribefold.ai`).
+
+---
+
 ## `REACT_APP_API_BASE_URL`
 
 - **Used by**:

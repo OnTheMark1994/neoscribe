@@ -6,6 +6,7 @@ import DownloadsPage from './pages/DownloadsPage';
 import AccountPage from './pages/AccountPage';
 import HelpPage from './pages/HelpPage';
 import DeveloperPage from './pages/DeveloperPage';
+import ConfirmEmailPage from './pages/ConfirmEmailPage';
 import './App.css';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
         <Route path="/auto-login" element={<AccountPage />} />
         <Route path="/help" element={<HelpPage />} />
         <Route path="/dev" element={<DeveloperPage />} />
+        <Route path="/confirm" element={<ConfirmEmailPage />} />
       </Routes>
     </Layout>
   );
