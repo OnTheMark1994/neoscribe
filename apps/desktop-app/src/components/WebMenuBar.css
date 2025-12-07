@@ -16,6 +16,11 @@
   user-select: none;
 }
 
+/* When AI sidebar is visible, stop the web menu bar at the editor edge (400px AISidebar width) */
+.App.ai-sidebar-visible .web-menu-bar {
+  right: 400px;
+}
+
 .web-menu-left {
   display: flex;
   align-items: center;

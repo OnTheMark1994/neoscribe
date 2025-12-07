@@ -4,6 +4,7 @@ This app runs as both an Electron desktop app and a static web app.
 
 ## Render.com Static Site Configuration
 
+- apps/desktop-app (not /apps/desktop-app)
 - **Build Command:** `npm install && npm run build:web`
 - **Publish Directory:** `build`
 

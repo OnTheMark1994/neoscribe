@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Provider, useDispatch } from 'react-redux';
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './store/store';
 import { setAIChanges } from './store/aiChangesSlice';
+import { openSettings, closeSettings } from './store/uiSlice';
 import { setAnonId as setUserAnonId, setAuthId as setUserAuthId, setUser as setUserData } from './store/userSlice';
 import './App.css';
 import Editor from './components/Editor';
@@ -34,9 +35,11 @@ function App() {
     return saved === null ? true : saved === 'true';
   });
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
-  const [showWebSettingsModal, setShowWebSettingsModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const editorRef = useRef(null);
+
+  const isSettingsOpen = useSelector(state => state.ui.isSettingsOpen);
+  const settingsTab = useSelector(state => state.ui.settingsTab);
 
   const handleAIResponse = (newLines, processedChanges, allChangeIds) => {
     console.log('[APP] Received AI response with', newLines.length, 'lines');
@@ -392,14 +395,14 @@ function App() {
   }
 
   return (
-    <div className={`App ${isWeb() ? 'has-web-menu' : ''}`}>
+    <div className={`App ${isWeb() ? 'has-web-menu' : ''} ${isAIEnabled ? 'ai-sidebar-visible' : ''}`}>
       {/* Web Menu Bar - only shown in browser */}
       {isWeb() && (
         <WebMenuBar
           onNew={handleWebNew}
           onOpen={handleWebOpen}
           onDownloadInfo={() => setShowDownloadModal(true)}
-          onSettings={() => setShowWebSettingsModal(true)}
+          onSettings={() => dispatch(openSettings({ tab: 'general' }))}
           onToggleAI={() => setIsAIEnabled(prev => !prev)}
           onFoldAll={handleWebFoldAll}
           onUnfoldAll={handleWebUnfoldAll}
@@ -458,19 +461,20 @@ function App() {
         />
       )}
 
-      {/* Web-only Settings modal */}
-      {isWeb() && showWebSettingsModal && (
+      {/* Web-only Settings modal (controlled via Redux UI state) */}
+      {isWeb() && isSettingsOpen && (
         <Window
           title="Settings"
-          onClose={() => setShowWebSettingsModal(false)}
+          onClose={() => dispatch(closeSettings())}
           className="window-large"
         >
           <Settings
             anonId={anonId}
             authId={authId}
             userAccount={userAccount}
-            onClose={() => setShowWebSettingsModal(false)}
+            onClose={() => dispatch(closeSettings())}
             onThemeChanged={setBackground}
+            initialTab={settingsTab || 'general'}
           />
         </Window>
       )}
@@ -503,7 +507,7 @@ function App() {
                 type="button"
                 className="btn-secondary"
                 onClick={() => {
-                  window.open('https://scribefold-ai-monorepo.onrender.com', '_blank', 'noopener,noreferrer');
+                  window.open('https://scribefold-ai-monorepo.onrender.com/#/downloads', '_blank', 'noopener,noreferrer');
                 }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >

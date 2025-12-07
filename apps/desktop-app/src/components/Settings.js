@@ -5,8 +5,8 @@ import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
 
-function Settings({ anonId, authId: authIdProp, userAccount, onClose, onThemeChanged }) {
-  const [activeTab, setActiveTab] = useState('general');
+function Settings({ anonId, authId: authIdProp, userAccount, onClose, onThemeChanged, initialTab = 'general' }) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'general');
   const [themes, setThemes] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState('');
   const [aiEnabled, setAiEnabled] = useState(true);
@@ -61,7 +61,7 @@ function Settings({ anonId, authId: authIdProp, userAccount, onClose, onThemeCha
       ]);
     }
 
-    // Ask main process what tab was last requested (handles initial open timing)
+    // Ask main process what tab was last requested (handles initial open timing in Electron)
     if (window.electronAPI && window.electronAPI.getInitialSettingsTab) {
       window.electronAPI.getInitialSettingsTab().then((tab) => {
         setRequestedTabLabel(tab || "none found")
@@ -94,10 +94,22 @@ function Settings({ anonId, authId: authIdProp, userAccount, onClose, onThemeCha
       });
     }
 
-    // Also honor a dedicated hash for AI settings when first opened
+    // Also honor a dedicated hash for AI settings when first opened (Electron)
     if (window.location.hash === '#settings-ai') {
       setActiveTab('ai');
       setRequestedTabLabel('AI');
+    }
+
+    // In web mode, use initialTab prop when there is no Electron API driving tab selection
+    if (!window.electronAPI && (initialTab === 'ai' || initialTab === 'account' || initialTab === 'general')) {
+      setActiveTab(initialTab);
+      if (initialTab === 'ai') {
+        setRequestedTabLabel('AI');
+      } else if (initialTab === 'account') {
+        setRequestedTabLabel('Account');
+      } else {
+        setRequestedTabLabel('NONE');
+      }
     }
   }, []);
 

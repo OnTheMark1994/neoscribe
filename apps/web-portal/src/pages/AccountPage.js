@@ -806,7 +806,7 @@ const AccountPage = () => {
           </div>
         </div>
         </section>
-
+        )}
         <div
           style={{
             borderTop: '1px solid var(--sf-border-color, #333)',
@@ -814,9 +814,12 @@ const AccountPage = () => {
           }}
         />
 
-        <section className="sf-account-stats">
+        {/* Keep the one-time purchases / subscription management UI in this file for later.
+            We are temporarily hiding it in the portal until the Stripe flows are finalized. */}
+        {false && (
+        <section className="sf-account-plans">
         <div className="sf-section-header">
-          <h2>Usage stats</h2>
+          <h2>One-time Purchases</h2>
           <button 
             type="button" 
             className={`sf-refresh-btn-icon ${statsLoading ? 'sf-spinning' : ''}`}

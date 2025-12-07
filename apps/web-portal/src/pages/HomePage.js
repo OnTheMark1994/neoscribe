@@ -16,7 +16,16 @@ const HomePage = () => {
           </p>
           <div className="sf-hero-actions">
             <a href="/downloads" className="sf-primary-btn">Download ScribeFold AI</a>
-            <a href="#learn-more" className="sf-secondary-btn">Learn more</a>
+            <a
+              href="https://scribefold-ai-monorepo-web-build.onrender.com/"
+              className="sf-secondary-btn"
+            >
+              Try Web App
+            </a>
+            {/* Keep this Learn more button in the markup for later use when we add more marketing content */}
+            {false && (
+              <a href="#learn-more" className="sf-secondary-btn">Learn more</a>
+            )}
           </div>
         </div>
         <div className="sf-hero-right">

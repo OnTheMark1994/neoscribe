@@ -128,7 +128,7 @@ function WebMenuBar({
 
       <div className="web-menu-right">
         <a 
-          href="https://github.com/AbeApple/scribefold-ai-monorepo/releases" 
+          href="https://scribefold-ai-monorepo.onrender.com/#/downloads" 
           target="_blank" 
           rel="noopener noreferrer"
           className="web-menu-desktop-link"

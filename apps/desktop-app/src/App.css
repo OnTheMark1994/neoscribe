@@ -124,7 +124,6 @@ body {
 }
 
 /* Web menu bar offset - push content down when menu is visible */
-.App.has-web-menu .background-container,
 .App.has-web-menu .page-container,
 .App.has-web-menu .loading-screen {
   top: 32px;

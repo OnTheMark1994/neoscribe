@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
 import './AISidebar.css';
 import TokenInfoModal from './TokenInfoModal';
 import RefreshButton from './RefreshButton';
 import { callDeepSeekServerAPI, calculateFullTokenEstimate, processChanges, integrateChangesIntoLines, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl } from '../utils/aiService';
 import { getLines, updateLinesFromText, getTextFromLines } from '../utils/editorEngine';
+import { isWeb } from '../utils/environment';
+import { openSettings } from '../store/uiSlice';
 
 // Duration to keep the refresh animation visible (ms)
 const REFRESH_ANIMATION_DURATION = 800;
@@ -20,6 +23,7 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initial
   const messagesEndRef = useRef(null);
   const aiDebugDataRef = useRef([]);
   const [isRefreshingTokens, setIsRefreshingTokens] = useState(false);
+  const dispatch = useDispatch();
 
   useEffect(() => {
     // Update token count when component mounts
@@ -422,13 +426,23 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initial
   };
 
   const openAiSettings = () => {
-    // Open Settings window directly to the AI tab
+    // In web mode, open shared Settings modal directly to AI tab
+    if (isWeb()) {
+      dispatch(openSettings({ tab: 'ai' }));
+      return;
+    }
+    // Electron desktop behavior
     if (window.electronAPI && window.electronAPI.openAISettings) {
       window.electronAPI.openAISettings();
     }
   };
   const openAccountSettings = () => {
-    // Open Settings window directly to the Account tab
+    // In web mode, open shared Settings modal directly to Account tab
+    if (isWeb()) {
+      dispatch(openSettings({ tab: 'account' }));
+      return;
+    }
+    // Electron desktop behavior
     if (window.electronAPI && window.electronAPI.openAccountSettings) {
       window.electronAPI.openAccountSettings();
     }
