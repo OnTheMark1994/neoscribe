@@ -5,7 +5,7 @@ import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
 
-function Settings({ anonId, authId: authIdProp, userAccount }) {
+function Settings({ anonId, authId: authIdProp, userAccount, onClose, onThemeChanged }) {
   const [activeTab, setActiveTab] = useState('general');
   const [themes, setThemes] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState('');
@@ -48,6 +48,17 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
       window.electronAPI.getThemeList().then(themeList => {
         setThemes(themeList);
       });
+    } else {
+      // Web fallback: hardcoded theme list matching public/images folder
+      setThemes([
+        { name: 'Space Dreams', path: 'spacedreams.jpg' },
+        { name: 'Mountains', path: 'Mountains.png' },
+        { name: 'Bitter Skies', path: 'bitterskies.jpg' },
+        { name: 'Enchantment', path: 'enchantment.jpg' },
+        { name: 'Spy Games', path: 'spygames.jpg' },
+        { name: 'Tranquility', path: 'tranquility.jpg' },
+        { name: 'Writing Desk', path: 'writingdesk.jpg' }
+      ]);
     }
 
     // Ask main process what tab was last requested (handles initial open timing)
@@ -114,6 +125,10 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
       });
     }
 
+    if (onThemeChanged) {
+      onThemeChanged(selectedTheme);
+    }
+
     // Show a transient confirmation message
     setSettingsSavedMsg('Settings saved!');
     setTimeout(() => {
@@ -122,7 +137,11 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
   };
 
   const handleCancel = () => {
-    window.close();
+    if (onClose) {
+      onClose();
+    } else {
+      window.close();
+    }
   };
 
   const handleThemeSelect = (themePath) => {
@@ -131,7 +150,7 @@ function Settings({ anonId, authId: authIdProp, userAccount }) {
 
   const handleCustomTheme = async () => {
     if (!window.electronAPI || !window.electronAPI.selectCustomTheme) {
-      alert('Custom theme selection is not available in this build.');
+      // Custom themes are only available in the desktop app.
       return;
     }
 

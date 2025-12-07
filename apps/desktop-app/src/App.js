@@ -9,7 +9,12 @@ import AISidebar from './components/AISidebar';
 import Settings from './components/Settings';
 import DiffNavigation from './components/DiffNavigation';
 import ConfirmCloseModal from './components/ConfirmCloseModal';
+import WebMenuBar from './components/WebMenuBar';
+import Window from './components/Window';
 import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData } from './utils/aiService';
+import { isElectron, isWeb, getWebAnonId } from './utils/environment';
+import { uploadTextFile, downloadTextFile, downloadTextFileAs } from './utils/webFileOps';
+import { parseText, getTextFromLines, getLines } from './utils/editorEngine';
 
 function App() {
   const dispatch = useDispatch();
@@ -29,6 +34,8 @@ function App() {
     return saved === null ? true : saved === 'true';
   });
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [showWebSettingsModal, setShowWebSettingsModal] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const editorRef = useRef(null);
 
   const handleAIResponse = (newLines, processedChanges, allChangeIds) => {
@@ -61,6 +68,20 @@ function App() {
     // Expose isModified to window for Electron
     window.isModified = isModified;
   }, [isModified]);
+
+  // Warn about unsaved changes when closing the browser tab/window in web mode
+  useEffect(() => {
+    if (!isWeb()) return;
+
+    const handleBeforeUnload = (e) => {
+      if (!window.isModified) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   useEffect(() => {
     console.log('[APP] isModified changed to:', isModified);
@@ -95,8 +116,8 @@ function App() {
   }, [developerMode]);
 
   useEffect(() => {
-    // Get anon_id from Electron
-    if (window.electronAPI) {
+    // Get anon_id from Electron or generate for web
+    if (isElectron()) {
       window.electronAPI.getAnonId().then(id => {
         console.log('[APP] Received anon_id:', id);
         setAnonId(id);
@@ -182,6 +203,12 @@ function App() {
           setShowUnsavedDialog(true);
         });
       }
+    } else {
+      // Web mode: generate anon_id from localStorage
+      const webAnonId = getWebAnonId();
+      console.log('[APP] Using web anon_id:', webAnonId);
+      setAnonId(webAnonId);
+      dispatch(setUserAnonId(webAnonId));
     }
 
     // Load saved background on startup
@@ -193,8 +220,8 @@ function App() {
       setBackground('spacedreams.jpg');
     }
 
-    // Check if this is the settings window (general or AI tab)
-    if (window.location.hash === '#settings' || window.location.hash === '#settings-ai') {
+    // Check if this is the dedicated Electron settings window (general or AI tab)
+    if ((window.location.hash === '#settings' || window.location.hash === '#settings-ai') && isElectron()) {
       setIsSettingsView(true);
     }
 
@@ -260,9 +287,16 @@ function App() {
     if (!backgroundContainer) return;
 
     if (imagePath) {
-      const isAbsolutePath = imagePath.includes(':') || imagePath.startsWith('/');
-      const imageUrl = isAbsolutePath 
-        ? `file:///${imagePath.replace(/\\/g, '/')}` 
+      // If we are in a normal browser and an old absolute OS path was stored
+      // (from a previous Electron custom theme), fall back to the default theme.
+      const looksAbsolute = imagePath.includes(':') || imagePath.startsWith('/');
+      if (!isElectron() && looksAbsolute) {
+        imagePath = 'spacedreams.jpg';
+      }
+
+      const isAbsolutePath = isElectron() && looksAbsolute;
+      const imageUrl = isAbsolutePath
+        ? `file:///${imagePath.replace(/\\/g, '/')}`
         : `images/${imagePath}`;
       backgroundContainer.style.backgroundImage = `url('${imageUrl}')`;
       localStorage.setItem('backgroundImage', imagePath);
@@ -289,13 +323,91 @@ function App() {
     setIsModified(false);
   };
 
-  // Render settings view if hash is #settings
-  if (isSettingsView) {
-    return <Settings anonId={anonId} authId={authId} userAccount={userAccount} />;
+  // Web menu handlers
+  const handleWebNew = () => {
+    if (isModified && !window.confirm('You have unsaved changes. Continue?')) return;
+    parseText('');
+    setCurrentFilePath(null);
+    setIsModified(false);
+    if (editorRef.current?.updateLinesFromAI) {
+      editorRef.current.updateLinesFromAI(getLines());
+    }
+  };
+
+  const handleWebOpen = async () => {
+    const result = await uploadTextFile();
+    if (result.success) {
+      parseText(result.content);
+      setCurrentFilePath(result.fileName);
+      setIsModified(false);
+      if (editorRef.current?.updateLinesFromAI) {
+        editorRef.current.updateLinesFromAI(getLines());
+      }
+    }
+  };
+
+  const handleWebDownloadFile = () => {
+    const content = getTextFromLines();
+    const fileName = currentFilePath || 'document.txt';
+    downloadTextFile(content, fileName);
+  };
+
+  const handleWebFoldAll = () => {
+    const lines = getLines();
+    lines.forEach(line => {
+      if (line.startIdx !== -1 && line.endIdx >= line.startIdx) {
+        line.open = false;
+        if (!line.text.includes('#folded')) {
+          line.text = line.text.trim() + ' #folded';
+        }
+      }
+    });
+    if (editorRef.current?.updateLinesFromAI) {
+      editorRef.current.updateLinesFromAI(lines);
+    }
+  };
+
+  const handleWebUnfoldAll = () => {
+    const lines = getLines();
+    lines.forEach(line => {
+      if (line.startIdx !== -1) {
+        line.open = true;
+        line.text = line.text.replace(/#folded\b/gi, '').trim();
+      }
+    });
+    if (editorRef.current?.updateLinesFromAI) {
+      editorRef.current.updateLinesFromAI(lines);
+    }
+  };
+
+  // Electron-only settings window (separate BrowserWindow)
+  if (isSettingsView && isElectron()) {
+    return (
+      <Settings 
+        anonId={anonId} 
+        authId={authId} 
+        userAccount={userAccount}
+      />
+    );
   }
 
   return (
-    <div className="App">
+    <div className={`App ${isWeb() ? 'has-web-menu' : ''}`}>
+      {/* Web Menu Bar - only shown in browser */}
+      {isWeb() && (
+        <WebMenuBar
+          onNew={handleWebNew}
+          onOpen={handleWebOpen}
+          onDownloadInfo={() => setShowDownloadModal(true)}
+          onSettings={() => setShowWebSettingsModal(true)}
+          onToggleAI={() => setIsAIEnabled(prev => !prev)}
+          onFoldAll={handleWebFoldAll}
+          onUnfoldAll={handleWebUnfoldAll}
+          isAIEnabled={isAIEnabled}
+          currentFileName={currentFilePath}
+          isModified={isModified}
+        />
+      )}
       <div className="loading-screen" id="loadingScreen">
         <div className="loading-text">Loading...</div>
       </div>
@@ -344,6 +456,74 @@ function App() {
             }
           }}
         />
+      )}
+
+      {/* Web-only Settings modal */}
+      {isWeb() && showWebSettingsModal && (
+        <Window
+          title="Settings"
+          onClose={() => setShowWebSettingsModal(false)}
+          className="window-large"
+        >
+          <Settings
+            anonId={anonId}
+            authId={authId}
+            userAccount={userAccount}
+            onClose={() => setShowWebSettingsModal(false)}
+            onThemeChanged={setBackground}
+          />
+        </Window>
+      )}
+
+      {/* Web-only Download info modal */}
+      {isWeb() && showDownloadModal && (
+        <Window
+          title="Download"
+          onClose={() => setShowDownloadModal(false)}
+          className="window-medium"
+        >
+          <div style={{ color: '#e0e0e0', fontSize: '14px', lineHeight: 1.5, textAlign: 'center' }}>
+            <p style={{ marginBottom: '12px' }}>
+              The browser cannot save directly to your file system so to keep your
+              work download a text file version of your document or download the
+              desktop app so you can save directly.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  handleWebDownloadFile();
+                  setShowDownloadModal(false);
+                }}
+              >
+                Download Text File
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  window.open('https://scribefold-ai-monorepo.onrender.com', '_blank', 'noopener,noreferrer');
+                }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                <span>Download Desktop App</span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M14 3h7v7" />
+                  <path d="M10 14L21 3" />
+                  <path d="M5 5v16h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </Window>
       )}
     </div>
   );

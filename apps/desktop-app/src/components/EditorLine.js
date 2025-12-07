@@ -40,9 +40,74 @@ function EditorLine({
 
   const handleContentEdit = (e) => {
     const lines = getLines();
+
+    // Capture caret offset within this line before React re-renders
+    let caretOffset = null;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && contentRef.current) {
+      const range = sel.getRangeAt(0);
+      if (contentRef.current.contains(range.startContainer)) {
+        caretOffset = range.startOffset;
+      }
+    }
+
     lines[lineIndex].text = e.target.textContent;
     console.log('[EDITORLINE] handleContentEdit line', lineIndex, 'new text:', lines[lineIndex].text);
     onContentChange();
+
+    if (caretOffset !== null) {
+      // After state updates, restore caret to the same offset inside this line
+      setTimeout(() => {
+        if (!contentRef.current) return;
+        const node = contentRef.current;
+        const textNode = node.firstChild || node;
+        const len = (textNode.textContent || '').length;
+        const safeOffset = Math.min(caretOffset, len);
+
+        const range2 = document.createRange();
+        const sel2 = window.getSelection();
+        try {
+          range2.setStart(textNode, safeOffset);
+        } catch (err) {
+          return;
+        }
+        range2.collapse(true);
+        sel2.removeAllRanges();
+        sel2.addRange(range2);
+      }, 0);
+    }
+  };
+
+  const handleMouseUp = () => {
+    // In some browsers the caret can jump to the start of the line after a click
+    // if the line is re-rendered. Capture the caret position on mouse up and
+    // re-apply it so typing starts where the user clicked.
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !contentRef.current) return;
+
+    const range = sel.getRangeAt(0);
+    if (!contentRef.current.contains(range.startContainer)) return;
+
+    const offset = range.startOffset;
+
+    setTimeout(() => {
+      const node = contentRef.current;
+      if (!node) return;
+      const textNode = node.firstChild || node;
+      const len = (textNode.textContent || '').length;
+      const safeOffset = Math.min(offset, len);
+
+      const range2 = document.createRange();
+      const sel2 = window.getSelection();
+      try {
+        range2.setStart(textNode, safeOffset);
+      } catch (e) {
+        return;
+      }
+      range2.collapse(true);
+      sel2.removeAllRanges();
+      sel2.addRange(range2);
+    }, 0);
   };
 
   const handleKeyDown = (e) => {
@@ -348,6 +413,7 @@ function EditorLine({
                   suppressContentEditableWarning={true}
                   onInput={handleContentEdit}
                   onKeyDown={handleKeyDown}
+                  onMouseUp={handleMouseUp}
                   data-idx={lineIndex}
                 >
                   {line.modifyFrom}
@@ -369,6 +435,7 @@ function EditorLine({
                 suppressContentEditableWarning={true}
                 onInput={handleContentEdit}
                 onKeyDown={handleKeyDown}
+                onMouseUp={handleMouseUp}
                 data-idx={lineIndex}
               >
                 {getDisplayText()}
@@ -415,6 +482,7 @@ function EditorLine({
                 suppressContentEditableWarning={true}
                 onInput={handleContentEdit}
                 onKeyDown={handleKeyDown}
+                onMouseUp={handleMouseUp}
                 data-idx={lineIndex}
               >
                 {line.modifyFrom}
@@ -436,6 +504,7 @@ function EditorLine({
               suppressContentEditableWarning={true}
               onInput={handleContentEdit}
               onKeyDown={handleKeyDown}
+              onMouseUp={handleMouseUp}
               data-idx={lineIndex}
             >
               {getDisplayText()}

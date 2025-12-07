@@ -25,7 +25,9 @@
   },
   "scripts": {
     "react-start": "cross-env BROWSER=none react-scripts start",
+    "start:web": "react-scripts start",
     "react-build": "react-scripts build",
+    "build:web": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron-dev": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
