@@ -22,6 +22,10 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
   const [requestedTabLabel, setRequestedTabLabel] = useState('NONE');
   const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
   const [developerToolsStatus, setDeveloperToolsStatus] = useState('');
+  const [showPreviewBar, setShowPreviewBar] = useState(() => {
+    const saved = localStorage.getItem('showPreviewBar');
+    return saved === null ? true : saved === 'true';
+  });
   const [editorViewMode, setEditorViewMode] = useState(() => {
     const saved = localStorage.getItem('editorViewMode');
     if (saved === 'fold') return 'array'; // migrate old value
@@ -386,6 +390,10 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
                   onClick={() => {
                     setEditorViewMode('array');
                     localStorage.setItem('editorViewMode', 'array');
+                    // Notify Electron main window if available
+                    if (window.electronAPI && window.electronAPI.settingsSaved) {
+                      window.electronAPI.settingsSaved({ editorViewMode: 'array' });
+                    }
                   }}
                 >
                   Array
@@ -395,6 +403,9 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
                   onClick={() => {
                     setEditorViewMode('monaco');
                     localStorage.setItem('editorViewMode', 'monaco');
+                    if (window.electronAPI && window.electronAPI.settingsSaved) {
+                      window.electronAPI.settingsSaved({ editorViewMode: 'monaco' });
+                    }
                   }}
                 >
                   Monaco
@@ -404,6 +415,9 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
                   onClick={() => {
                     setEditorViewMode('textarea');
                     localStorage.setItem('editorViewMode', 'textarea');
+                    if (window.electronAPI && window.electronAPI.settingsSaved) {
+                      window.electronAPI.settingsSaved({ editorViewMode: 'textarea' });
+                    }
                   }}
                 >
                   Textarea
@@ -413,6 +427,33 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
                 {editorViewMode === 'array' && 'Array view: Line-by-line editing with folding support'}
                 {editorViewMode === 'monaco' && 'Monaco view: VS Code-style editor with syntax highlighting'}
                 {editorViewMode === 'textarea' && 'Textarea view: Simple plain text editing'}
+              </p>
+            </div>
+          </div>
+
+          <div className="setting-section">
+            <h2>Preview Bar</h2>
+            <div className="setting-item">
+              <div className="toggle-container">
+                <label>Show Right Preview Bar</label>
+                <div
+                  className={`toggle-switch ${showPreviewBar ? 'active' : ''}`}
+                  onClick={() => {
+                    const next = !showPreviewBar;
+                    setShowPreviewBar(next);
+                    localStorage.setItem('showPreviewBar', next ? 'true' : 'false');
+                    if (window.electronAPI && window.electronAPI.settingsSaved) {
+                      window.electronAPI.settingsSaved({ showPreviewBar: next });
+                    }
+                  }}
+                >
+                  <div className="toggle-slider"></div>
+                </div>
+              </div>
+              <p className="setting-hint">
+                {showPreviewBar
+                  ? 'Preview bar is visible on the right side.'
+                  : 'Preview bar is hidden. AI tools still work but without the live preview panel.'}
               </p>
             </div>
           </div>

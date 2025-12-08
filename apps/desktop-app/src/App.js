@@ -38,6 +38,10 @@ function App() {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const editorRef = useRef(null);
+  const [showPreviewBar, setShowPreviewBar] = useState(() => {
+    const saved = localStorage.getItem('showPreviewBar');
+    return saved === null ? true : saved === 'true';
+  });
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -254,6 +258,12 @@ function App() {
           }
         }
         
+        if (settings.showPreviewBar !== undefined) {
+          const visible = !!settings.showPreviewBar;
+          setShowPreviewBar(visible);
+          localStorage.setItem('showPreviewBar', visible ? 'true' : 'false');
+        }
+
         if (settings.requestCloseAfterSave) {
           window.close();
         }

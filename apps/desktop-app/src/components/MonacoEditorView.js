@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import './MonacoEditorView.css';
 
@@ -9,12 +9,74 @@ import './MonacoEditorView.css';
  * - Custom folding for #chapter and #section markers
  * - Line numbers (array-like index display)
  * - Syntax highlighting for chapter/section headers
+ * - AI eye icons for lines shared with AI
  */
 function MonacoEditorView({ monacoRef, content, onContentChange }) {
   const foldingProviderRef = useRef(null);
+  const decorationsRef = useRef([]);
+  const [showPreviewBar, setShowPreviewBar] = useState(() => {
+    if (typeof localStorage === 'undefined') return true;
+    const saved = localStorage.getItem('showPreviewBar');
+    return saved === null ? true : saved === 'true';
+  });
+
+  // Update decorations when content changes
+  const updateDecorations = (editor, monaco) => {
+    if (!editor || !monaco) return;
+    
+    const model = editor.getModel();
+    if (!model) return;
+    
+    const lines = model.getLinesContent();
+    const newDecorations = [];
+    
+    lines.forEach((line, index) => {
+      const lineNumber = index + 1;
+      const trimmed = line.trim().toLowerCase();
+      const hasAiHide = /#ai-hide\b/i.test(line);
+      const hasAiTag = /#ai-title\b|#ai-summary\b/i.test(line);
+      
+      // Chapter lines
+      if (/^#chapter\b/.test(trimmed)) {
+        newDecorations.push({
+          range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+          options: {
+            isWholeLine: true,
+            className: 'chapter-line-decoration',
+            glyphMarginClassName: hasAiHide ? 'ai-hide-icon' : 'ai-eye-icon',
+            glyphMarginHoverMessage: { value: hasAiHide ? 'Hidden from AI' : 'Shared with AI (click to toggle)' }
+          }
+        });
+      }
+      // Section lines
+      else if (/^#section\b/.test(trimmed)) {
+        newDecorations.push({
+          range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+          options: {
+            isWholeLine: true,
+            className: 'section-line-decoration',
+            glyphMarginClassName: hasAiHide ? 'ai-hide-icon' : 'ai-eye-icon',
+            glyphMarginHoverMessage: { value: hasAiHide ? 'Hidden from AI' : 'Shared with AI (click to toggle)' }
+          }
+        });
+      }
+      // Lines with AI tags
+      else if (hasAiTag || hasAiHide) {
+        newDecorations.push({
+          range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+          options: {
+            glyphMarginClassName: hasAiHide ? 'ai-hide-icon' : 'ai-eye-icon',
+            glyphMarginHoverMessage: { value: hasAiHide ? 'Hidden from AI' : 'Shared with AI' }
+          }
+        });
+      }
+    });
+    
+    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
+  };
 
   const handleEditorDidMount = (editor, monaco) => {
-    // Store the editor instance in the ref
+    // Store instance for parent to call methods if needed
     if (monacoRef) {
       monacoRef.current = editor;
     }
@@ -25,15 +87,13 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
         provideFoldingRanges: function(model) {
           const lines = model.getLinesContent();
           const ranges = [];
-          const stack = []; // Track open sections: { lineNumber, level }
+          const stack = [];
 
           lines.forEach((line, index) => {
             const lineNumber = index + 1;
             const trimmed = line.trim().toLowerCase();
 
-            // Check for chapter/section start
             if (/^#chapter\b/.test(trimmed)) {
-              // Close any open sections of same or higher level
               while (stack.length > 0) {
                 const prev = stack.pop();
                 ranges.push({
@@ -44,7 +104,6 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
               }
               stack.push({ lineNumber, level: 1 });
             } else if (/^#section\b/.test(trimmed)) {
-              // Close any open sections at level 2
               while (stack.length > 0 && stack[stack.length - 1].level >= 2) {
                 const prev = stack.pop();
                 ranges.push({
@@ -55,7 +114,6 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
               }
               stack.push({ lineNumber, level: 2 });
             } else if (/^#chapterend\b/.test(trimmed)) {
-              // Close all sections up to and including the chapter
               while (stack.length > 0) {
                 const prev = stack.pop();
                 ranges.push({
@@ -66,7 +124,6 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
                 if (prev.level === 1) break;
               }
             } else if (/^#sectionend\b/.test(trimmed)) {
-              // Close the current section
               if (stack.length > 0 && stack[stack.length - 1].level === 2) {
                 const prev = stack.pop();
                 ranges.push({
@@ -78,7 +135,6 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
             }
           });
 
-          // Close any remaining open sections at end of file
           while (stack.length > 0) {
             const prev = stack.pop();
             ranges.push({
@@ -92,7 +148,7 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
         }
       });
 
-      // Register custom language for syntax highlighting
+      // Register custom language
       monaco.languages.register({ id: 'scribefold' });
       
       monaco.languages.setMonarchTokensProvider('scribefold', {
@@ -111,7 +167,7 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
         }
       });
 
-      // Define custom theme with chapter/section highlighting
+      // Define custom theme with transparent background
       monaco.editor.defineTheme('scribefold-dark', {
         base: 'vs-dark',
         inherit: true,
@@ -122,19 +178,84 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
           { token: 'comment.folded', foreground: '6272A4', fontStyle: 'italic' },
           { token: 'comment.ai', foreground: '50FA7B', fontStyle: 'italic' },
         ],
-        colors: {}
+        colors: {
+          'editor.background': '#00000000',
+          'editorGutter.background': '#00000000',
+        }
       });
 
-      // Apply the custom theme
       monaco.editor.setTheme('scribefold-dark');
     }
+
+    // Helper to toggle #ai-hide on a line
+    const toggleAiHideForLine = (lineNumber) => {
+      const model = editor.getModel();
+      if (!model) return;
+
+      const lineContent = model.getLineContent(lineNumber);
+      const hasAiHide = /#ai-hide\b/i.test(lineContent);
+      let newContent;
+
+      if (hasAiHide) {
+        // Remove #ai-hide
+        newContent = lineContent.replace(/\s*#ai-hide\b/gi, '');
+      } else {
+        // Add #ai-hide
+        newContent = lineContent.trimEnd() + ' #ai-hide';
+      }
+
+      editor.executeEdits('ai-toggle', [{
+        range: new monaco.Range(lineNumber, 1, lineNumber, lineContent.length + 1),
+        text: newContent
+      }]);
+
+      updateDecorations(editor, monaco);
+    };
 
     // Set up change listener
     editor.onDidChangeModelContent(() => {
       const value = editor.getValue();
       onContentChange(value);
+      updateDecorations(editor, monaco);
     });
+
+    // Click on gutter (glyph margin or line decorations) to toggle AI visibility for chapter/section lines
+    editor.onMouseDown((e) => {
+      if (
+        e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+        e.target.type === monaco.editor.MouseTargetType.GUTTER_LINE_DECORATIONS
+      ) {
+        const lineNumber = e.target.position?.lineNumber;
+        if (!lineNumber) return;
+
+        const model = editor.getModel();
+        if (!model) return;
+
+        const lineContent = model.getLineContent(lineNumber);
+        const trimmed = lineContent.trim().toLowerCase();
+
+        // Only respond on chapter/section header lines (same as array view behavior)
+        if (/^#chapter\b/.test(trimmed) || /^#section\b/.test(trimmed)) {
+          toggleAiHideForLine(lineNumber);
+        }
+      }
+    });
+
+    // Initial decorations
+    updateDecorations(editor, monaco);
   };
+
+  // Listen for updates to the preview bar setting (from Settings window)
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === 'showPreviewBar') {
+        const next = e.newValue === null ? true : e.newValue === 'true';
+        setShowPreviewBar(next);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   // Cleanup folding provider on unmount
   useEffect(() => {
@@ -155,7 +276,7 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
         theme="scribefold-dark"
         onMount={handleEditorDidMount}
         options={{
-          minimap: { enabled: true },
+          minimap: { enabled: showPreviewBar },
           fontSize: 14,
           lineNumbers: 'on',
           wordWrap: 'on',

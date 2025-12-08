@@ -32,6 +32,10 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
   const [currentFindIndex, setCurrentFindIndex] = useState(-1);
   const findInputRef = useRef(null);
 
+  // Use refs to always have access to latest functions
+  const switchToViewModeRef = useRef(null);
+  const cycleViewModeRef = useRef(null);
+
   // Expose imperative editor helpers to parent (App)
   useEffect(() => {
     if (onEditorReady) {
@@ -43,18 +47,48 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
           setRenderTrigger(prev => prev + 1); // Trigger re-render
         },
         toggleFoldView: () => {
-          cycleViewMode();
+          if (cycleViewModeRef.current) cycleViewModeRef.current();
         },
         toggleArrayView: () => {
           setIsArrayView(prev => !prev);
         },
         setViewMode: (mode) => {
-          switchToViewMode(mode);
+          if (switchToViewModeRef.current) switchToViewModeRef.current(mode);
         },
-        getViewMode: () => viewMode
+        getViewMode: () => localStorage.getItem('editorViewMode') || 'array'
       });
     }
   }, [onEditorReady]);
+
+  // Listen for view mode changes from Settings (via localStorage)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'editorViewMode' && e.newValue) {
+        const newMode = e.newValue;
+        if ((newMode === 'array' || newMode === 'monaco' || newMode === 'textarea') && newMode !== viewMode) {
+          console.log('[EDITOR] View mode changed via storage:', newMode);
+          switchToViewMode(newMode, true); // Skip localStorage update since it came from there
+        }
+      }
+    };
+
+    // Also check periodically for changes (handles same-window updates from Settings modal)
+    const checkViewMode = () => {
+      const saved = localStorage.getItem('editorViewMode');
+      if (saved && saved !== viewMode && (saved === 'array' || saved === 'monaco' || saved === 'textarea')) {
+        console.log('[EDITOR] View mode changed via check:', saved);
+        switchToViewMode(saved, true); // Skip localStorage update
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    const interval = setInterval(checkViewMode, 500);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [viewMode]);
 
   useEffect(() => {
     // Initialize editor
@@ -330,7 +364,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
   };
 
   // Switch to a specific view mode
-  const switchToViewMode = (newMode) => {
+  const switchToViewMode = (newMode, skipLocalStorage = false) => {
     if (newMode === viewMode) return;
     
     console.log('[EDITOR] switchToViewMode:', viewMode, '->', newMode);
@@ -346,7 +380,10 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     }
     
     setViewMode(newMode);
-    localStorage.setItem('editorViewMode', newMode);
+    // Only update localStorage if not triggered by localStorage change
+    if (!skipLocalStorage) {
+      localStorage.setItem('editorViewMode', newMode);
+    }
   };
 
   // Cycle through view modes: array -> monaco -> textarea -> array
@@ -356,6 +393,10 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     const nextIndex = (currentIndex + 1) % modes.length;
     switchToViewMode(modes[nextIndex]);
   };
+
+  // Keep refs updated so parent can always call latest functions
+  switchToViewModeRef.current = switchToViewMode;
+  cycleViewModeRef.current = cycleViewMode;
 
   const foldAll = () => {
     const lines = getLines();
