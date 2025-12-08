@@ -5,7 +5,7 @@ import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
 
-function Settings({ anonId, authId: authIdProp, userAccount, onClose, onThemeChanged, initialTab = 'general' }) {
+function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, onThemeChanged, initialTab = 'general' }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'general');
   const [themes, setThemes] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState('');
@@ -529,6 +529,7 @@ function Settings({ anonId, authId: authIdProp, userAccount, onClose, onThemeCha
             <AccountAuthSection
               anonId={anonId}
               authId={authId}
+              deviceId={deviceId}
               onAccountUpdated={(result) => {
                 if (result && result.authUser && result.authUser.id) {
                   const newAuthId = result.authUser.id;

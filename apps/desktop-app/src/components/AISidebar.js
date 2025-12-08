@@ -573,7 +573,7 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initial
           <div className="ai-web-auth-banner">
             <div className="ai-web-auth-banner-content">
               <p><strong>Get free tokens</strong></p>
-              <p>Free tokens awarede on:</p>
+              <p>Free tokens awarded on:</p>
               <ul>
                 <li>Creating a free account, <strong>or</strong></li>
                 <li>Downloading the desktop app</li>

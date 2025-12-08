@@ -6,12 +6,14 @@ import './ConfirmEmailPage.css';
 /**
  * Email confirmation page - auto-confirms email when user clicks link from email
  * URL format: /#/confirm?token=...
+ * After confirmation, redirects to /auto-login with credentials for seamless login
  */
 const ConfirmEmailPage = () => {
   const [status, setStatus] = useState('confirming'); // 'confirming' | 'success' | 'error'
   const [message, setMessage] = useState('');
   const [tokensAdded, setTokensAdded] = useState(0);
   const [alreadyConfirmed, setAlreadyConfirmed] = useState(false);
+  const [autoLoginUrl, setAutoLoginUrl] = useState(null);
 
   const location = useLocation();
 
@@ -51,6 +53,12 @@ const ConfirmEmailPage = () => {
         setMessage(data.message || 'Email confirmed successfully!');
         setTokensAdded(data.tokensAdded || 0);
         setAlreadyConfirmed(data.alreadyConfirmed || false);
+        
+        // Build auto-login URL if email and password are returned
+        if (data.email && data.password) {
+          const loginUrl = `/auto-login?email=${encodeURIComponent(data.email)}&password=${encodeURIComponent(data.password)}`;
+          setAutoLoginUrl(loginUrl);
+        }
       } catch (err) {
         console.error('[ConfirmEmailPage] Error:', err);
         setStatus('error');
@@ -86,11 +94,13 @@ const ConfirmEmailPage = () => {
             )}
 
             <p className="sf-confirm-instructions">
-              You can now return to the application and press refresh to see your tokens.
+              {autoLoginUrl 
+                ? 'Click the button below to go to your account.'
+                : 'You can now return to the application and press refresh to see your tokens.'}
             </p>
 
             <div className="sf-confirm-actions">
-              <Link to="/account" className="sf-confirm-btn sf-confirm-btn-primary">
+              <Link to={autoLoginUrl || '/account'} className="sf-confirm-btn sf-confirm-btn-primary">
                 Go to Account
               </Link>
             </div>

@@ -338,7 +338,8 @@ export async function devBurnTokens(anonId, authId = null, amount) {
 }
 
 // Create a new auth account and link it to the anon user
-export async function createUserAccount(anonId, { name, email, password }) {
+// deviceId is optional but used for abuse prevention (one auth grant per device)
+export async function createUserAccount(anonId, { name, email, password, deviceId }) {
   if (!anonId) {
     throw new Error('anonId is required to create user account');
   }
@@ -352,6 +353,11 @@ export async function createUserAccount(anonId, { name, email, password }) {
     email,
     password
   };
+  
+  // Include deviceId if provided (for abuse prevention during email confirmation)
+  if (deviceId) {
+    body.deviceId = deviceId;
+  }
 
   const response = await fetch(url, {
     method: 'POST',

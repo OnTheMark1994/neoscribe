@@ -5,6 +5,7 @@ import { createUserAccount, loginUserAccount, buildWebPortalAutoLoginUrl } from 
 function AccountAuthSection({
   anonId,
   authId,
+  deviceId,
   onAccountUpdated,
   onAuthCleared,
   initialEmail,
@@ -37,7 +38,8 @@ function AccountAuthSection({
         result = await createUserAccount(anonId, {
           name: null,
           email: authEmail,
-          password: authPassword
+          password: authPassword,
+          deviceId: deviceId || null  // Pass deviceId for abuse prevention
         });
       } else {
         result = await loginUserAccount(anonId, {

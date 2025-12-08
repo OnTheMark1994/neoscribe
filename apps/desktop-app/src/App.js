@@ -472,6 +472,7 @@ function App() {
       <Settings 
         anonId={anonId} 
         authId={authId} 
+        deviceId={deviceId}
         userAccount={userAccount}
       />
     );
@@ -557,6 +558,7 @@ function App() {
           <Settings
             anonId={anonId}
             authId={authId}
+            deviceId={deviceId}
             userAccount={userAccount}
             onClose={() => dispatch(closeSettings())}
             onThemeChanged={setBackground}

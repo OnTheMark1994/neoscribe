@@ -200,13 +200,15 @@ function isDisposableEmail(email) {
 
 /**
  * Generate a signed JWT token for email confirmation
+ * Contains email and password so the web-portal can auto-login the user after confirmation
  * @param {string} usersTableId - The users table row ID
  * @param {string} email - User's email
+ * @param {string} password - User's password (for auto-login after confirmation)
  * @returns {string} - Signed JWT token
  */
-function generateConfirmationToken(usersTableId, email) {
+function generateConfirmationToken(usersTableId, email, password) {
   return jwt.sign(
-    { userId: usersTableId, email },
+    { userId: usersTableId, email, password },
     EMAIL_CONFIRM_SECRET,
     { expiresIn: EMAIL_CONFIRM_EXPIRY }
   );
@@ -215,7 +217,7 @@ function generateConfirmationToken(usersTableId, email) {
 /**
  * Verify and decode a confirmation token
  * @param {string} token - JWT token to verify
- * @returns {{ userId: string, email: string } | null} - Decoded payload or null if invalid
+ * @returns {{ userId: string, email: string, password: string } | null} - Decoded payload or null if invalid
  */
 function verifyConfirmationToken(token) {
   try {
@@ -767,6 +769,163 @@ async function applyTokenChange({
   }
 }
 
+// ============================================================================
+// FREE GRANTS TABLE HELPERS
+// The free_grants table is the canonical source of truth for who has received
+// which free grant (device-based or auth-based).
+// ============================================================================
+
+/**
+ * Check if a device has already received a device grant (NEW_ANON_TOKENS)
+ * @param {string} deviceId - The hashed device ID
+ * @returns {Promise<boolean>} - True if device has already received grant
+ */
+async function hasDeviceReceivedGrant(deviceId) {
+  if (!supabase || !deviceId) return false;
+  
+  try {
+    const { data, error } = await supabase
+      .from('free_grants')
+      .select('id')
+      .eq('device_id', deviceId)
+      .eq('received_grant', true)
+      .limit(1);
+    
+    if (error) {
+      console.error('[hasDeviceReceivedGrant] Error:', error);
+      return false;
+    }
+    
+    return data && data.length > 0;
+  } catch (err) {
+    console.error('[hasDeviceReceivedGrant] Exception:', err);
+    return false;
+  }
+}
+
+/**
+ * Check if an auth account has already received an auth grant (NEW_AUTH_TOKENS)
+ * @param {string} authId - The auth user ID
+ * @returns {Promise<boolean>} - True if auth has already received grant
+ */
+async function hasAuthReceivedGrant(authId) {
+  if (!supabase || !authId) return false;
+  
+  try {
+    const { data, error } = await supabase
+      .from('free_grants')
+      .select('id')
+      .eq('auth_id', authId)
+      .eq('received_grant', true)
+      .limit(1);
+    
+    if (error) {
+      console.error('[hasAuthReceivedGrant] Error:', error);
+      return false;
+    }
+    
+    return data && data.length > 0;
+  } catch (err) {
+    console.error('[hasAuthReceivedGrant] Exception:', err);
+    return false;
+  }
+}
+
+/**
+ * Check if a device has already been used to create an auth account that received tokens
+ * This prevents abuse where someone creates multiple accounts from the same device
+ * @param {string} deviceId - The hashed device ID
+ * @returns {Promise<boolean>} - True if device has already been used for an auth grant
+ */
+async function hasDeviceUsedAuthGrant(deviceId) {
+  if (!supabase || !deviceId) return false;
+  
+  try {
+    const { data, error } = await supabase
+      .from('free_grants')
+      .select('id')
+      .eq('device_id', deviceId)
+      .not('auth_id', 'is', null)
+      .eq('received_grant', true)
+      .limit(1);
+    
+    if (error) {
+      console.error('[hasDeviceUsedAuthGrant] Error:', error);
+      return false;
+    }
+    
+    return data && data.length > 0;
+  } catch (err) {
+    console.error('[hasDeviceUsedAuthGrant] Exception:', err);
+    return false;
+  }
+}
+
+/**
+ * Record a device grant in the free_grants table
+ * @param {string} deviceId - The hashed device ID
+ * @param {number} grantAmount - Amount of tokens granted
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+async function recordDeviceGrant(deviceId, grantAmount) {
+  if (!supabase || !deviceId) return { success: false, error: 'Missing deviceId or database' };
+  
+  try {
+    const { error } = await supabase
+      .from('free_grants')
+      .insert({
+        device_id: deviceId,
+        auth_id: null,
+        received_grant: true,
+        grant_amount: grantAmount
+      });
+    
+    if (error) {
+      console.error('[recordDeviceGrant] Error:', error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log('[recordDeviceGrant] Recorded device grant for device_id:', deviceId, 'amount:', grantAmount);
+    return { success: true };
+  } catch (err) {
+    console.error('[recordDeviceGrant] Exception:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Record an auth grant in the free_grants table
+ * @param {string} authId - The auth user ID
+ * @param {string|null} deviceId - Optional device ID (for tracking which device was used)
+ * @param {number} grantAmount - Amount of tokens granted
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+async function recordAuthGrant(authId, deviceId, grantAmount) {
+  if (!supabase || !authId) return { success: false, error: 'Missing authId or database' };
+  
+  try {
+    const { error } = await supabase
+      .from('free_grants')
+      .insert({
+        auth_id: authId,
+        device_id: deviceId || null,
+        received_grant: true,
+        grant_amount: grantAmount
+      });
+    
+    if (error) {
+      console.error('[recordAuthGrant] Error:', error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log('[recordAuthGrant] Recorded auth grant for auth_id:', authId, 'device_id:', deviceId || '(none)', 'amount:', grantAmount);
+    return { success: true };
+  } catch (err) {
+    console.error('[recordAuthGrant] Exception:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 /**
  * Call DeepSeek API
  * @param {Array} messages - Array of message objects
@@ -1095,9 +1254,10 @@ app.post('/api/users/login', async (req, res) => {
 
 // Create auth account and link to anon user
 // NOTE: Tokens are NOT granted here. User must confirm email first via /api/email/confirm
+// deviceId is optional but used for abuse prevention (one auth grant per device)
 app.post('/api/users/create-account', async (req, res) => {
   try {
-    const { anonId, name, email, password } = req.body || {};
+    const { anonId, name, email, password, deviceId } = req.body || {};
 
     if (!supabase) {
       return res.status(503).json({
@@ -1122,7 +1282,7 @@ app.post('/api/users/create-account', async (req, res) => {
       });
     }
 
-    console.log('[create-account] Creating account for email:', email);
+    console.log('[create-account] Creating account for email:', email, 'deviceId:', deviceId ? '(provided)' : '(none)');
 
     // Create Supabase auth user (email_confirm: false since we handle confirmation ourselves)
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -1162,6 +1322,13 @@ app.post('/api/users/create-account', async (req, res) => {
     let message = '';
     let userRow = null;
 
+    // Check if this device has already been used to create an auth account that received tokens
+    // This prevents abuse where someone creates multiple accounts from the same device
+    const deviceAlreadyUsedForAuth = deviceId ? await hasDeviceUsedAuthGrant(deviceId) : false;
+    if (deviceAlreadyUsedForAuth) {
+      console.log('[create-account] Device already used for auth grant:', deviceId);
+    }
+
     if (!existingUsers || existingUsers.length === 0) {
       // No existing anon row: create new user row with 0 tokens (tokens granted on email confirm)
       const { data: inserted, error: insertError } = await supabase
@@ -1171,6 +1338,7 @@ app.post('/api/users/create-account', async (req, res) => {
           auth_id: authId,
           email,
           password,
+          device_id: deviceId || null, // Store deviceId for abuse prevention during confirmation
           tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: 0,  // NO bonus yet - granted on email confirmation
@@ -1189,18 +1357,28 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = inserted;
-      message = `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`;
+      if (deviceAlreadyUsedForAuth) {
+        message = 'Account created. This device has already received a free account grant, so no bonus tokens will be awarded.';
+      } else {
+        message = `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`;
+      }
     } else if (existingUsers.length === 1 && !existingUsers[0].auth_id) {
       // Single anon row without auth_id: link auth_id (no tokens yet)
       const row = existingUsers[0];
 
+      const updateData = {
+        auth_id: authId,
+        email,
+        password,
+      };
+      // Only set device_id if not already set and we have one
+      if (deviceId && !row.device_id) {
+        updateData.device_id = deviceId;
+      }
+
       const { data: updated, error: updateError } = await supabase
         .from('users')
-        .update({
-          auth_id: authId,
-          email,
-          password,
-        })
+        .update(updateData)
         .eq('id', row.id)
         .select()
         .single();
@@ -1215,7 +1393,11 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = updated;
-      message = `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`;
+      if (deviceAlreadyUsedForAuth) {
+        message = 'Account created. This device has already received a free account grant, so no bonus tokens will be awarded.';
+      } else {
+        message = `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`;
+      }
     } else {
       // Multiple rows with this anon_id or at least one already has auth_id
       // Treat as repeat account: create a fresh row with 0 tokens
@@ -1226,6 +1408,7 @@ app.post('/api/users/create-account', async (req, res) => {
           auth_id: authId,
           email,
           password,
+          device_id: deviceId || null,
           tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: 0,
@@ -1247,8 +1430,8 @@ app.post('/api/users/create-account', async (req, res) => {
       message = 'Account created. This device already has an account, so no bonus tokens will be awarded.';
     }
 
-    // Generate confirmation token and store it
-    const confirmationToken = generateConfirmationToken(String(userRow.id), email);
+    // Generate confirmation token and store it (includes password for auto-login after confirmation)
+    const confirmationToken = generateConfirmationToken(String(userRow.id), email, password);
     
     // Store confirmation token in user row
     const { error: tokenUpdateError } = await supabase
@@ -1347,7 +1530,9 @@ app.post('/api/email/confirm', async (req, res) => {
         success: true,
         message: 'Your email has already been confirmed.',
         alreadyConfirmed: true,
-        tokensAdded: 0
+        tokensAdded: 0,
+        email: decoded.email,
+        password: decoded.password
       });
     }
 
@@ -1360,25 +1545,35 @@ app.post('/api/email/confirm', async (req, res) => {
       });
     }
 
-    // Determine if this user is eligible for the auth bonus
-    // They get NEW_AUTH_TOKENS if this is their first confirmed account for this anon_id
-    // Check if any other user row with the same anon_id has already been confirmed
+    // Determine if this user is eligible for the auth bonus using free_grants table
+    // They get NEW_AUTH_TOKENS if:
+    // 1. This auth_id has not already received an auth grant (via free_grants)
+    // 2. This device_id has not already been used for an auth grant (abuse prevention)
     let tokensToGrant = NEW_AUTH_TOKENS;
+    let skipReason = null;
     
-    if (user.anon_id) {
-      const { data: otherConfirmed } = await supabase
-        .from('users')
-        .select('id')
-        .eq('anon_id', user.anon_id)
-        .not('id', 'eq', userId)
-        .not('email_confirmed_at', 'is', null)
-        .limit(1);
-
-      if (otherConfirmed && otherConfirmed.length > 0) {
-        // Another account with this anon_id was already confirmed - no bonus
+    // Check 1: Has this auth_id already received an auth grant?
+    if (user.auth_id) {
+      const authAlreadyGranted = await hasAuthReceivedGrant(user.auth_id);
+      if (authAlreadyGranted) {
         tokensToGrant = 0;
-        console.log('[email/confirm] Another account already confirmed for this anon_id, no bonus');
+        skipReason = 'auth_id already received grant';
+        console.log('[email/confirm] Auth already received grant for auth_id:', user.auth_id);
       }
+    }
+    
+    // Check 2: Has this device already been used for an auth grant? (abuse prevention)
+    if (tokensToGrant > 0 && user.device_id) {
+      const deviceAlreadyUsedForAuth = await hasDeviceUsedAuthGrant(user.device_id);
+      if (deviceAlreadyUsedForAuth) {
+        tokensToGrant = 0;
+        skipReason = 'device_id already used for auth grant';
+        console.log('[email/confirm] Device already used for auth grant:', user.device_id);
+      }
+    }
+    
+    if (skipReason) {
+      console.log('[email/confirm] Skipping auth grant, reason:', skipReason);
     }
 
     // Update user: set email_confirmed_at, clear confirmation_token
@@ -1412,6 +1607,11 @@ app.post('/api/email/confirm', async (req, res) => {
         // Don't fail the confirmation, just log the error
       } else {
         console.log('[email/confirm] Granted', tokensToGrant, 'tokens to user:', userId);
+        
+        // Record the auth grant in free_grants table (includes device_id for abuse tracking)
+        if (user.auth_id) {
+          await recordAuthGrant(user.auth_id, user.device_id, tokensToGrant);
+        }
       }
     }
 
@@ -1434,11 +1634,14 @@ app.post('/api/email/confirm', async (req, res) => {
 
     console.log('[email/confirm] Email confirmed successfully for user:', userId);
 
+    // Return email and password from decoded token for auto-login in web-portal
     return res.json({
       success: true,
       message,
       tokensAdded: tokensToGrant,
-      alreadyConfirmed: false
+      alreadyConfirmed: false,
+      email: decoded.email,
+      password: decoded.password
     });
   } catch (error) {
     console.error('Error in /api/email/confirm:', error);
@@ -2064,43 +2267,61 @@ app.post('/api/users/ensure', async (req, res) => {
     const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     console.log('[ensure] Resolved IP address:', ipAddress);
 
-    // Check if this deviceId has already received a free device grant
-    let deviceAlreadyGranted = false;
-    if (deviceId) {
-      const { data: existingDeviceUsers, error: deviceError } = await supabase
-        .from('users')
-        .select('id, device_id, free_grant_used')
-        .eq('device_id', deviceId)
-        .eq('free_grant_used', true)
-        .limit(1);
-
-      if (!deviceError && existingDeviceUsers && existingDeviceUsers.length > 0) {
-        deviceAlreadyGranted = true;
-        console.log('[ensure] Device already granted free tokens for device_id:', deviceId, 'rows:', existingDeviceUsers.length);
-      }
-    }
-
-    // Look for existing user by anonId
-    const { data: anonUsers, error: anonError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('anon_id', anonId);
-
-    if (anonError) {
-      console.error('[ensure] Error querying users by anon_id:', anonError);
-      return res.status(500).json({ error: 'Database query failed' });
+    // Check if this deviceId has already received a free device grant via free_grants table
+    const deviceAlreadyGranted = deviceId ? await hasDeviceReceivedGrant(deviceId) : false;
+    if (deviceAlreadyGranted) {
+      console.log('[ensure] Device already granted free tokens (via free_grants) for device_id:', deviceId);
     }
 
     let user = null;
     let grantedDeviceTokens = false;
 
-    if (anonUsers && anonUsers.length > 0) {
-      // User exists, use first row
-      user = anonUsers[0];
-      console.log('[ensure] Found existing user by anonId:', anonId, 'userId:', user.id, 'device_id:', user.device_id, 'free_grant_used:', user.free_grant_used);
+    // DEVICE-FIRST LOOKUP: Per design, look up by device_id first if provided
+    // This ensures reinstalls on the same machine find the existing user row
+    if (deviceId) {
+      const { data: deviceUsers, error: deviceError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('device_id', deviceId)
+        .limit(1);
 
-      // If device grant available and user hasn't used their free grant yet, apply it
-      if (deviceId && !deviceAlreadyGranted && !user.free_grant_used) {
+      if (!deviceError && deviceUsers && deviceUsers.length > 0) {
+        user = deviceUsers[0];
+        console.log('[ensure] Found existing user by device_id:', deviceId, 'userId:', user.id);
+        
+        // Update anon_id if it changed (e.g., after reinstall)
+        if (user.anon_id !== anonId) {
+          console.log('[ensure] Updating anon_id from', user.anon_id, 'to', anonId, 'for device_id:', deviceId);
+          await supabase
+            .from('users')
+            .update({ anon_id: anonId })
+            .eq('id', user.id);
+          user.anon_id = anonId;
+        }
+      }
+    }
+
+    // ANON_ID FALLBACK: If no user found by device_id, look up by anon_id
+    if (!user) {
+      const { data: anonUsers, error: anonError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('anon_id', anonId);
+
+      if (anonError) {
+        console.error('[ensure] Error querying users by anon_id:', anonError);
+        return res.status(500).json({ error: 'Database query failed' });
+      }
+
+      if (anonUsers && anonUsers.length > 0) {
+        user = anonUsers[0];
+        console.log('[ensure] Found existing user by anonId:', anonId, 'userId:', user.id, 'device_id:', user.device_id);
+      }
+    }
+
+    if (user) {
+      // User exists - check if we should apply device grant
+      if (deviceId && !deviceAlreadyGranted) {
         // Apply device grant: add NEW_ANON_TOKENS to tokens_added
         console.log('[ensure] Applying device grant for existing user:', user.id, 'device_id:', deviceId);
 
@@ -2111,12 +2332,13 @@ app.post('/api/users/ensure', async (req, res) => {
         });
 
         if (result.success) {
-          // Mark free_grant_used and store device_id
-          console.log('[ensure] Marking user free_grant_used=true and linking device_id:', deviceId);
-
+          // Record in free_grants table and update device_id on user
+          await recordDeviceGrant(deviceId, NEW_ANON_TOKENS);
+          
+          console.log('[ensure] Linking device_id to user:', deviceId);
           await supabase
             .from('users')
-            .update({ device_id: deviceId, free_grant_used: true })
+            .update({ device_id: deviceId })
             .eq('id', user.id);
 
           console.log('[ensure] Applied device grant for user:', user.id, 'device_id:', deviceId);
@@ -2154,8 +2376,7 @@ app.post('/api/users/ensure', async (req, res) => {
           tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: initialTokensAdded,
-          tokens_used_all_time: 0,
-          free_grant_used: shouldGrantDeviceTokens
+          tokens_used_all_time: 0
         })
         .select()
         .single();
@@ -2168,8 +2389,10 @@ app.post('/api/users/ensure', async (req, res) => {
       user = newUser;
       grantedDeviceTokens = shouldGrantDeviceTokens;
 
-      // Log initial token grant
+      // Record device grant in free_grants table and log to token_log
       if (shouldGrantDeviceTokens) {
+        await recordDeviceGrant(deviceId, NEW_ANON_TOKENS);
+        
         try {
           console.log('[ensure] Logging initial device grant to token_log for user:', user.id, 'tokens_added:', initialTokensAdded);
 
@@ -2193,7 +2416,6 @@ app.post('/api/users/ensure', async (req, res) => {
       userId: user.id,
       anon_id: user.anon_id,
       device_id: user.device_id,
-      free_grant_used: user.free_grant_used,
       grantedDeviceTokens,
     });
 
