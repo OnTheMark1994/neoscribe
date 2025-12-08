@@ -1319,18 +1319,33 @@ app.post('/api/users/create-account', async (req, res) => {
       });
     }
 
+    console.log('[create-account] Found', existingUsers?.length || 0, 'existing user rows for anonId:', anonId);
+    if (existingUsers && existingUsers.length > 0) {
+      console.log('[create-account] First existing user auth_id:', existingUsers[0].auth_id || '(none)');
+    }
+
     let message = '';
     let userRow = null;
 
     // Check if this device has already been used to create an auth account that received tokens
     // This prevents abuse where someone creates multiple accounts from the same device
+    // NOTE: On web, deviceId is null, so this will be false
     const deviceAlreadyUsedForAuth = deviceId ? await hasDeviceUsedAuthGrant(deviceId) : false;
     if (deviceAlreadyUsedForAuth) {
       console.log('[create-account] Device already used for auth grant:', deviceId);
     }
 
+    // Determine the appropriate message based on eligibility
+    // User gets auth grant on email confirmation UNLESS:
+    // 1. This device (desktop only) already used for an auth grant
+    const willGetAuthGrant = !deviceAlreadyUsedForAuth;
+    const confirmMessage = willGetAuthGrant
+      ? `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`
+      : 'Account created. This device has already received a free account grant, so no additional tokens will be added on confirmation.';
+
     if (!existingUsers || existingUsers.length === 0) {
       // No existing anon row: create new user row with 0 tokens (tokens granted on email confirm)
+      console.log('[create-account] Creating new user row (no existing anon row)');
       const { data: inserted, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -1357,13 +1372,10 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = inserted;
-      if (deviceAlreadyUsedForAuth) {
-        message = 'Account created. This device has already received a free account grant, so no bonus tokens will be awarded.';
-      } else {
-        message = `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`;
-      }
+      message = confirmMessage;
     } else if (existingUsers.length === 1 && !existingUsers[0].auth_id) {
       // Single anon row without auth_id: link auth_id (no tokens yet)
+      console.log('[create-account] Linking auth_id to existing anon row');
       const row = existingUsers[0];
 
       const updateData = {
@@ -1393,15 +1405,16 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = updated;
-      if (deviceAlreadyUsedForAuth) {
-        message = 'Account created. This device has already received a free account grant, so no bonus tokens will be awarded.';
-      } else {
-        message = `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`;
-      }
+      message = confirmMessage;
     } else {
-      // Multiple rows with this anon_id or at least one already has auth_id
-      // Treat as repeat account: create a fresh row with 0 tokens
-      const { data: repeatUser, error: repeatError } = await supabase
+      // Multiple rows with this anon_id OR single row already has auth_id
+      // This is an edge case - create a new row for this auth account
+      // User can still get auth grant on confirmation if this is a new auth_id
+      console.log('[create-account] Creating new user row (multiple anon rows or auth_id already set)');
+      console.log('[create-account] Reason: existingUsers.length=', existingUsers.length, 
+        'firstRowAuthId=', existingUsers[0]?.auth_id || '(none)');
+      
+      const { data: newUser, error: newUserError } = await supabase
         .from('users')
         .insert({
           anon_id: anonId,
@@ -1417,17 +1430,19 @@ app.post('/api/users/create-account', async (req, res) => {
         .select()
         .single();
 
-      if (repeatError) {
-        console.error('❌ Failed to insert repeat user row:', repeatError);
+      if (newUserError) {
+        console.error('❌ Failed to insert new user row:', newUserError);
         return res.status(500).json({
           success: false,
-          error: 'Failed to create repeat user record',
-          details: repeatError.message
+          error: 'Failed to create user record',
+          details: newUserError.message
         });
       }
 
-      userRow = repeatUser;
-      message = 'Account created. This device already has an account, so no bonus tokens will be awarded.';
+      userRow = newUser;
+      // Still show the confirm message - user CAN get tokens on confirmation
+      // The free_grants table is what determines eligibility, not this branch
+      message = confirmMessage;
     }
 
     // Generate confirmation token and store it (includes password for auto-login after confirmation)
