@@ -80,12 +80,18 @@ function EditorLine({
 
   const handleMouseUp = () => {
     // In some browsers the caret can jump to the start of the line after a click
-    // if the line is re-rendered. Capture the caret position on mouse up and
-    // re-apply it so typing starts where the user clicked.
+    // if the line is re-rendered. We only restore the caret when the selection
+    // is a single caret (collapsed). For range selections (double-click word
+    // selection, spellcheck selections, click+drag, etc.), we leave the native
+    // selection entirely alone so highlighting and spellcheck can work normally.
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !contentRef.current) return;
 
     const range = sel.getRangeAt(0);
+
+    // If there is an active range selection, do not modify it.
+    if (!range.collapsed) return;
+
     if (!contentRef.current.contains(range.startContainer)) return;
 
     const offset = range.startOffset;
@@ -111,12 +117,7 @@ function EditorLine({
   };
 
   const handleKeyDown = (e) => {
-    // Log Ctrl+S but allow it to propagate so the menu accelerator still triggers save
-    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
-      console.log('[EDITORLINE] Ctrl+S intercepted at line', lineIndex);
-      // Do NOT prevent default here so Electron's Cmd/Ctrl+S accelerator still works
-    }
-
+    // Note: Ctrl+S is now handled in parent Editor.js, not here
     const lines = getLines();
 
     if (e.key === 'Enter') {

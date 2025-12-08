@@ -400,7 +400,23 @@ const AccountPage = () => {
         await signInWithEmail(email, password);
         setStatus('');
       } else {
-        await signUpWithEmail(email, password);
+        const result = await signUpWithEmail(email, password);
+
+        // If Supabase returned a user id, initialize a corresponding users row
+        // in the backend so web-only signups also receive their free token grant.
+        const authUserId = result?.user?.id;
+        if (authUserId) {
+          try {
+            await fetch(`${SERVER_URL}/api/user/initialize`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: authUserId, authId: authUserId }),
+            });
+          } catch (initErr) {
+            // eslint-disable-next-line no-console
+            console.error('[WEB] Failed to initialize backend user for web signup:', initErr);
+          }
+        }
         setStatus('Check your email to confirm your account.');
       }
     } catch (err) {

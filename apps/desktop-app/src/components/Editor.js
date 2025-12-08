@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { useSelector } from 'react-redux';
 import { parseText, getTextFromLines, updateLinesFromText, getLines } from '../utils/editorEngine';
-import EditorLine from './EditorLine';
-import DiffActionButtons from './DiffActionButtons';
+import FoldEditorView from './FoldEditorView';
+import TextareaEditorView from './TextareaEditorView';
 import './Editor.css';
 
 function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete, onEditorReady, isAIEnabled }) {
   const [content, setContent] = useState('');
-  const [isFoldView, setIsFoldView] = useState(true);
+  const [isFoldView, setIsFoldView] = useState(() => {
+    const saved = localStorage.getItem('editorViewMode');
+    return saved === 'textarea' ? false : true; // default to fold view
+  });
   const [isArrayView, setIsArrayView] = useState(true);
   const [renderTrigger, setRenderTrigger] = useState(0);
   const editorRef = useRef(null);
@@ -132,6 +135,15 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Ctrl+S: Save - centralized here so it works in both fold and textarea views
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        console.log('[EDITOR] Ctrl+S intercepted in parent Editor component');
+        handleSave();
+        return;
+      }
+
+      // Ctrl+F: Find - works in both views with the same UI
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setIsFindVisible(true);
@@ -141,11 +153,16 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
             findInputRef.current.select();
           }
         }, 0);
-      } else if (e.key === 'Escape') {
+        return;
+      }
+
+      // Escape: Close find box
+      if (e.key === 'Escape') {
         if (isFindVisible) {
           setIsFindVisible(false);
           clearFindHighlight();
         }
+        return;
       }
     };
 
@@ -153,7 +170,14 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isFindVisible]);
+  }, [isFindVisible, isFoldView]);
+
+  // Auto-highlight current match when index changes (after user types or navigates)
+  useEffect(() => {
+    if (currentFindIndex >= 0 && findMatches.length > 0) {
+      highlightCurrentFindMatch(currentFindIndex);
+    }
+  }, [currentFindIndex, findMatches]);
 
   // Keep ref in sync with prop so async callbacks always see latest file path
   useEffect(() => {
@@ -205,8 +229,15 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     const filePath = filePathRef.current;
     console.log('[EDITOR] handleSave called, filePathRef.current:', filePath);
     
-    const textContent = getTextFromLines();
-    console.log('[EDITOR] Text content length:', textContent.length);
+    // CRITICAL: Get content from the correct source based on current view mode
+    let textContent;
+    if (isFoldView) {
+      textContent = getTextFromLines();
+    } else {
+      // In textarea view, get content from textarea ref
+      textContent = textareaRef.current?.value ?? content ?? '';
+    }
+    console.log('[EDITOR] Text content length:', textContent.length, 'from', isFoldView ? 'fold/array view' : 'textarea view');
 
     if (filePath) {
       console.log('[EDITOR] Saving to existing file:', filePath);
@@ -247,7 +278,13 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     if (!window.electronAPI) return;
     
     console.log('[EDITOR] handleSaveAs called');
-    const textContent = getTextFromLines();
+    // CRITICAL: Get content from the correct source based on current view mode
+    let textContent;
+    if (isFoldView) {
+      textContent = getTextFromLines();
+    } else {
+      textContent = textareaRef.current?.value ?? content ?? '';
+    }
     try {
       const result = await window.electronAPI.saveFileAs(textContent);
       console.log('[EDITOR] Save As result:', result);
@@ -290,9 +327,11 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
       if (nextIsFoldView) {
         // Switching from plain textarea into fold view: parse latest textarea text
         syncTextareaToFoldLines();
+        localStorage.setItem('editorViewMode', 'fold');
       } else {
-        // Switching from fold view into plain textarea: materialize latest lines into text
+        // Switching from fold view into plain textarea: sync text
         syncFoldLinesToTextarea();
+        localStorage.setItem('editorViewMode', 'textarea');
       }
 
       return nextIsFoldView;
@@ -806,12 +845,46 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     // Always start by clearing previous highlights so we work from plain text
     clearFindHighlight();
 
-    if (!isFoldView || !query) {
+    if (!query) {
       setFindMatches([]);
       setCurrentFindIndex(-1);
       return;
     }
 
+    // Handle textarea view
+    if (!isFoldView) {
+      if (!textareaRef.current) {
+        setFindMatches([]);
+        setCurrentFindIndex(-1);
+        return;
+      }
+
+      const text = textareaRef.current.value || '';
+      const lowerText = text.toLowerCase();
+      const lowerQuery = query.toLowerCase();
+      const matches = [];
+      
+      let startIndex = 0;
+      while ((startIndex = lowerText.indexOf(lowerQuery, startIndex)) !== -1) {
+        matches.push({
+          startIndex,
+          endIndex: startIndex + query.length
+        });
+        startIndex += query.length;
+      }
+
+      setFindMatches(matches);
+      if (matches.length > 0) {
+        setCurrentFindIndex(0);
+        // Don't focus/scroll here - it steals focus from find input on every keystroke
+        // Focus/scroll happens in highlightCurrentFindMatch when user navigates
+      } else {
+        setCurrentFindIndex(-1);
+      }
+      return;
+    }
+
+    // Handle fold/array view
     const container = editorRef.current;
     if (!container) {
       setFindMatches([]);
@@ -869,6 +942,44 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
   };
 
   const highlightCurrentFindMatch = (index) => {
+    if (findMatches.length === 0 || index < 0 || index >= findMatches.length) {
+      return;
+    }
+
+    // Handle textarea view
+    if (!isFoldView) {
+      if (!textareaRef.current) return;
+      const match = findMatches[index];
+      
+      // Only focus textarea if find input doesn't have focus (prevents stealing focus while typing)
+      const shouldFocus = document.activeElement !== findInputRef.current;
+      if (shouldFocus) {
+        textareaRef.current.focus();
+      }
+      
+      // Select the match
+      textareaRef.current.setSelectionRange(match.startIndex, match.endIndex);
+      
+      // Scroll to show the selection - use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        if (!textareaRef.current) return;
+        
+        // Calculate line number of the match
+        const text = textareaRef.current.value.substring(0, match.startIndex);
+        const lineNumber = (text.match(/\n/g) || []).length;
+        const lineHeight = parseFloat(getComputedStyle(textareaRef.current).lineHeight) || 28.8;
+        
+        // Calculate scroll position to center the match vertically
+        const matchTopPosition = lineNumber * lineHeight;
+        const viewportHeight = textareaRef.current.clientHeight;
+        const scrollPosition = matchTopPosition - (viewportHeight / 2) + (lineHeight / 2);
+        
+        textareaRef.current.scrollTop = Math.max(0, scrollPosition);
+      });
+      return;
+    }
+
+    // Handle fold/array view
     const container = editorRef.current;
     if (!container) return;
 
@@ -877,10 +988,6 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
       el.classList.remove('find-highlight-current');
       el.classList.add('find-highlight');
     });
-
-    if (!isFoldView || findMatches.length === 0 || index < 0 || index >= findMatches.length) {
-      return;
-    }
 
     const highlight = container.querySelector(`[data-find-index="${index}"]`);
     if (highlight) {
@@ -959,7 +1066,21 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
   const handleFindInputChange = (e) => {
     const value = e.target.value;
     setFindQuery(value);
-    recomputeFindMatches(value);
+    
+    // Debounce search in fold/array view to improve performance
+    if (isFoldView) {
+      // Clear previous timeout
+      if (window.findDebounceTimeout) {
+        clearTimeout(window.findDebounceTimeout);
+      }
+      // Set new timeout - search after 150ms of no typing
+      window.findDebounceTimeout = setTimeout(() => {
+        recomputeFindMatches(value);
+      }, 150);
+    } else {
+      // In textarea view, search immediately (it's fast)
+      recomputeFindMatches(value);
+    }
   };
 
   const handleFindNext = () => {
@@ -969,9 +1090,8 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
       if (next >= findMatches.length) {
         next = 0;
       }
-      // Always scroll to the computed match, even if index value doesn't change
-      highlightCurrentFindMatch(next);
       return next;
+      // Highlighting happens automatically in useEffect
     });
   };
 
@@ -982,9 +1102,8 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
       if (next < 0) {
         next = findMatches.length - 1;
       }
-      // Always scroll to the computed match, even if index value doesn't change
-      highlightCurrentFindMatch(next);
       return next;
+      // Highlighting happens automatically in useEffect
     });
   };
 
@@ -995,84 +1114,64 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
 
   return (
     <>
-      {isFoldView ? (
-        <>
-          {isFindVisible && (
-            <div className="find-box">
-              <input
-                ref={findInputRef}
-                type="text"
-                className="find-input"
-                value={findQuery}
-                onChange={handleFindInputChange}
-                placeholder="Find..."
-              />
-              <div className="find-counter">
-                {findMatches.length === 0
-                  ? 'No results'
-                  : `${currentFindIndex + 1} of ${findMatches.length}`}
-              </div>
-              <button
-                className="find-btn"
-                onClick={handleFindPrevious}
-                disabled={findMatches.length === 0}
-              >
-                ↑
-              </button>
-              <button
-                className="find-btn"
-                onClick={handleFindNext}
-                disabled={findMatches.length === 0}
-              >
-                ↓
-              </button>
-              <button
-                className="find-btn find-close-btn"
-                onClick={handleFindClose}
-              >
-                ×
-              </button>
-            </div>
-          )}
-          <div id="editor-display" className="editor-display" ref={editorRef}>
-            {getVisibleLines().map(({ line, index, displayDepth }) => (
-              <React.Fragment key={line.id || index}>
-                <EditorLine
-                  line={line}
-                  lineIndex={index}
-                  displayDepth={displayDepth}
-                  isArrayView={isArrayView}
-                  onToggleFold={toggleFold}
-                  onContentChange={onContentChange}
-                  onRenderEditor={renderEditor}
-                  currentChangeId={allChangeIds[currentChangeIdIndex]}
-                  onShowAIContextMenu={showAIContextMenu}
-                  isAIEnabled={isAIEnabled}
-                />
-                {line.proposedChangeType && (
-                  <DiffActionButtons
-                    proposedChangeId={line.proposedChangeId}
-                    changeType={line.proposedChangeType}
-                    onUpdate={renderEditor}
-                    onContentChange={onContentChange}
-                  />
-                )}
-              </React.Fragment>
-            ))}
+      {isFindVisible && (
+        <div className="find-box">
+          <input
+            ref={findInputRef}
+            type="text"
+            className="find-input"
+            value={findQuery}
+            onChange={handleFindInputChange}
+            placeholder="Find..."
+          />
+          <div className="find-counter">
+            {findMatches.length === 0
+              ? 'No results'
+              : `${currentFindIndex + 1} of ${findMatches.length}`}
           </div>
-        </>
+          <button
+            className="find-btn"
+            onClick={handleFindPrevious}
+            disabled={findMatches.length === 0}
+          >
+            ↑
+          </button>
+          <button
+            className="find-btn"
+            onClick={handleFindNext}
+            disabled={findMatches.length === 0}
+          >
+            ↓
+          </button>
+          <button
+            className="find-btn find-close-btn"
+            onClick={handleFindClose}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {isFoldView ? (
+        <FoldEditorView
+          editorRef={editorRef}
+          visibleLines={getVisibleLines()}
+          isArrayView={isArrayView}
+          onToggleFold={toggleFold}
+          onContentChange={onContentChange}
+          onRenderEditor={renderEditor}
+          currentChangeId={allChangeIds[currentChangeIdIndex]}
+          onShowAIContextMenu={showAIContextMenu}
+          isAIEnabled={isAIEnabled}
+        />
       ) : (
-        <textarea
-          ref={textareaRef}
-          id="editor"
-          className="editor-textarea"
-          value={content}
-          onChange={(e) => {
-            setContent(e.target.value);
+        <TextareaEditorView
+          textareaRef={textareaRef}
+          content={content}
+          onContentChange={(newContent) => {
+            setContent(newContent);
             onContentChange();
           }}
           placeholder="Start typing or use File menu to open a file..."
-          spellCheck={true}
         />
       )}
     </>
