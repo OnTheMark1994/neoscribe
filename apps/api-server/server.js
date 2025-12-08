@@ -2343,7 +2343,7 @@ app.post('/api/users/ensure', async (req, res) => {
         const result = await applyTokenChange({
           userId: user.id,
           deltaAdded: NEW_ANON_TOKENS,
-          note: 'Device anon grant (first desktop install)',
+          note: 'New desktop user device grant',
         });
 
         if (result.success) {

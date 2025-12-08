@@ -286,13 +286,20 @@ function App() {
       setIsSettingsView(true);
     }
 
-    // Load saved authId on startup so auth state persists across sessions
-    const savedAuthId = localStorage.getItem('authId');
-    if (savedAuthId) {
-      console.log('[APP] Loaded authId from localStorage:', savedAuthId);
-      setAuthId(savedAuthId);
-      dispatch(setUserAuthId(savedAuthId));
+    // Load saved authId on startup so auth state persists across sessions.
+    // This is "best effort" client state; the backend users table and Supabase Auth
+    // remain the ultimate source of truth.
+    try {
+      const savedAuthId = localStorage.getItem('authId');
+      if (savedAuthId) {
+        console.log('[APP] Loaded authId from localStorage:', savedAuthId);
+        setAuthId(savedAuthId);
+        dispatch(setUserAuthId(savedAuthId));
+      }
+    } catch (e) {
+      // ignore storage errors
     }
+
   }, []);
 
   // Once anonId is known (and deviceId if in Electron), ensure user exists and load account data from backend
@@ -328,18 +335,33 @@ function App() {
         setUserAccount(data || null);
         dispatch(setUserData(data || null));
 
-        // If backend returns an auth-linked user, keep authId in sync in App state + localStorage
         if (data && (data.authId || data.auth_id)) {
           const newAuthId = data.authId || data.auth_id;
           console.log('[APP] Synching authId from backend:', newAuthId);
           setAuthId(newAuthId);
-          localStorage.setItem('authId', newAuthId);
+          try {
+            localStorage.setItem('authId', newAuthId);
+          } catch (e) {
+            // ignore storage errors
+          }
           dispatch(setUserAuthId(newAuthId));
+        } else if (authId) {
+          // Backend says there is no auth linked, but we had one in memory.
+          // Clear it so we don't send a stale authId to the server.
+          console.log('[APP] Clearing stale authId from App state');
+          setAuthId(null);
+          try {
+            localStorage.removeItem('authId');
+          } catch (e) {
+            // ignore storage errors
+          }
+          dispatch(setUserAuthId(null));
         }
 
         // After user ensure, load authoritative token stats so AISidebar can show real available tokens
         try {
-          const tokenData = await fetchUserTokens(anonId, (data && (data.authId || data.auth_id)) || authId || null);
+          const backendAuthId = data && (data.authId || data.auth_id) ? (data.authId || data.auth_id) : null;
+          const tokenData = await fetchUserTokens(anonId, backendAuthId);
           const normalized = normalizeUserTokenData(tokenData || {});
           const initialAvailable = normalized.availableTokens > 0 ? normalized.availableTokens : 0;
           console.log('[APP] Initial availableTokens from backend:', initialAvailable, 'normalized:', normalized);

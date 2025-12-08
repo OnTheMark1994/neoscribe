@@ -534,7 +534,6 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
                 if (result && result.authUser && result.authUser.id) {
                   const newAuthId = result.authUser.id;
                   setAuthId(newAuthId);
-                  localStorage.setItem('authId', newAuthId);
 
                   // Notify main window so primary App instance can update authId immediately
                   if (window.electronAPI && window.electronAPI.settingsSaved) {

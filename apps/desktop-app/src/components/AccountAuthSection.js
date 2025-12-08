@@ -79,9 +79,19 @@ function AccountAuthSection({
   };
 
   const handleLogout = () => {
+    // Clear local auth state and any saved credentials
+    setAuthEmail('');
     setAuthPassword('');
     setStatus('');
     setAuthMode('login');
+
+    try {
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userPassword');
+    } catch (e) {
+      // ignore storage errors
+    }
+
     if (onAuthCleared) {
       onAuthCleared();
     }
@@ -235,6 +245,10 @@ function AccountAuthSection({
         </>
       ) : (
         <>
+          <div className="auth-info-message" style={{ marginTop: '12px' }}>
+            Email must be confirmed to receive bonus tokens.
+          </div>
+
           <div className="setting-item">
             <label>Email</label>
             <input
