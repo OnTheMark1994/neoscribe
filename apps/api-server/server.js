@@ -1343,6 +1343,13 @@ app.post('/api/users/create-account', async (req, res) => {
       ? `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`
       : 'Account created. This device has already received a free account grant, so no additional tokens will be added on confirmation.';
 
+    // Prefer reusing an existing unconfirmed user row for this device/anon combo
+    // so that typos or retries with a new email do not create separate token pools.
+    const primaryUnconfirmedUser =
+      (existingUsers || []).find((u) => !u.email_confirmed_at && deviceId && u.device_id === deviceId) ||
+      (existingUsers || []).find((u) => !u.email_confirmed_at) ||
+      null;
+
     if (!deviceAlreadyUsedForAuth && (!existingUsers || existingUsers.length === 0)) {
       // First auth account for this anon/device: create new user row with 0 tokens (granted on email confirm)
       console.log('[create-account] Creating new user row (no existing anon row, device not yet used for auth)');
@@ -1372,6 +1379,41 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = inserted;
+      message = confirmMessage;
+    } else if (!deviceAlreadyUsedForAuth && primaryUnconfirmedUser) {
+      // Reuse an existing unconfirmed user row for this device/anon.
+      // This ensures that retries with a corrected email do not create a
+      // separate account and token pool for the same device.
+      console.log('[create-account] Reusing existing unconfirmed user row for new auth/email');
+      const row = primaryUnconfirmedUser;
+
+      const updateData = {
+        auth_id: authId,
+        email,
+        password,
+      };
+      // Only set device_id if not already set and we have one
+      if (deviceId && !row.device_id) {
+        updateData.device_id = deviceId;
+      }
+
+      const { data: updated, error: updateError } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', row.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('❌ Failed to update existing user row:', updateError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to update user record',
+          details: updateError.message
+        });
+      }
+
+      userRow = updated;
       message = confirmMessage;
     } else if (!deviceAlreadyUsedForAuth && existingUsers.length === 1 && !existingUsers[0].auth_id) {
       // First auth account for this anon/device, and we have a single anon row: link auth_id (no tokens yet)
