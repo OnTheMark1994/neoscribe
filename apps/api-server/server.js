@@ -1181,7 +1181,7 @@ app.post('/api/users/login', async (req, res) => {
       }
 
       userRow = inserted;
-      message = 'Logged in and created user record; no bonus tokens awarded on login.';
+      message = 'Login successful!';
     } else if (existingUsers.length === 1 && !existingUsers[0].auth_id) {
       // Single anon row without auth_id: link auth_id, no token changes
       const row = existingUsers[0];
@@ -1205,7 +1205,7 @@ app.post('/api/users/login', async (req, res) => {
       }
 
       userRow = updated;
-      message = 'Logged in and linked to existing anon user; no bonus tokens awarded on login.';
+      message = 'Login successful!';
     } else {
       // Multiple rows or at least one already has auth_id, create a new row with no bonus tokens
       const { data: repeatUser, error: repeatError } = await supabase
@@ -1231,7 +1231,7 @@ app.post('/api/users/login', async (req, res) => {
       }
 
       userRow = repeatUser;
-      message = 'Logged in with existing account; no bonus tokens awarded for repeat accounts.';
+      message = 'Login successful!';
     }
 
     // console.log('✓ Login-account completed:', message);
@@ -1343,9 +1343,9 @@ app.post('/api/users/create-account', async (req, res) => {
       ? `Account created! Please check your email to confirm and receive ${NEW_AUTH_TOKENS.toLocaleString()} free tokens.`
       : 'Account created. This device has already received a free account grant, so no additional tokens will be added on confirmation.';
 
-    if (!existingUsers || existingUsers.length === 0) {
-      // No existing anon row: create new user row with 0 tokens (tokens granted on email confirm)
-      console.log('[create-account] Creating new user row (no existing anon row)');
+    if (!deviceAlreadyUsedForAuth && (!existingUsers || existingUsers.length === 0)) {
+      // First auth account for this anon/device: create new user row with 0 tokens (granted on email confirm)
+      console.log('[create-account] Creating new user row (no existing anon row, device not yet used for auth)');
       const { data: inserted, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -1353,7 +1353,7 @@ app.post('/api/users/create-account', async (req, res) => {
           auth_id: authId,
           email,
           password,
-          device_id: deviceId || null, // Store deviceId for abuse prevention during confirmation
+          device_id: deviceId || null,
           tokens_monthly: 0,
           tokens_used: 0,
           tokens_added: 0,  // NO bonus yet - granted on email confirmation
@@ -1373,9 +1373,9 @@ app.post('/api/users/create-account', async (req, res) => {
 
       userRow = inserted;
       message = confirmMessage;
-    } else if (existingUsers.length === 1 && !existingUsers[0].auth_id) {
-      // Single anon row without auth_id: link auth_id (no tokens yet)
-      console.log('[create-account] Linking auth_id to existing anon row');
+    } else if (!deviceAlreadyUsedForAuth && existingUsers.length === 1 && !existingUsers[0].auth_id) {
+      // First auth account for this anon/device, and we have a single anon row: link auth_id (no tokens yet)
+      console.log('[create-account] Linking auth_id to existing anon row (device not yet used for auth)');
       const row = existingUsers[0];
 
       const updateData = {
@@ -1407,13 +1407,14 @@ app.post('/api/users/create-account', async (req, res) => {
       userRow = updated;
       message = confirmMessage;
     } else {
-      // Multiple rows with this anon_id OR single row already has auth_id
-      // This is an edge case - create a new row for this auth account
-      // User can still get auth grant on confirmation if this is a new auth_id
-      console.log('[create-account] Creating new user row (multiple anon rows or auth_id already set)');
-      console.log('[create-account] Reason: existingUsers.length=', existingUsers.length, 
-        'firstRowAuthId=', existingUsers[0]?.auth_id || '(none)');
-      
+      // Either this device has already been used for an auth grant, or anon rows are ambiguous.
+      // In both cases, create a fresh user row for this new auth account so we do not
+      // disturb the existing primary user row on this device.
+      console.log('[create-account] Creating new user row for additional auth account or ambiguous anon rows');
+      console.log('[create-account] Reason: deviceAlreadyUsedForAuth =', deviceAlreadyUsedForAuth,
+        'existingUsers.length =', existingUsers ? existingUsers.length : 0,
+        'firstRowAuthId =', existingUsers && existingUsers[0] ? (existingUsers[0].auth_id || '(none)') : '(n/a)');
+
       const { data: newUser, error: newUserError } = await supabase
         .from('users')
         .insert({
@@ -1440,8 +1441,8 @@ app.post('/api/users/create-account', async (req, res) => {
       }
 
       userRow = newUser;
-      // Still show the confirm message - user CAN get tokens on confirmation
-      // The free_grants table is what determines eligibility, not this branch
+      // Still show the confirm message - user CAN get tokens on confirmation if eligible.
+      // The free_grants table is what determines eligibility, not this branch.
       message = confirmMessage;
     }
 
