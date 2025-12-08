@@ -124,12 +124,7 @@ const AccountPage = () => {
   };
 
   // Auto-login route: /auto-login?email=...&password=...
-  // Handles:
-  // - Prefilling email/password fields
-  // - Showing "Signing you in..." message
-  // - If logged-in user matches, redirect to account
-  // - If different user logged in, log them out first, wait 500ms, then log in new user
-  // - Rate limited to one attempt per page load
+  // Prefills form fields and triggers the same login flow as manual login
   useEffect(() => {
     const urlEmail = query.get('email');
     const urlPassword = query.get('password');
@@ -139,12 +134,6 @@ const AccountPage = () => {
     
     if (!urlEmail || !urlPassword || !isAutoLoginRoute) return;
     
-    // Prefill the form fields
-    setEmail(urlEmail);
-    setPassword(urlPassword);
-    setIsAutoLogin(true);
-    setStatus('Signing you in...');
-
     // If the email in the URL has changed since the last auto-login,
     // reset the rate-limit so each distinct email gets one attempt.
     if (lastAutoLoginEmailRef.current !== urlEmail) {
@@ -180,8 +169,14 @@ const AccountPage = () => {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        // Log in the new user
+        // Prefill the form fields
+        setEmail(urlEmail);
+        setPassword(urlPassword);
+        setAuthMode('login');
+        setIsAutoLogin(true);
         setStatus('Signing you in...');
+        
+        // Use the same signInWithEmail from AuthContext that manual login uses
         await signInWithEmail(urlEmail, urlPassword);
         setStatus('');
         setIsAutoLogin(false);
