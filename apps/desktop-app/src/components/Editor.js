@@ -3,18 +3,24 @@ import { useSelector } from 'react-redux';
 import { parseText, getTextFromLines, updateLinesFromText, getLines } from '../utils/editorEngine';
 import FoldEditorView from './FoldEditorView';
 import TextareaEditorView from './TextareaEditorView';
+import MonacoEditorView from './MonacoEditorView';
 import './Editor.css';
 
 function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete, onEditorReady, isAIEnabled }) {
   const [content, setContent] = useState('');
-  const [isFoldView, setIsFoldView] = useState(() => {
+  // viewMode: 'array' | 'monaco' | 'textarea'
+  const [viewMode, setViewMode] = useState(() => {
     const saved = localStorage.getItem('editorViewMode');
-    return saved === 'textarea' ? false : true; // default to fold view
+    // Migrate old 'fold' value to 'array'
+    if (saved === 'fold') return 'array';
+    if (saved === 'array' || saved === 'monaco' || saved === 'textarea') return saved;
+    return 'array'; // default
   });
   const [isArrayView, setIsArrayView] = useState(true);
   const [renderTrigger, setRenderTrigger] = useState(0);
   const editorRef = useRef(null);
   const textareaRef = useRef(null);
+  const monacoRef = useRef(null);
   const menuListenersSetupRef = useRef(false);
   const openDialogActiveRef = useRef(false);
   // Keep latest file path in a ref so menu callbacks always see the current value
@@ -37,11 +43,15 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
           setRenderTrigger(prev => prev + 1); // Trigger re-render
         },
         toggleFoldView: () => {
-          toggleFoldView();
+          cycleViewMode();
         },
         toggleArrayView: () => {
           setIsArrayView(prev => !prev);
-        }
+        },
+        setViewMode: (mode) => {
+          switchToViewMode(mode);
+        },
+        getViewMode: () => viewMode
       });
     }
   }, [onEditorReady]);
@@ -76,7 +86,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
       window.electronAPI.onMenuOpen(() => handleOpen());
       window.electronAPI.onMenuSave(() => handleSave());
       window.electronAPI.onMenuSaveAs(() => handleSaveAs());
-      window.electronAPI.onToggleFoldView && window.electronAPI.onToggleFoldView(() => toggleFoldView());
+      window.electronAPI.onToggleFoldView && window.electronAPI.onToggleFoldView(() => cycleViewMode());
       window.electronAPI.onFoldAll(() => foldAll());
       window.electronAPI.onUnfoldAll(() => unfoldAll());
       window.electronAPI.onToggleArrayView && window.electronAPI.onToggleArrayView(() => {
@@ -135,7 +145,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl+S: Save - centralized here so it works in both fold and textarea views
+      // Ctrl+S: Save - centralized here so it works in all views
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         console.log('[EDITOR] Ctrl+S intercepted in parent Editor component');
@@ -143,7 +153,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
         return;
       }
 
-      // Ctrl+F: Find - works in both views with the same UI
+      // Ctrl+F: Find - works in all views with the same UI
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setIsFindVisible(true);
@@ -170,7 +180,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isFindVisible, isFoldView]);
+  }, [isFindVisible, viewMode]);
 
   // Auto-highlight current match when index changes (after user types or navigates)
   useEffect(() => {
@@ -231,13 +241,15 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     
     // CRITICAL: Get content from the correct source based on current view mode
     let textContent;
-    if (isFoldView) {
+    if (viewMode === 'array') {
       textContent = getTextFromLines();
+    } else if (viewMode === 'monaco') {
+      textContent = monacoRef.current?.getValue() ?? content ?? '';
     } else {
-      // In textarea view, get content from textarea ref
+      // textarea view
       textContent = textareaRef.current?.value ?? content ?? '';
     }
-    console.log('[EDITOR] Text content length:', textContent.length, 'from', isFoldView ? 'fold/array view' : 'textarea view');
+    console.log('[EDITOR] Text content length:', textContent.length, 'from', viewMode, 'view');
 
     if (filePath) {
       console.log('[EDITOR] Saving to existing file:', filePath);
@@ -280,8 +292,10 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     console.log('[EDITOR] handleSaveAs called');
     // CRITICAL: Get content from the correct source based on current view mode
     let textContent;
-    if (isFoldView) {
+    if (viewMode === 'array') {
       textContent = getTextFromLines();
+    } else if (viewMode === 'monaco') {
+      textContent = monacoRef.current?.getValue() ?? content ?? '';
     } else {
       textContent = textareaRef.current?.value ?? content ?? '';
     }
@@ -304,38 +318,43 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     }
   };
 
-  // Sync helpers between fold/lines model and textarea text
-  const syncFoldLinesToTextarea = () => {
-    const textContent = getTextFromLines();
-    setContent(textContent);
-    if (textareaRef.current) {
-      textareaRef.current.value = textContent;
+  // Get current content from any view mode
+  const getCurrentContent = () => {
+    if (viewMode === 'array') {
+      return getTextFromLines();
+    } else if (viewMode === 'monaco') {
+      return monacoRef.current?.getValue() ?? content ?? '';
+    } else {
+      return textareaRef.current?.value ?? content ?? '';
     }
   };
 
-  const syncTextareaToFoldLines = () => {
-    const textContent = textareaRef.current?.value ?? content ?? '';
-    parseText(textContent);
-    renderEditor();
+  // Switch to a specific view mode
+  const switchToViewMode = (newMode) => {
+    if (newMode === viewMode) return;
+    
+    console.log('[EDITOR] switchToViewMode:', viewMode, '->', newMode);
+    
+    // Get current content before switching
+    const currentContent = getCurrentContent();
+    setContent(currentContent);
+    
+    // If switching to array view, parse the content
+    if (newMode === 'array') {
+      parseText(currentContent);
+      renderEditor();
+    }
+    
+    setViewMode(newMode);
+    localStorage.setItem('editorViewMode', newMode);
   };
 
-  const toggleFoldView = () => {
-    console.log("toggleFoldView");
-    setIsFoldView(prevIsFoldView => {
-      const nextIsFoldView = !prevIsFoldView;
-
-      if (nextIsFoldView) {
-        // Switching from plain textarea into fold view: parse latest textarea text
-        syncTextareaToFoldLines();
-        localStorage.setItem('editorViewMode', 'fold');
-      } else {
-        // Switching from fold view into plain textarea: sync text
-        syncFoldLinesToTextarea();
-        localStorage.setItem('editorViewMode', 'textarea');
-      }
-
-      return nextIsFoldView;
-    });
+  // Cycle through view modes: array -> monaco -> textarea -> array
+  const cycleViewMode = () => {
+    const modes = ['array', 'monaco', 'textarea'];
+    const currentIndex = modes.indexOf(viewMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    switchToViewMode(modes[nextIndex]);
   };
 
   const foldAll = () => {
@@ -852,7 +871,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     }
 
     // Handle textarea view
-    if (!isFoldView) {
+    if (viewMode === 'textarea') {
       if (!textareaRef.current) {
         setFindMatches([]);
         setCurrentFindIndex(-1);
@@ -876,15 +895,38 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
       setFindMatches(matches);
       if (matches.length > 0) {
         setCurrentFindIndex(0);
-        // Don't focus/scroll here - it steals focus from find input on every keystroke
-        // Focus/scroll happens in highlightCurrentFindMatch when user navigates
       } else {
         setCurrentFindIndex(-1);
       }
       return;
     }
 
-    // Handle fold/array view
+    // Handle monaco view - use Monaco's built-in find
+    if (viewMode === 'monaco') {
+      if (!monacoRef.current) {
+        setFindMatches([]);
+        setCurrentFindIndex(-1);
+        return;
+      }
+
+      const model = monacoRef.current.getModel();
+      if (!model) {
+        setFindMatches([]);
+        setCurrentFindIndex(-1);
+        return;
+      }
+
+      const matches = model.findMatches(query, false, false, false, null, true);
+      setFindMatches(matches || []);
+      if (matches && matches.length > 0) {
+        setCurrentFindIndex(0);
+      } else {
+        setCurrentFindIndex(-1);
+      }
+      return;
+    }
+
+    // Handle array view
     const container = editorRef.current;
     if (!container) {
       setFindMatches([]);
@@ -947,39 +989,42 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     }
 
     // Handle textarea view
-    if (!isFoldView) {
+    if (viewMode === 'textarea') {
       if (!textareaRef.current) return;
       const match = findMatches[index];
       
-      // Only focus textarea if find input doesn't have focus (prevents stealing focus while typing)
       const shouldFocus = document.activeElement !== findInputRef.current;
       if (shouldFocus) {
         textareaRef.current.focus();
       }
       
-      // Select the match
       textareaRef.current.setSelectionRange(match.startIndex, match.endIndex);
       
-      // Scroll to show the selection - use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
         if (!textareaRef.current) return;
-        
-        // Calculate line number of the match
         const text = textareaRef.current.value.substring(0, match.startIndex);
         const lineNumber = (text.match(/\n/g) || []).length;
         const lineHeight = parseFloat(getComputedStyle(textareaRef.current).lineHeight) || 28.8;
-        
-        // Calculate scroll position to center the match vertically
         const matchTopPosition = lineNumber * lineHeight;
         const viewportHeight = textareaRef.current.clientHeight;
         const scrollPosition = matchTopPosition - (viewportHeight / 2) + (lineHeight / 2);
-        
         textareaRef.current.scrollTop = Math.max(0, scrollPosition);
       });
       return;
     }
 
-    // Handle fold/array view
+    // Handle monaco view
+    if (viewMode === 'monaco') {
+      if (!monacoRef.current || !findMatches[index]) return;
+      const match = findMatches[index];
+      if (match.range) {
+        monacoRef.current.setSelection(match.range);
+        monacoRef.current.revealRangeInCenter(match.range);
+      }
+      return;
+    }
+
+    // Handle array view
     const container = editorRef.current;
     if (!container) return;
 
@@ -1067,8 +1112,8 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
     const value = e.target.value;
     setFindQuery(value);
     
-    // Debounce search in fold/array view to improve performance
-    if (isFoldView) {
+    // Debounce search in array view to improve performance
+    if (viewMode === 'array') {
       // Clear previous timeout
       if (window.findDebounceTimeout) {
         clearTimeout(window.findDebounceTimeout);
@@ -1151,7 +1196,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
           </button>
         </div>
       )}
-      {isFoldView ? (
+      {viewMode === 'array' && (
         <FoldEditorView
           editorRef={editorRef}
           visibleLines={getVisibleLines()}
@@ -1163,7 +1208,18 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
           onShowAIContextMenu={showAIContextMenu}
           isAIEnabled={isAIEnabled}
         />
-      ) : (
+      )}
+      {viewMode === 'monaco' && (
+        <MonacoEditorView
+          monacoRef={monacoRef}
+          content={content}
+          onContentChange={(newContent) => {
+            setContent(newContent);
+            onContentChange();
+          }}
+        />
+      )}
+      {viewMode === 'textarea' && (
         <TextareaEditorView
           textareaRef={textareaRef}
           content={content}

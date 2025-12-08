@@ -171,12 +171,16 @@ function WebMenuBar({
               </button>
               <div className="web-menu-divider" />
 
-              {/* AI panel and array/textarea view */}
+              {/* AI panel */}
               <button onClick={() => handleMenuClick(onToggleAI)}>
                 <span>{isAIEnabled ? 'Hide AI Panel' : 'Show AI Panel'}</span>
               </button>
+              <div className="web-menu-divider" />
+
+              {/* View modes */}
               <button onClick={() => handleMenuClick(onToggleArrayView)}>
-                <span>Toggle Array View</span>
+                <span>Cycle View Mode</span>
+                <span className="shortcut">Ctrl+Shift+A</span>
               </button>
             </div>
           )}

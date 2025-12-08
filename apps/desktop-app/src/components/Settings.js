@@ -22,6 +22,11 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
   const [requestedTabLabel, setRequestedTabLabel] = useState('NONE');
   const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
   const [developerToolsStatus, setDeveloperToolsStatus] = useState('');
+  const [editorViewMode, setEditorViewMode] = useState(() => {
+    const saved = localStorage.getItem('editorViewMode');
+    if (saved === 'fold') return 'array'; // migrate old value
+    return saved || 'array';
+  });
 
   useEffect(() => {
     // Load settings from localStorage
@@ -368,6 +373,47 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
               <button className="btn-secondary" onClick={handleCustomTheme} style={{ width: '100%' }}>
                 Select Custom Image...
               </button>
+            </div>
+          </div>
+
+          <div className="setting-section">
+            <h2>Editor View</h2>
+            <div className="setting-item">
+              <label>Current View Mode</label>
+              <div className="view-mode-selector">
+                <button
+                  className={`view-mode-btn ${editorViewMode === 'array' ? 'active' : ''}`}
+                  onClick={() => {
+                    setEditorViewMode('array');
+                    localStorage.setItem('editorViewMode', 'array');
+                  }}
+                >
+                  Array
+                </button>
+                <button
+                  className={`view-mode-btn ${editorViewMode === 'monaco' ? 'active' : ''}`}
+                  onClick={() => {
+                    setEditorViewMode('monaco');
+                    localStorage.setItem('editorViewMode', 'monaco');
+                  }}
+                >
+                  Monaco
+                </button>
+                <button
+                  className={`view-mode-btn ${editorViewMode === 'textarea' ? 'active' : ''}`}
+                  onClick={() => {
+                    setEditorViewMode('textarea');
+                    localStorage.setItem('editorViewMode', 'textarea');
+                  }}
+                >
+                  Textarea
+                </button>
+              </div>
+              <p className="setting-hint">
+                {editorViewMode === 'array' && 'Array view: Line-by-line editing with folding support'}
+                {editorViewMode === 'monaco' && 'Monaco view: VS Code-style editor with syntax highlighting'}
+                {editorViewMode === 'textarea' && 'Textarea view: Simple plain text editing'}
+              </p>
             </div>
           </div>
 

@@ -329,7 +329,7 @@ function createMenu() {
         },
         { type: 'separator' },
         {
-          label: 'Toggle Array View',
+          label: 'Cycle View Mode (Array/Monaco/Textarea)',
           accelerator: 'CmdOrCtrl+Shift+A',
           click: () => {
             if (mainWindow && !mainWindow.isDestroyed()) {
@@ -337,6 +337,7 @@ function createMenu() {
             }
           }
         },
+        { type: 'separator' },
         {
           label: 'Fold All',
           accelerator: 'CmdOrCtrl+Shift+[',
