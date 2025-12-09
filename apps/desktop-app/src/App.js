@@ -37,7 +37,6 @@ function App() {
   
   // Local state only for things that don't need to be shared
   const [isSettingsView, setIsSettingsView] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleAIResponse = (newLines, processedChanges, allChangeIds) => {
     console.log('[APP] Received AI response with', newLines.length, 'lines');
@@ -62,59 +61,6 @@ function App() {
       editorRef.current.updateLinesFromAI(getLines());
     }
     dispatch(setIsModified(true));
-  };
-
-  // Track browser fullscreen state in web mode
-  useEffect(() => {
-    if (!isWeb()) return;
-
-    const handleFullscreenChange = () => {
-      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
-      setIsFullscreen(!!fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-    };
-  }, []);
-
-  const handleToggleFullscreen = async () => {
-    if (isWeb()) {
-      const doc = document;
-      const docEl = doc.documentElement;
-      const fullscreenElement = doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement;
-
-      if (!fullscreenElement) {
-        const request = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
-        if (request) {
-          request.call(docEl);
-        }
-      } else {
-        const exit = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
-        if (exit) {
-          exit.call(doc);
-        }
-      }
-    } else if (isElectron() && window.electronAPI && window.electronAPI.toggleFullscreen) {
-      try {
-        const result = await window.electronAPI.toggleFullscreen();
-        if (result && typeof result.isFullScreen === 'boolean') {
-          setIsFullscreen(result.isFullScreen);
-        } else {
-          setIsFullscreen(prev => !prev);
-        }
-      } catch (e) {
-        console.error('[APP] toggleFullscreen failed', e);
-      }
-    }
   };
 
   const handleSave = () => {
@@ -198,6 +144,11 @@ function App() {
   };
 
   const handleWebFoldAll = () => {
+    if (editorRef.current && editorRef.current.foldAll) {
+      editorRef.current.foldAll();
+      return;
+    }
+    // Fallback: legacy behavior
     const lines = getLines();
     lines.forEach(line => {
       if (line.startIdx !== -1 && line.endIdx >= line.startIdx) {
@@ -219,6 +170,11 @@ function App() {
   };
 
   const handleWebUnfoldAll = () => {
+    if (editorRef.current && editorRef.current.unfoldAll) {
+      editorRef.current.unfoldAll();
+      return;
+    }
+    // Fallback: legacy behavior
     const lines = getLines();
     lines.forEach(line => {
       if (line.startIdx !== -1) {
@@ -250,10 +206,6 @@ function App() {
         onOpen={handleWebOpen}
         onSave={handleSave}
         onSaveAs={handleSaveAs}
-        onDownloadInfo={() => dispatch(openDownloadModal())}
-        onSettings={() => dispatch(openSettings({ tab: 'general' }))}
-        onToggleFullscreen={handleToggleFullscreen}
-        isFullscreen={isFullscreen}
         onFoldAll={handleWebFoldAll}
         onUnfoldAll={handleWebUnfoldAll}
       />

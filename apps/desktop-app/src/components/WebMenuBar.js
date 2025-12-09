@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectIsAIEnabled, setIsAIEnabled, setBackgroundImage } from '../store/settingsSlice';
 import { selectCurrentFilePath, selectIsModified } from '../store/editorSlice';
+import { openSettings, openDownloadModal } from '../store/uiSlice';
 import { isElectron, isWeb } from '../utils/environment';
 import './WebMenuBar.css';
 
@@ -30,14 +31,10 @@ const IS_ELECTRON = isElectron();
 function WebMenuBar({ 
   onNew, 
   onOpen, 
-  onSave, // Electron: direct save, Web: shows download modal
+  onSave, // Electron: direct save, Web: handled via download modal action
   onSaveAs, // Electron only
-  onDownloadInfo, // Web only
-  onSettings,
   onFoldAll,
   onUnfoldAll,
-  onToggleFullscreen,
-  isFullscreen = false,
 }) {
   const dispatch = useDispatch();
   
@@ -52,6 +49,7 @@ function WebMenuBar({
     : null;
   const [activeMenu, setActiveMenu] = useState(null);
   const [showBar, setShowBar] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [themes, setThemes] = useState([]);
   const hideTimeoutRef = useRef(null);
   const menuRef = useRef(null);
@@ -94,16 +92,16 @@ function WebMenuBar({
         e.preventDefault();
         if (IS_ELECTRON) onSaveAs?.();
       } else if (ctrl && e.key === 's') {
-        // Ctrl+S - Save (Electron) or Download (Web)
+        // Ctrl+S - Save (Electron) or open Download modal (Web)
         e.preventDefault();
         if (IS_WEB) {
-          onDownloadInfo?.();
+          dispatch(openDownloadModal());
         } else {
           onSave?.();
         }
       } else if (ctrl && e.key === ',') {
         e.preventDefault();
-        onSettings?.();
+        dispatch(openSettings({ tab: 'general' }));
       }
       // View shortcuts
       else if (e.key === 'F11') {
@@ -126,7 +124,7 @@ function WebMenuBar({
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onNew, onOpen, onSave, onSaveAs, onDownloadInfo, onSettings, onFoldAll, onUnfoldAll, isAIEnabled, dispatch]);
+  }, [onNew, onOpen, onSave, onSaveAs, onFoldAll, onUnfoldAll, isAIEnabled, dispatch]);
 
   // Keep bar visibility in sync with fullscreen state (both web and Electron)
   useEffect(() => {
@@ -139,10 +137,74 @@ function WebMenuBar({
     }
   }, [isFullscreen]);
 
+  // Track browser fullscreen state in web mode
+  useEffect(() => {
+    if (!IS_WEB) return;
+
+    const handleFullscreenChange = () => {
+      const fullscreenElement =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
+      setIsFullscreen(!!fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
   // Handlers
-  const handleFullscreen = () => {
-    // Let parent decide how to toggle fullscreen based on environment
-    onToggleFullscreen?.();
+  const handleFullscreen = async () => {
+    if (IS_WEB) {
+      const doc = document;
+      const docEl = doc.documentElement;
+      const fullscreenElement =
+        doc.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement;
+
+      if (!fullscreenElement) {
+        const request =
+          docEl.requestFullscreen ||
+          docEl.webkitRequestFullscreen ||
+          docEl.mozRequestFullScreen ||
+          docEl.msRequestFullscreen;
+        if (request) {
+          request.call(docEl);
+        }
+      } else {
+        const exit =
+          doc.exitFullscreen ||
+          doc.webkitExitFullscreen ||
+          doc.mozCancelFullScreen ||
+          doc.msExitFullscreen;
+        if (exit) {
+          exit.call(doc);
+        }
+      }
+    } else if (IS_ELECTRON && window.electronAPI && window.electronAPI.toggleFullscreen) {
+      try {
+        const result = await window.electronAPI.toggleFullscreen();
+        if (result && typeof result.isFullScreen === 'boolean') {
+          setIsFullscreen(result.isFullScreen);
+        } else {
+          setIsFullscreen(prev => !prev);
+        }
+      } catch (e) {
+        console.error('[MENU] toggleFullscreen failed', e);
+      }
+    }
   };
 
   const handleExit = () => {
@@ -230,7 +292,12 @@ function WebMenuBar({
               </button>
               <div className="web-menu-divider" />
               {IS_WEB ? (
-                <button onClick={() => handleMenuClick(onDownloadInfo)}>
+                <button
+                  onClick={() => {
+                    setActiveMenu(null);
+                    dispatch(openDownloadModal());
+                  }}
+                >
                   <span>Save/Download</span><span className="shortcut">Ctrl+S</span>
                 </button>
               ) : (
@@ -244,7 +311,12 @@ function WebMenuBar({
                 </>
               )}
               <div className="web-menu-divider" />
-              <button onClick={() => handleMenuClick(onSettings)}>
+              <button
+                onClick={() => {
+                  setActiveMenu(null);
+                  dispatch(openSettings({ tab: 'general' }));
+                }}
+              >
                 <span>Settings</span><span className="shortcut">Ctrl+,</span>
               </button>
               {IS_ELECTRON && (

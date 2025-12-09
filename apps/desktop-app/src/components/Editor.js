@@ -82,7 +82,9 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
         },
         getViewMode: () => localStorage.getItem('editorViewMode') || 'array',
         saveFile: () => handleSave(),
-        saveFileAs: () => handleSaveAs()
+        saveFileAs: () => handleSaveAs(),
+        foldAll: () => foldAll(),
+        unfoldAll: () => unfoldAll()
       });
     }
   }, [onEditorReady]);
@@ -435,6 +437,15 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
         }
       }
     });
+    // If currently in Monaco view, also trigger Monaco's built-in foldAll action
+    if (viewMode === 'monaco' && monacoRef.current && window.monaco) {
+      try {
+        const action = monacoRef.current.getAction('editor.foldAll');
+        action && action.run();
+      } catch (e) {
+        console.warn('[EDITOR] Monaco foldAll action failed:', e);
+      }
+    }
     renderEditor();
     onContentChange();
   };
@@ -447,6 +458,15 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
         line.text = line.text.replace(/#folded\b/gi, '').trim();
       }
     });
+    // If currently in Monaco view, also trigger Monaco's built-in unfoldAll action
+    if (viewMode === 'monaco' && monacoRef.current && window.monaco) {
+      try {
+        const action = monacoRef.current.getAction('editor.unfoldAll');
+        action && action.run();
+      } catch (e) {
+        console.warn('[EDITOR] Monaco unfoldAll action failed:', e);
+      }
+    }
     renderEditor();
     onContentChange();
   };

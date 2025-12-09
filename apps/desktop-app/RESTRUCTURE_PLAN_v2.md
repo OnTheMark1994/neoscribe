@@ -1,3 +1,25 @@
+### Anti-pattern: boomerang prop drilling of local state
+
+Avoid sending transitory UI state up from a component only to pass it straight back down again. For example, we briefly had this pattern:
+
+- WebMenuBar raised fullscreen toggle up to App via an onToggleFullscreen prop.
+- App owned isFullscreen state and DOM/Electron listeners.
+- App then passed isFullscreen back down into WebMenuBar as a prop.
+
+This created **boomerang state**: the only real consumer of isFullscreen was the menu bar itself (to hide/show and change the F11 label), yet it was managed in App and drilled both ways for no benefit.
+
+Fix:
+
+- WebMenuBar now owns its own isFullscreen state and the associated DOM/Electron calls.
+- App no longer tracks fullscreen at all.
+
+Rule of thumb:
+
+- If state is only used by a single component (and perhaps its own immediate children), keep it **local** to that component.
+- Use Redux only when multiple unrelated parts of the tree need the same state, or when the state is a real piece of app data/settings, not a transient visual flag.
+
+
+
 # ScribeFold AI Desktop App - Restructuring Plan v2
 
 ## Executive Summary
@@ -74,7 +96,6 @@ src/
 │
 └── hooks/                      # Custom hooks (optional, add as needed)
     └── useElectronEvents.js    # OPTIONAL: Electron event listeners
-```
 
 ### 1.2 Design Rationale
 
