@@ -49,8 +49,8 @@ const initialState = {
   isAIEnabled: true,              // AI sidebar enabled
   developerMode: true,            // Developer mode enabled
   backgroundImage: 'spacedreams.jpg',  // Background theme path
-  showPreviewBar: true,           // Monaco minimap visible
-  showMonacoLineNumbers: true,    // Monaco line numbers visible
+  showPreviewBar: false,          // Monaco minimap visible (default OFF)
+  showMonacoLineNumbers: false,   // Monaco line numbers visible (default OFF)
   editorViewMode: 'array',        // Default editor view mode
   aiService: 'deepseek-server',   // Selected AI service
   apiKeys: {},                    // API keys by service
@@ -105,8 +105,8 @@ const settingsSlice = createSlice({
       state.isAIEnabled = getStorageItem('aiEnabled', true);
       state.developerMode = getStorageItem('developerMode', true);
       state.backgroundImage = getStorageItem('backgroundImage', 'spacedreams.jpg');
-      state.showPreviewBar = getStorageItem('showPreviewBar', true);
-      state.showMonacoLineNumbers = getStorageItem('showMonacoLineNumbers', true);
+      state.showPreviewBar = getStorageItem('showPreviewBar', false);
+      state.showMonacoLineNumbers = getStorageItem('showMonacoLineNumbers', false);
       
       // Handle editorViewMode with migration from 'fold' to 'array'
       let savedViewMode = getStorageItem('editorViewMode', 'array');

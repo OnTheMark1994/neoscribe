@@ -96,5 +96,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   unsavedChangesResponse: (action) => ipcRenderer.send('unsaved-changes-response', action),
 
   // Secure external URL opening
-  openExternal: (url) => ipcRenderer.invoke('open-external', url)
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // App controls (for WebMenuBar)
+  quitApp: () => ipcRenderer.invoke('quit-app'),
+  toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen')
 });

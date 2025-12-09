@@ -60,6 +60,15 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
           // Replace lines in editorEngine
           const { setLines } = require('../utils/editorEngine');
           setLines(newLines);
+          // Keep plain-text content in sync so Monaco/Textarea views
+          // immediately reflect updates (web open, AI responses, etc.)
+          try {
+            const { getTextFromLines } = require('../utils/editorEngine');
+            const text = getTextFromLines();
+            setContent(text);
+          } catch (e) {
+            // Fallback: just bump render if anything goes wrong
+          }
           setRenderTrigger(prev => prev + 1); // Trigger re-render
         },
         toggleFoldView: () => {
@@ -71,7 +80,9 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
         setViewMode: (mode) => {
           if (switchToViewModeRef.current) switchToViewModeRef.current(mode);
         },
-        getViewMode: () => localStorage.getItem('editorViewMode') || 'array'
+        getViewMode: () => localStorage.getItem('editorViewMode') || 'array',
+        saveFile: () => handleSave(),
+        saveFileAs: () => handleSaveAs()
       });
     }
   }, [onEditorReady]);

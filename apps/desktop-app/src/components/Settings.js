@@ -6,7 +6,7 @@ import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
 import { selectAnonId, selectAuthId, selectDeviceId, selectUserData, setAuthId as setReduxAuthId } from '../store/userSlice';
-import { setBackgroundImage } from '../store/settingsSlice';
+import { setBackgroundImage, selectShowPreviewBar, selectShowMonacoLineNumbers, setShowPreviewBar, setShowMonacoLineNumbers } from '../store/settingsSlice';
 import { setBackground } from '../utils/backgroundHelper';
 
 /**
@@ -39,14 +39,8 @@ function Settings({ onClose, initialTab = 'general' }) {
   const [requestedTabLabel, setRequestedTabLabel] = useState('NONE');
   const [settingsSavedMsg, setSettingsSavedMsg] = useState('');
   const [developerToolsStatus, setDeveloperToolsStatus] = useState('');
-  const [showPreviewBar, setShowPreviewBar] = useState(() => {
-    const saved = localStorage.getItem('showPreviewBar');
-    return saved === null ? true : saved === 'true';
-  });
-  const [showMonacoLineNumbers, setShowMonacoLineNumbers] = useState(() => {
-    const saved = localStorage.getItem('showMonacoLineNumbers');
-    return saved === null ? true : saved === 'true';
-  });
+  const showPreviewBar = useSelector(selectShowPreviewBar);
+  const showMonacoLineNumbers = useSelector(selectShowMonacoLineNumbers);
   const [editorViewMode, setEditorViewMode] = useState(() => {
     const saved = localStorage.getItem('editorViewMode');
     if (saved === 'fold') return 'array'; // migrate old value
@@ -461,8 +455,7 @@ function Settings({ onClose, initialTab = 'general' }) {
                   className={`toggle-switch ${showMonacoLineNumbers ? 'active' : ''}`}
                   onClick={() => {
                     const next = !showMonacoLineNumbers;
-                    setShowMonacoLineNumbers(next);
-                    localStorage.setItem('showMonacoLineNumbers', next ? 'true' : 'false');
+                    dispatch(setShowMonacoLineNumbers(next));
                     if (window.electronAPI && window.electronAPI.settingsSaved) {
                       window.electronAPI.settingsSaved({ showMonacoLineNumbers: next });
                     }
@@ -488,8 +481,7 @@ function Settings({ onClose, initialTab = 'general' }) {
                   className={`toggle-switch ${showPreviewBar ? 'active' : ''}`}
                   onClick={() => {
                     const next = !showPreviewBar;
-                    setShowPreviewBar(next);
-                    localStorage.setItem('showPreviewBar', next ? 'true' : 'false');
+                    dispatch(setShowPreviewBar(next));
                     if (window.electronAPI && window.electronAPI.settingsSaved) {
                       window.electronAPI.settingsSaved({ showPreviewBar: next });
                     }

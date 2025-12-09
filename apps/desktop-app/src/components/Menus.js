@@ -76,7 +76,7 @@ function Menus() {
       )}
 
       {/* Web-only Settings modal */}
-      {isWeb() && isSettingsOpen && (
+      {isSettingsOpen && (
         <Window
           title="Settings"
           onClose={() => dispatch(closeSettings())}

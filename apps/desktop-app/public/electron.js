@@ -112,8 +112,9 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // Create menu
-  createMenu();
+  // Disable native menu - using WebMenuBar.js for both web and Electron
+  Menu.setApplicationMenu(null);
+  // createMenu(); // Disabled - now using WebMenuBar component
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -588,6 +589,21 @@ ipcMain.handle('open-external', async (event, url) => {
   if (typeof url === 'string' && url.startsWith('http')) {
     await shell.openExternal(url);
   }
+});
+
+// Quit application (for WebMenuBar Exit button)
+ipcMain.handle('quit-app', async () => {
+  app.quit();
+});
+
+// Toggle fullscreen (for WebMenuBar Fullscreen button)
+ipcMain.handle('toggle-fullscreen', async () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const isFullScreen = mainWindow.isFullScreen();
+    mainWindow.setFullScreen(!isFullScreen);
+    return { isFullScreen: !isFullScreen };
+  }
+  return { isFullScreen: false };
 });
 
 ipcMain.handle('open-encrypted-file', async () => {

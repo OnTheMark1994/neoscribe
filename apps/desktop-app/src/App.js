@@ -86,23 +86,46 @@ function App() {
     };
   }, []);
 
-  const handleToggleFullscreen = () => {
-    if (!isWeb()) return;
+  const handleToggleFullscreen = async () => {
+    if (isWeb()) {
+      const doc = document;
+      const docEl = doc.documentElement;
+      const fullscreenElement = doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement;
 
-    const doc = document;
-    const docEl = doc.documentElement;
-    const fullscreenElement = doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement;
+      if (!fullscreenElement) {
+        const request = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+        if (request) {
+          request.call(docEl);
+        }
+      } else {
+        const exit = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+        if (exit) {
+          exit.call(doc);
+        }
+      }
+    } else if (isElectron() && window.electronAPI && window.electronAPI.toggleFullscreen) {
+      try {
+        const result = await window.electronAPI.toggleFullscreen();
+        if (result && typeof result.isFullScreen === 'boolean') {
+          setIsFullscreen(result.isFullScreen);
+        } else {
+          setIsFullscreen(prev => !prev);
+        }
+      } catch (e) {
+        console.error('[APP] toggleFullscreen failed', e);
+      }
+    }
+  };
 
-    if (!fullscreenElement) {
-      const request = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
-      if (request) {
-        request.call(docEl);
-      }
-    } else {
-      const exit = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
-      if (exit) {
-        exit.call(doc);
-      }
+  const handleSave = () => {
+    if (editorRef.current && editorRef.current.saveFile) {
+      editorRef.current.saveFile();
+    }
+  };
+
+  const handleSaveAs = () => {
+    if (editorRef.current && editorRef.current.saveFileAs) {
+      editorRef.current.saveFileAs();
     }
   };
 
@@ -214,27 +237,26 @@ function App() {
   }
 
   return (
-    <div className={`App ${isWeb() ? 'has-web-menu' : ''} ${isAIEnabled ? 'ai-sidebar-visible' : ''}`}>
+    <div className={`App has-web-menu ${isAIEnabled ? 'ai-sidebar-visible' : ''}`}>
       {/* AppInitializer handles all initialization logic */}
       <AppInitializer />
       
       {/* Loading screen controlled by Redux */}
       <LoadingScreen />
       
-      {/* Web Menu Bar - only shown in browser */}
-      {isWeb() && (
-        <WebMenuBar
-          onNew={handleWebNew}
-          onOpen={handleWebOpen}
-          onDownloadInfo={() => dispatch(openDownloadModal())}
-          onSettings={() => dispatch(openSettings({ tab: 'general' }))}
-          onToggleFullscreen={handleToggleFullscreen}
-          isFullscreen={isFullscreen}
-          onFoldAll={handleWebFoldAll}
-          onUnfoldAll={handleWebUnfoldAll}
-          onToggleArrayView={handleWebToggleArrayView}
-        />
-      )}
+      {/* Unified Menu Bar - works for both web and Electron */}
+      <WebMenuBar
+        onNew={handleWebNew}
+        onOpen={handleWebOpen}
+        onSave={handleSave}
+        onSaveAs={handleSaveAs}
+        onDownloadInfo={() => dispatch(openDownloadModal())}
+        onSettings={() => dispatch(openSettings({ tab: 'general' }))}
+        onToggleFullscreen={handleToggleFullscreen}
+        isFullscreen={isFullscreen}
+        onFoldAll={handleWebFoldAll}
+        onUnfoldAll={handleWebUnfoldAll}
+      />
       
       <div id="backgroundContainer" className="background-container"></div>
       
