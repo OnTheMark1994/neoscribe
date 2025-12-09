@@ -192,8 +192,10 @@ function App() {
     return <Settings />;
   }
 
+  const appEnvClass = isElectron() ? 'env-electron' : 'env-web';
+
   return (
-    <div className={`App has-web-menu ${isAIEnabled ? 'ai-sidebar-visible' : ''}`}>
+    <div className={`App ${appEnvClass} has-web-menu ${isAIEnabled ? 'ai-sidebar-visible' : ''}`}>
       {/* AppInitializer handles all initialization logic */}
       <AppInitializer />
       

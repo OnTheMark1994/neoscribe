@@ -163,6 +163,19 @@ function WebMenuBar({
     };
   }, []);
 
+  // Track fullscreen state in Electron via IPC events from main process
+  useEffect(() => {
+    if (!IS_ELECTRON || !window.electronAPI || !window.electronAPI.onFullscreenChanged) return;
+
+    const handler = (data) => {
+      if (data && typeof data.isFullScreen === 'boolean') {
+        setIsFullscreen(data.isFullScreen);
+      }
+    };
+
+    window.electronAPI.onFullscreenChanged(handler);
+  }, []);
+
   // Handlers
   const handleFullscreen = async () => {
     if (IS_WEB) {

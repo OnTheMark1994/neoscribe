@@ -112,6 +112,19 @@ function createWindow() {
     mainWindow = null;
   });
 
+  // Keep renderer informed about fullscreen state changes (for WebMenuBar)
+  mainWindow.on('enter-full-screen', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', { isFullScreen: true });
+    }
+  });
+
+  mainWindow.on('leave-full-screen', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', { isFullScreen: false });
+    }
+  });
+
   // Disable native menu - using WebMenuBar.js for both web and Electron
   Menu.setApplicationMenu(null);
   // createMenu(); // Disabled - now using WebMenuBar component
