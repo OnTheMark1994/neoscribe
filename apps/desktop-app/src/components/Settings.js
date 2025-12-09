@@ -1,11 +1,28 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import './Settings.css';
 import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData, devBurnTokens } from '../utils/aiService';
 import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
+import { selectAnonId, selectAuthId, selectDeviceId, selectUserData, setAuthId as setReduxAuthId } from '../store/userSlice';
+import { setBackgroundImage } from '../store/settingsSlice';
+import { setBackground } from '../utils/backgroundHelper';
 
-function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, onThemeChanged, initialTab = 'general' }) {
+/**
+ * Settings - Settings management UI (refactored per v2 plan)
+ * 
+ * Now reads anonId, authId, deviceId, userData from Redux.
+ * Only onClose and initialTab are passed as props.
+ */
+function Settings({ onClose, initialTab = 'general' }) {
+  const dispatch = useDispatch();
+  
+  // Read from Redux
+  const anonId = useSelector(selectAnonId);
+  const authIdFromRedux = useSelector(selectAuthId);
+  const deviceId = useSelector(selectDeviceId);
+  const userAccount = useSelector(selectUserData);
   const [activeTab, setActiveTab] = useState(initialTab || 'general');
   const [themes, setThemes] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState('');
@@ -51,7 +68,7 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
     setApiKeys(savedApiKeys);
 
     const savedAuthId = localStorage.getItem('authId');
-    setAuthId(authIdProp || savedAuthId);
+    setAuthId(authIdFromRedux || savedAuthId);
 
     const savedDeveloperMode = localStorage.getItem('developerMode');
     setDeveloperMode(savedDeveloperMode === null ? true : savedDeveloperMode === 'true');
@@ -150,9 +167,9 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
       });
     }
 
-    if (onThemeChanged) {
-      onThemeChanged(selectedTheme);
-    }
+    // Update background in DOM and Redux
+    setBackground(selectedTheme);
+    dispatch(setBackgroundImage(selectedTheme));
 
     // Show a transient confirmation message
     setSettingsSavedMsg('Settings saved!');

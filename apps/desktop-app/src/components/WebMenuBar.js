@@ -1,24 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectIsAIEnabled, setIsAIEnabled } from '../store/settingsSlice';
+import { selectCurrentFilePath, selectIsModified } from '../store/editorSlice';
 import './WebMenuBar.css';
 
 /**
  * WebMenuBar - Menu bar shown in web browser mode (replaces Electron native menu)
+ * 
+ * Refactored to read isAIEnabled, currentFileName, isModified from Redux.
+ * Callbacks for actions are still passed as props from App.
  */
 function WebMenuBar({ 
   onNew, 
   onOpen, 
   onDownloadInfo,
   onSettings,
-  onToggleAI,
   onFoldAll,
   onUnfoldAll,
   onToggleFullscreen,
   onToggleArrayView,
   isFullscreen,
-  isAIEnabled,
-  currentFileName,
-  isModified
 }) {
+  const dispatch = useDispatch();
+  
+  // Read from Redux
+  const isAIEnabled = useSelector(selectIsAIEnabled);
+  const currentFilePath = useSelector(selectCurrentFilePath);
+  const isModified = useSelector(selectIsModified);
+  
+  // Extract filename from path
+  const currentFileName = currentFilePath 
+    ? currentFilePath.split(/[/\\]/).pop() 
+    : null;
   const [activeMenu, setActiveMenu] = useState(null);
   const [showBar, setShowBar] = useState(true);
   const hideTimeoutRef = useRef(null);
@@ -172,12 +185,43 @@ function WebMenuBar({
               <div className="web-menu-divider" />
 
               {/* AI panel */}
-              <button onClick={() => handleMenuClick(onToggleAI)}>
+              <button onClick={() => { setActiveMenu(null); dispatch(setIsAIEnabled(!isAIEnabled)); }}>
                 <span>{isAIEnabled ? 'Hide AI Panel' : 'Show AI Panel'}</span>
               </button>
               <div className="web-menu-divider" />
 
-              {/* View modes */}
+              {/* View modes - direct selectors */}
+              <button
+                onClick={() => {
+                  setActiveMenu(null);
+                  // Set explicit view mode and rely on Editor's storage listener
+                  localStorage.setItem('editorViewMode', 'array');
+                  window.dispatchEvent(new StorageEvent('storage', { key: 'editorViewMode', newValue: 'array' }));
+                }}
+              >
+                <span>Array View</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveMenu(null);
+                  localStorage.setItem('editorViewMode', 'textarea');
+                  window.dispatchEvent(new StorageEvent('storage', { key: 'editorViewMode', newValue: 'textarea' }));
+                }}
+              >
+                <span>Textarea View</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveMenu(null);
+                  localStorage.setItem('editorViewMode', 'monaco');
+                  window.dispatchEvent(new StorageEvent('storage', { key: 'editorViewMode', newValue: 'monaco' }));
+                }}
+              >
+                <span>Monaco View</span>
+              </button>
+              <div className="web-menu-divider" />
+
+              {/* View mode cycle shortcut */}
               <button onClick={() => handleMenuClick(onToggleArrayView)}>
                 <span>Cycle View Mode</span>
                 <span className="shortcut">Ctrl+Shift+A</span>

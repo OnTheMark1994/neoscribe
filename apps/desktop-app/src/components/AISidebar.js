@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import './AISidebar.css';
 import TokenInfoModal from './TokenInfoModal';
 import RefreshButton from './RefreshButton';
@@ -7,12 +7,28 @@ import { callDeepSeekServerAPI, calculateFullTokenEstimate, processChanges, inte
 import { getLines, updateLinesFromText, getTextFromLines } from '../utils/editorEngine';
 import { isWeb } from '../utils/environment';
 import { openSettings } from '../store/uiSlice';
+import { selectAnonId, selectAuthId, selectAvailableTokens, setAvailableTokens as setReduxAvailableTokens } from '../store/userSlice';
+import { selectDeveloperMode } from '../store/settingsSlice';
 import { WEB_PORTAL_BASE_URL } from '../utils/constants';
 
 // Duration to keep the refresh animation visible (ms)
 const REFRESH_ANIMATION_DURATION = 800;
 
-function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initialAvailableTokens = null }) {
+/**
+ * AISidebar - AI chat and token management sidebar (refactored per v2 plan)
+ * 
+ * Now reads anonId, authId, developerMode, and availableTokens from Redux.
+ * Only onAIResponse callback is passed as prop.
+ */
+function AISidebar({ onAIResponse }) {
+  const dispatch = useDispatch();
+  
+  // Read from Redux instead of props
+  const anonId = useSelector(selectAnonId);
+  const authId = useSelector(selectAuthId);
+  const developerMode = useSelector(selectDeveloperMode);
+  const reduxAvailableTokens = useSelector(selectAvailableTokens);
+  
   const [messages, setMessages] = useState([]);
   // In developer mode start with a sample prompt, otherwise start empty and show placeholder only
   const [prompt, setPrompt] = useState(() => (developerMode ? 'please add content in various places of your choosing ' : ''));
@@ -20,23 +36,22 @@ function AISidebar({ anonId, authId, onAIResponse, developerMode = true, initial
   const [isThinking, setIsThinking] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [tokenEstimate, setTokenEstimate] = useState(null);
-  const [availableTokens, setAvailableTokens] = useState(initialAvailableTokens);
+  const [availableTokens, setAvailableTokens] = useState(reduxAvailableTokens);
   const messagesEndRef = useRef(null);
   const aiDebugDataRef = useRef([]);
   const [isRefreshingTokens, setIsRefreshingTokens] = useState(false);
-  const dispatch = useDispatch();
 
   useEffect(() => {
     // Update token count when component mounts
     updateTokenCount();
   }, []);
 
-  // If App provides an updated initialAvailableTokens (e.g., after /api/users/ensure completes), sync it into local state
+  // Sync availableTokens from Redux when it changes
   useEffect(() => {
-    if (initialAvailableTokens != null) {
-      setAvailableTokens(initialAvailableTokens);
+    if (reduxAvailableTokens != null) {
+      setAvailableTokens(reduxAvailableTokens);
     }
-  }, [initialAvailableTokens]);
+  }, [reduxAvailableTokens]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive

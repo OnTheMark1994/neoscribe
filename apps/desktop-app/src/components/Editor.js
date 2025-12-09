@@ -1,16 +1,32 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { parseText, getTextFromLines, updateLinesFromText, getLines } from '../utils/editorEngine';
+import { selectCurrentFilePath, selectIsModified, setIsModified, setCurrentFilePath } from '../store/editorSlice';
+import { selectIsAIEnabled, selectEditorViewMode } from '../store/settingsSlice';
 import FoldEditorView from './FoldEditorView';
 import TextareaEditorView from './TextareaEditorView';
 import MonacoEditorView from './MonacoEditorView';
 import './Editor.css';
 
-function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete, onEditorReady, isAIEnabled }) {
+/**
+ * Editor - Main editor orchestrator (refactored per v2 plan)
+ * 
+ * Now reads currentFilePath, isModified, isAIEnabled from Redux.
+ * Callbacks are still passed as props from App for file operations.
+ */
+function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }) {
+  const dispatch = useDispatch();
+  
+  // Read from Redux
+  const currentFilePath = useSelector(selectCurrentFilePath);
+  const isAIEnabled = useSelector(selectIsAIEnabled);
+  const savedViewMode = useSelector(selectEditorViewMode);
+  
   const [content, setContent] = useState('');
   // viewMode: 'array' | 'monaco' | 'textarea'
   const [viewMode, setViewMode] = useState(() => {
-    const saved = localStorage.getItem('editorViewMode');
+    // Initialize from Redux/localStorage
+    const saved = savedViewMode || localStorage.getItem('editorViewMode');
     // Migrate old 'fold' value to 'array'
     if (saved === 'fold') return 'array';
     if (saved === 'array' || saved === 'monaco' || saved === 'textarea') return saved;
@@ -1254,9 +1270,12 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
         <MonacoEditorView
           monacoRef={monacoRef}
           content={content}
-          isAIEnabled={isAIEnabled}
           onContentChange={(newContent) => {
+            // Keep local content state in sync for save operations
             setContent(newContent);
+            // Update editorEngine lines so Array view sees latest text
+            updateLinesFromText(newContent);
+            // Notify parent (App) so Redux isModified flag stays accurate
             onContentChange();
           }}
         />

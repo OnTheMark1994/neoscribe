@@ -1,28 +1,29 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { useSelector } from 'react-redux';
 import Editor from '@monaco-editor/react';
+import { selectShowPreviewBar, selectShowMonacoLineNumbers, selectIsAIEnabled } from '../store/settingsSlice';
 import './MonacoEditorView.css';
 
 /**
  * MonacoEditorView - Monaco editor component with custom #chapter/#section folding
+ * (refactored per v2 plan)
  * 
  * This component provides a Monaco editor interface (VS Code editor) with:
  * - Custom folding for #chapter and #section markers
  * - Line numbers (array-like index display)
  * - Syntax highlighting for chapter/section headers
  * - AI eye icons for lines shared with AI
+ * 
+ * Now reads showPreviewBar, showLineNumbers, and isAIEnabled from Redux.
  */
-function MonacoEditorView({ monacoRef, content, onContentChange, isAIEnabled }) {
+function MonacoEditorView({ monacoRef, content, onContentChange }) {
   const foldingProviderRef = useRef(null);
   const decorationsRef = useRef([]);
-  const [showPreviewBar, setShowPreviewBar] = useState(() => {
-    if (typeof localStorage === 'undefined') return true;
-    const saved = localStorage.getItem('showPreviewBar');
-    return saved === null ? true : saved === 'true';
-  });
-  const [showLineNumbers, setShowLineNumbers] = useState(() => {
-    const saved = localStorage.getItem('showMonacoLineNumbers');
-    return saved === null ? true : saved === 'true';
-  });
+  
+  // Read from Redux instead of localStorage
+  const showPreviewBar = useSelector(selectShowPreviewBar);
+  const showLineNumbers = useSelector(selectShowMonacoLineNumbers);
+  const isAIEnabled = useSelector(selectIsAIEnabled);
 
   // Update decorations when content changes
   // NOTE: We no longer fake indentation via CSS; we rely on Monaco's indent guides
@@ -293,30 +294,6 @@ function MonacoEditorView({ monacoRef, content, onContentChange, isAIEnabled }) 
     // Initial decorations
     updateDecorations(editor, monaco);
   };
-
-  // Listen for updates to the preview bar setting (from Settings window)
-  useEffect(() => {
-    const handleStorage = (e) => {
-      if (e.key === 'showPreviewBar') {
-        const next = e.newValue === null ? true : e.newValue === 'true';
-        setShowPreviewBar(next);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  // Listen for updates to the Monaco line number setting
-  useEffect(() => {
-    const handleStorage = (e) => {
-      if (e.key === 'showMonacoLineNumbers') {
-        const next = e.newValue === null ? true : e.newValue === 'true';
-        setShowLineNumbers(next);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
 
   // Cleanup folding provider on unmount
   useEffect(() => {
