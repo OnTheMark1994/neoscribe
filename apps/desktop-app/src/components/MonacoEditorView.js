@@ -11,7 +11,7 @@ import './MonacoEditorView.css';
  * - Syntax highlighting for chapter/section headers
  * - AI eye icons for lines shared with AI
  */
-function MonacoEditorView({ monacoRef, content, onContentChange }) {
+function MonacoEditorView({ monacoRef, content, onContentChange, isAIEnabled }) {
   const foldingProviderRef = useRef(null);
   const decorationsRef = useRef([]);
   const [showPreviewBar, setShowPreviewBar] = useState(() => {
@@ -40,32 +40,36 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
       const hasAiHide = /#ai-hide\b/i.test(line);
       const hasAiTag = /#ai-title\b|#ai-summary\b/i.test(line);
 
-      // Chapter lines - eye icon + chapter decoration
+      // Chapter lines - eye icon + chapter decoration (only when AI is enabled)
       if (/^#chapter\b/.test(trimmed)) {
         newDecorations.push({
           range: new monaco.Range(lineNumber, 1, lineNumber, 1),
           options: {
             isWholeLine: true,
             className: 'chapter-line-decoration',
-            glyphMarginClassName: hasAiHide ? 'ai-hide-icon' : 'ai-eye-icon',
-            glyphMarginHoverMessage: { value: hasAiHide ? 'Hidden from AI' : 'Shared with AI (click to toggle)' }
+            glyphMarginClassName: isAIEnabled ? (hasAiHide ? 'ai-hide-icon' : 'ai-eye-icon') : undefined,
+            glyphMarginHoverMessage: isAIEnabled
+              ? { value: hasAiHide ? 'Hidden from AI' : 'Shared with AI (click to toggle)' }
+              : undefined,
           }
         });
       }
-      // Section lines - eye icon + section decoration
+      // Section lines - eye icon + section decoration (only when AI is enabled)
       else if (/^#section\b/.test(trimmed)) {
         newDecorations.push({
           range: new monaco.Range(lineNumber, 1, lineNumber, 1),
           options: {
             isWholeLine: true,
             className: 'section-line-decoration',
-            glyphMarginClassName: hasAiHide ? 'ai-hide-icon' : 'ai-eye-icon',
-            glyphMarginHoverMessage: { value: hasAiHide ? 'Hidden from AI' : 'Shared with AI (click to toggle)' }
+            glyphMarginClassName: isAIEnabled ? (hasAiHide ? 'ai-hide-icon' : 'ai-eye-icon') : undefined,
+            glyphMarginHoverMessage: isAIEnabled
+              ? { value: hasAiHide ? 'Hidden from AI' : 'Shared with AI (click to toggle)' }
+              : undefined,
           }
         });
       }
-      // Lines with AI tags - just eye icon
-      else if (hasAiTag || hasAiHide) {
+      // Lines with AI tags - just eye icon (only when AI is enabled)
+      else if (isAIEnabled && (hasAiTag || hasAiHide)) {
         newDecorations.push({
           range: new monaco.Range(lineNumber, 1, lineNumber, 1),
           options: {
@@ -78,6 +82,13 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
 
     decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
   };
+
+  // Re-apply decorations when AI enabled state changes so eyes show/hide correctly
+  useEffect(() => {
+    const editor = monacoRef?.current;
+    if (!editor || !window.monaco) return;
+    updateDecorations(editor, window.monaco);
+  }, [isAIEnabled]);
 
   const handleEditorDidMount = (editor, monaco) => {
     // Store instance for parent to call methods if needed
@@ -200,6 +211,26 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
       },
     });
 
+    // Inject runtime CSS so Monaco glyph margin eyes use the same PNG icons
+    // as the rest of the app without going through the module bundler.
+    if (typeof document !== 'undefined' && !document.getElementById('monaco-ai-eye-style')) {
+      const style = document.createElement('style');
+      style.id = 'monaco-ai-eye-style';
+      style.textContent = `
+        .monaco-editor .ai-eye-icon {
+          background: url('/app-images/scribefold-ai-eye.png') center center no-repeat !important;
+          background-size: 14px 14px !important;
+          cursor: pointer !important;
+        }
+        .monaco-editor .ai-hide-icon {
+          background: url('/app-images/scribefold-ai-eye-grey.png') center center no-repeat !important;
+          background-size: 14px 14px !important;
+          cursor: pointer !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
     // Helper to toggle #ai-hide on a line
     const toggleAiHideForLine = (lineNumber) => {
       const model = editor.getModel();
@@ -232,23 +263,16 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
       updateDecorations(editor, monaco);
     });
 
-    // Click ONLY on the eye icon to toggle AI visibility
-    // Do NOT respond to fold arrow clicks (those should only fold/unfold)
+    // Toggle AI visibility when clicking in the glyph margin on chapter/section lines
     editor.onMouseDown((e) => {
-      // Only respond to glyph margin clicks (where our eye icons are)
+      // Only respond to glyph margin clicks (where our eye icons live)
       if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
         return;
       }
 
-      // Check if the clicked element is our eye icon by checking its class
-      const element = e.target.element;
-      if (!element) return;
-      
-      const classList = element.classList;
-      const isOurEyeIcon = classList && (classList.contains('ai-eye-icon') || classList.contains('ai-hide-icon'));
-      
-      if (!isOurEyeIcon) {
-        return; // Not our eye icon - could be fold arrow or other glyph
+      // If AI is disabled globally, do nothing
+      if (!isAIEnabled) {
+        return;
       }
 
       const lineNumber = e.target.position?.lineNumber;
@@ -260,7 +284,7 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
       const lineContent = model.getLineContent(lineNumber);
       const trimmed = lineContent.trim().toLowerCase();
 
-      // Only respond on chapter/section header lines
+      // Only respond on chapter/section header lines where we actually place AI eyes
       if (/^#chapter\b/.test(trimmed) || /^#section\b/.test(trimmed)) {
         toggleAiHideForLine(lineNumber);
       }

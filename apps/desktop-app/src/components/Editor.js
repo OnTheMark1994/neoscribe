@@ -1254,6 +1254,7 @@ function Editor({ currentFilePath, onFileChange, onContentChange, onSaveComplete
         <MonacoEditorView
           monacoRef={monacoRef}
           content={content}
+          isAIEnabled={isAIEnabled}
           onContentChange={(newContent) => {
             setContent(newContent);
             onContentChange();
