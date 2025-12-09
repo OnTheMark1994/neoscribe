@@ -26,6 +26,10 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
     const saved = localStorage.getItem('showPreviewBar');
     return saved === null ? true : saved === 'true';
   });
+  const [showMonacoLineNumbers, setShowMonacoLineNumbers] = useState(() => {
+    const saved = localStorage.getItem('showMonacoLineNumbers');
+    return saved === null ? true : saved === 'true';
+  });
   const [editorViewMode, setEditorViewMode] = useState(() => {
     const saved = localStorage.getItem('editorViewMode');
     if (saved === 'fold') return 'array'; // migrate old value
@@ -427,6 +431,33 @@ function Settings({ anonId, authId: authIdProp, deviceId, userAccount, onClose, 
                 {editorViewMode === 'array' && 'Array view: Line-by-line editing with folding support'}
                 {editorViewMode === 'monaco' && 'Monaco view: VS Code-style editor with syntax highlighting'}
                 {editorViewMode === 'textarea' && 'Textarea view: Simple plain text editing'}
+              </p>
+            </div>
+          </div>
+
+          <div className="setting-section">
+            <h2>Monaco Line Indexes</h2>
+            <div className="setting-item">
+              <div className="toggle-container">
+                <label>Show Line Indexes (Monaco)</label>
+                <div
+                  className={`toggle-switch ${showMonacoLineNumbers ? 'active' : ''}`}
+                  onClick={() => {
+                    const next = !showMonacoLineNumbers;
+                    setShowMonacoLineNumbers(next);
+                    localStorage.setItem('showMonacoLineNumbers', next ? 'true' : 'false');
+                    if (window.electronAPI && window.electronAPI.settingsSaved) {
+                      window.electronAPI.settingsSaved({ showMonacoLineNumbers: next });
+                    }
+                  }}
+                >
+                  <div className="toggle-slider"></div>
+                </div>
+              </div>
+              <p className="setting-hint">
+                {showMonacoLineNumbers
+                  ? 'Monaco view shows line index numbers on the left.'
+                  : 'Monaco view hides line index numbers for a cleaner page look.'}
               </p>
             </div>
           </div>
