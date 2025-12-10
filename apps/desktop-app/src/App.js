@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { selectIsAIEnabled } from './store/settingsSlice';
 import SimpleMonaco from './components/Editor/SimpleMonaco';
+import DiffMonaco from './components/Editor/DiffMonaco';
 import AISidebar from './components/AI/AISidebar';
 import WebMenuBar from './components/UI/WebMenuBar';
 import AppInitializer from './components/Data/AppInitializer';
@@ -29,7 +30,9 @@ function App() {
 
       <div className={`page-container ${isAIEnabled ? 'ai-sidebar-visible' : ''}`}>
         <div className="page">
-          <SimpleMonaco ref={monacoRef} />
+          {/* Leave this here just commented out for now */}
+          {/* <SimpleMonaco ref={monacoRef} /> */}
+          <DiffMonaco />
         </div>
       </div>
       
