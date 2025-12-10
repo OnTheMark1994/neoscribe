@@ -96,3 +96,14 @@
   /* color: #3b82f6 !important; blue */
   background-color: transparent !important;
 }
+
+/* 
+ * Note: Hidden line IDs (#__aid:) are injected as comments at line end.
+ * They're styled via Monaco's theme to be very faint or invisible.
+ * CSS can't directly hide specific text content, so we handle this in JS.
+ */
+
+/* AI change highlight (yellow background for active change during navigation) */
+.monaco-editor .ai-highlight {
+  background-color: rgba(255, 235, 59, 0.3) !important;
+}

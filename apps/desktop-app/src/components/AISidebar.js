@@ -3,8 +3,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import './AISidebar.css';
 import TokenInfoModal from './TokenInfoModal';
 import RefreshButton from './RefreshButton';
-import { callDeepSeekServerAPI, calculateFullTokenEstimate, processChanges, integrateChangesIntoLines, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl } from '../utils/aiService';
+import { callDeepSeekServerAPI, calculateFullTokenEstimate, processChanges, processChangesForRedux, integrateChangesIntoLines, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl } from '../utils/aiService';
 import { getLines, updateLinesFromText, getTextFromLines } from '../utils/editorEngine';
+import { setProposals } from '../store/aiSlice';
 import { isWeb } from '../utils/environment';
 import { openSettings } from '../store/uiSlice';
 import { selectAnonId, selectAuthId, selectAvailableTokens, setAvailableTokens as setReduxAvailableTokens } from '../store/userSlice';
@@ -18,9 +19,9 @@ const REFRESH_ANIMATION_DURATION = 800;
  * AISidebar - AI chat and token management sidebar (refactored per v2 plan)
  * 
  * Now reads anonId, authId, developerMode, and availableTokens from Redux.
- * Only onAIResponse callback is passed as prop.
+ * Uses monacoRef to get lines from SimpleMonaco and dispatch proposals to Redux.
  */
-function AISidebar({ onAIResponse }) {
+function AISidebar({ onAIResponse, monacoRef }) {
   const dispatch = useDispatch();
   
   // Read from Redux instead of props
@@ -336,7 +337,14 @@ function AISidebar({ onAIResponse }) {
         localStorage.setItem('aiService', 'deepseek-server');
       }
       
-      const lines = getLines();
+      // Get lines from SimpleMonaco via ref (with hidden IDs)
+      let lines;
+      if (monacoRef && monacoRef.current && monacoRef.current.prepareForAI) {
+        lines = monacoRef.current.prepareForAI();
+      } else {
+        // Fallback to editorEngine if ref not available
+        lines = getLines();
+      }
       
       console.log('[AI] Sending request to:', aiService);
       console.log('[AI] Lines count:', lines.length);
@@ -355,25 +363,25 @@ function AISidebar({ onAIResponse }) {
 
       setIsThinking(false);
 
-      // Process changes
+      // Process changes once for legacy diff model, debug, and change counts
       const processedChanges = processChanges(response.parsed);
-      console.log('[AI] Processed changes:', processedChanges);
+
+      // Process changes for Redux (View Zones format)
+      const reduxProposals = processChangesForRedux(response.parsed);
+      console.log('[AI] Redux proposals:', reduxProposals);
       
-      // Integrate changes into lines
-      const newLines = integrateChangesIntoLines(processedChanges, lines);
-      console.log('[AI] New lines after integration:', newLines.length);
+      // Dispatch to Redux to trigger View Zones
+      dispatch(setProposals(reduxProposals));
       
-      // Build list of all change IDs
-      const allChangeIds = [];
-      newLines.forEach(line => {
-        if (line.proposedChangeId) {
-          allChangeIds.push(line.proposedChangeId);
-        }
-      });
-      console.log('[AI] All change IDs:', allChangeIds);
-      
-      // Notify parent component about AI response
+      // Also process for legacy format if onAIResponse callback exists
       if (onAIResponse) {
+        const newLines = integrateChangesIntoLines(processedChanges, lines);
+        const allChangeIds = [];
+        newLines.forEach(line => {
+          if (line.proposedChangeId) {
+            allChangeIds.push(line.proposedChangeId);
+          }
+        });
         onAIResponse(newLines, processedChanges, allChangeIds);
       }
 

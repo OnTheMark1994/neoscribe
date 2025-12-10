@@ -654,6 +654,59 @@ function generateLineId() {
   return Math.random().toString(36).substr(2, 9);
 }
 
+/**
+ * Convert AI response to Redux proposals format for View Zones
+ * Groups insert changes into linesToInsert arrays
+ * @param {Object} aiResponse - Raw AI response with changes array
+ * @returns {Object} - { [lineId]: Proposal[] } for Redux
+ */
+export function processChangesForRedux(aiResponse) {
+  try {
+    const proposalsByLineID = {};
+    
+    if (!aiResponse.changes || !Array.isArray(aiResponse.changes)) {
+      return { error: "No changes array found" };
+    }
+    
+    // Process each change
+    aiResponse.changes.forEach(change => {
+      const lineID = change.lineID;
+      
+      if (!proposalsByLineID[lineID]) {
+        proposalsByLineID[lineID] = [];
+      }
+      
+      // Handle different change types
+      if (change.type === 'modify') {
+        proposalsByLineID[lineID].push({
+          id: generateChangeId(lineID, 'modify'),
+          type: 'modify',
+          proposedText: change.proposedText,
+        });
+      } else if (change.type === 'delete') {
+        proposalsByLineID[lineID].push({
+          id: generateChangeId(lineID, 'delete'),
+          type: 'delete',
+        });
+      } else if (change.type === 'insert' && Array.isArray(change.linesToInsert)) {
+        // Keep linesToInsert as array for View Zones
+        proposalsByLineID[lineID].push({
+          id: generateChangeId(lineID, 'insert'),
+          type: 'insert',
+          linesToInsert: change.linesToInsert,
+        });
+      }
+    });
+    
+    return proposalsByLineID;
+    
+  } catch (error) {
+    return {
+      error: "aiResponse.changes error: " + error.message,
+    };
+  }
+}
+
 // Integrate changes into lines array (matches original implementation exactly)
 export function integrateChangesIntoLines(changesByLineID, currentLines) {
   const integratedLines = [];

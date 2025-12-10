@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { selectIsAIEnabled } from './store/settingsSlice';
 import SimpleMonaco from './components/SimpleMonaco';
 import AISidebar from './components/AISidebar';
+import AiNavBar from './components/AiNavBar';
 import WebMenuBar from './components/WebMenuBar';
 import AppInitializer from './components/AppInitializer';
 import LoadingScreen from './components/LoadingScreen';
@@ -11,11 +12,12 @@ import StatusBar from './components/StatusBar';
 import './App.css';
 
 /**
- * App.js - Ultra simple: Monaco + AI sidebar + unified menu bar
- * Zero custom editor logic, just fast editing
+ * App.js - Monaco + AI sidebar + AI proposals navigation
+ * Manages refs for SimpleMonaco to expose AI functionality
  */
 function App() {
   const isAIEnabled = useSelector(selectIsAIEnabled);
+  const monacoRef = useRef(null);
 
   return (
     <div className={`App has-web-menu ${isAIEnabled ? 'ai-sidebar-visible' : ''}`}>
@@ -28,11 +30,17 @@ function App() {
 
       <div className={`page-container ${isAIEnabled ? 'ai-sidebar-visible' : ''}`}>
         <div className="page">
-          <SimpleMonaco />
+          <SimpleMonaco ref={monacoRef} />
         </div>
       </div>
       
-      {isAIEnabled && <AISidebar />}
+      {isAIEnabled && <AISidebar monacoRef={monacoRef} />}
+      {isAIEnabled && monacoRef.current && (
+        <AiNavBar
+          aiManager={monacoRef.current.getAiManager()}
+          lineIdToNumber={monacoRef.current.getLineIdToNumberMap()}
+        />
+      )}
       <StatusBar />
     </div>
   );

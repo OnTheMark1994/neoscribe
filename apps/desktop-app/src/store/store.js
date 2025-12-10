@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import aiChangesReducer from './aiChangesSlice';
+import aiReducer from './aiSlice';
 import userReducer from './userSlice';
 import uiReducer from './uiSlice';
 import editorReducer from './editorSlice';
@@ -26,6 +27,7 @@ export const store = configureStore({
     settings: settingsReducer,
     ui: uiReducer,
     aiChanges: aiChangesReducer,
+    ai: aiReducer,
     status: statusReducer,
   },
 });
