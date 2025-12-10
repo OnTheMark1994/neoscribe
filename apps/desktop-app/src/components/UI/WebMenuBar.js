@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectIsAIEnabled, setIsAIEnabled, setBackgroundImage } from '../store/settingsSlice';
-import { selectCurrentFilePath, selectIsModified, selectContent, fileOpened, resetEditor, bumpFoldAllTrigger, bumpUnfoldAllTrigger, bumpSaveTrigger } from '../store/editorSlice';
-import { openSettings, openDownloadModal } from '../store/uiSlice';
-import { showStatus } from '../store/statusSlice';
-import { isElectron, isWeb } from '../utils/environment';
-import { EditorContext } from '../contexts/EditorContext';
-import * as fileOps from '../utils/fileOps';
-import { parseText } from '../utils/editorEngine';
+import { selectIsAIEnabled, setIsAIEnabled, setBackgroundImage } from '../../store/settingsSlice';
+import { selectCurrentFilePath, selectIsModified, selectContent, fileOpened, resetEditor, bumpFoldAllTrigger, bumpUnfoldAllTrigger, bumpSaveTrigger } from '../../store/editorSlice';
+import { openSettings, openDownloadModal } from '../../store/uiSlice';
+import { showStatus } from '../../store/statusSlice';
+import { isElectron, isWeb } from '../../utils/environment';
+import { EditorContext } from '../../contexts/EditorContext';
+import * as fileOps from '../../utils/fileOps';
+import { parseText } from '../../utils/editorEngine';
 import './WebMenuBar.css';
 
 /**
@@ -282,7 +282,7 @@ function WebMenuBar() {
     if (IS_ELECTRON) {
       dispatch(setBackgroundImage(themePath));
       // Also update via setBackground helper
-      const { setBackground } = require('../utils/backgroundHelper');
+      const { setBackground } = require('../../utils/backgroundHelper');
       setBackground(themePath);
     }
   };

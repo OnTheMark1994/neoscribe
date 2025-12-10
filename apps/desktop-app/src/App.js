@@ -1,14 +1,13 @@
 import React, { useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { selectIsAIEnabled } from './store/settingsSlice';
-import SimpleMonaco from './components/SimpleMonaco';
-import AISidebar from './components/AISidebar';
-import AiNavBar from './components/AiNavBar';
-import WebMenuBar from './components/WebMenuBar';
-import AppInitializer from './components/AppInitializer';
-import LoadingScreen from './components/LoadingScreen';
-import Menus from './components/Menus';
-import StatusBar from './components/StatusBar';
+import SimpleMonaco from './components/Editor/SimpleMonaco';
+import AISidebar from './components/AI/AISidebar';
+import WebMenuBar from './components/UI/WebMenuBar';
+import AppInitializer from './components/Data/AppInitializer';
+import LoadingScreen from './components/UI/LoadingScreen';
+import Menus from './components/Windows/Menus';
+import StatusBar from './components/UI/StatusBar';
 import './App.css';
 
 /**
@@ -35,12 +34,6 @@ function App() {
       </div>
       
       {isAIEnabled && <AISidebar monacoRef={monacoRef} />}
-      {isAIEnabled && monacoRef.current && (
-        <AiNavBar
-          aiManager={monacoRef.current.getAiManager()}
-          lineIdToNumber={monacoRef.current.getLineIdToNumberMap()}
-        />
-      )}
       <StatusBar />
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { setAnonId, setAuthId, setDeviceId, setUser, setAvailableTokens } from '../store/userSlice';
+import { setAnonId, setAuthId, setDeviceId, setUser, setAvailableTokens } from '../../store/userSlice';
 import {
   loadAllSettings,
   setIsAIEnabled,
@@ -8,14 +8,14 @@ import {
   setBackgroundImage,
   setShowPreviewBar,
   setEditorViewMode,
-} from '../store/settingsSlice';
-import { fileOpened } from '../store/editorSlice';
-import { setLoadingVisible, openUnsavedDialog } from '../store/uiSlice';
-import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData } from '../utils/aiService';
-import { isElectron, isWeb, getWebAnonId } from '../utils/environment';
-import { setBackground, loadSavedBackground } from '../utils/backgroundHelper';
-import * as fileOps from '../utils/fileOps';
-import { parseText } from '../utils/editorEngine';
+} from '../../store/settingsSlice';
+import { fileOpened } from '../../store/editorSlice';
+import { setLoadingVisible, openUnsavedDialog } from '../../store/uiSlice';
+import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData } from '../../utils/aiService';
+import { isElectron, isWeb, getWebAnonId } from '../../utils/environment';
+import { setBackground, loadSavedBackground } from '../../utils/backgroundHelper';
+import * as fileOps from '../../utils/fileOps';
+import { parseText } from '../../utils/editorEngine';
 
 /**
  * AppInitializer - Handles ALL initialization logic in one place

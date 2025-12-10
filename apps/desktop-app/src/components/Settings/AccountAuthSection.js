@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Settings.css';
-import { createUserAccount, loginUserAccount, buildWebPortalAutoLoginUrl } from '../utils/aiService';
+import { createUserAccount, loginUserAccount, buildWebPortalAutoLoginUrl } from '../../utils/aiService';
 
 function AccountAuthSection({
   anonId,

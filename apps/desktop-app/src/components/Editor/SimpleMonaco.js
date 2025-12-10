@@ -7,25 +7,20 @@ import {
   selectUnfoldAllTrigger,
   selectSaveTrigger,
   setIsModified,
-} from '../store/editorSlice';
-import { showStatus } from '../store/statusSlice';
+} from '../../store/editorSlice';
+import { showStatus } from '../../store/statusSlice';
 import {
   selectShowPreviewBar,
   selectShowMonacoLineNumbers,
   selectMonacoStickyTopBar,
   selectIsAIEnabled,
-} from '../store/settingsSlice';
+} from '../../store/settingsSlice';
 import Editor from '@monaco-editor/react';
-import { saveFile } from '../utils/fileOps';
-import { AiChangeManager } from './AiChangeManager';
-import { selectAiProposals, selectActiveChangeId, setActiveChangeId } from '../store/aiSlice';
+import { saveFile } from '../../utils/fileOps';
 import './MonacoEditorView.css';
-import './AiInlineDiff.css';
 
 /**
- * SimpleMonaco - Monaco editor with AI proposal support
- * - Hidden line IDs for stable AI references
- * - View Zones for inline diff display
+ * SimpleMonaco - Plain Monaco editor
  * - Updates editor when file is opened (Redux content changes)
  */
 const SimpleMonaco = forwardRef((props, ref) => {
@@ -44,12 +39,6 @@ const SimpleMonaco = forwardRef((props, ref) => {
   const monacoRef = useRef(null);
   const decorationsRef = useRef([]);
   const foldingProviderRef = useRef(null);
-  const aiManagerRef = useRef(null);
-  const lineIdToNumberRef = useRef(new Map());
-  const contentChangeDisposableRef = useRef(null);
-  
-  const aiProposals = useSelector(selectAiProposals);
-  const activeChangeId = useSelector(selectActiveChangeId);
 
   // Update editor when content changes (file opened)
   useEffect(() => {
@@ -196,24 +185,8 @@ const SimpleMonaco = forwardRef((props, ref) => {
     // Focus editor so caret is visible immediately
     editor.focus();
 
-    // Initialize AI Change Manager
-    aiManagerRef.current = new AiChangeManager(editor, dispatch);
-
     // Initial decoration once on mount
     updateDecorations();
-
-    // Listen for content changes (debounced) so we can keep line maps fresh
-    let idInjectionTimeout = null;
-    if (contentChangeDisposableRef.current) {
-      contentChangeDisposableRef.current.dispose();
-      contentChangeDisposableRef.current = null;
-    }
-    contentChangeDisposableRef.current = editor.onDidChangeModelContent(() => {
-      if (idInjectionTimeout) clearTimeout(idInjectionTimeout);
-      idInjectionTimeout = setTimeout(() => {
-        updateLineIdMap(editor);
-      }, 1000); // Debounce 1 second
-    });
 
     // Click on glyph margin eye icon: toggle #ai-hide tag on that line
     editor.onMouseDown((e) => {
@@ -260,20 +233,12 @@ const SimpleMonaco = forwardRef((props, ref) => {
     updateDecorations();
   }, [isAIEnabled, content]);
 
-  // Cleanup folding provider and AI manager on unmount
+  // Cleanup folding provider on unmount
   useEffect(() => {
     return () => {
       if (foldingProviderRef.current) {
         foldingProviderRef.current.dispose();
         foldingProviderRef.current = null;
-      }
-      if (contentChangeDisposableRef.current) {
-        contentChangeDisposableRef.current.dispose();
-        contentChangeDisposableRef.current = null;
-      }
-      if (aiManagerRef.current) {
-        aiManagerRef.current.dispose();
-        aiManagerRef.current = null;
       }
     };
   }, []);
@@ -323,24 +288,6 @@ const SimpleMonaco = forwardRef((props, ref) => {
     })();
   }, [saveTrigger, currentFilePath, dispatch]);
 
-  // Update AI proposals when Redux changes
-  useEffect(() => {
-    if (!aiManagerRef.current || !aiProposals) return;
-    
-    const lineIdMap = updateLineIdMap(editorRef.current);
-    if (lineIdMap) {
-      lineIdToNumberRef.current = lineIdMap;
-    }
-    
-    const changes = flattenProposals(aiProposals);
-    aiManagerRef.current.updateChanges(changes, lineIdToNumberRef.current);
-    
-    // Auto-focus first change if we have a new set
-    if (changes.length > 0 && !activeChangeId) {
-      dispatch(setActiveChangeId(changes[0].id));
-      aiManagerRef.current.activeChangeId = changes[0].id;
-    }
-  }, [aiProposals, dispatch, activeChangeId]);
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -349,8 +296,6 @@ const SimpleMonaco = forwardRef((props, ref) => {
       return buildLinesFromMonaco(editorRef.current);
     },
     getEditor: () => editorRef.current,
-    getLineIdToNumberMap: () => lineIdToNumberRef.current,
-    getAiManager: () => aiManagerRef.current,
   }));
 
   return (
@@ -415,23 +360,6 @@ function generateStableId(index, text) {
 }
 
 /**
- * Update the lineID → lineNumber map using in-memory IDs
- */
-function updateLineIdMap(editor) {
-  if (!editor) return;
-  const model = editor.getModel();
-  if (!model) return;
-
-  const map = new Map();
-  for (let i = 1; i <= model.getLineCount(); i++) {
-    const fullLine = model.getLineContent(i);
-    const id = generateStableId(i, fullLine);
-    map.set(id, i);
-  }
-  return map;
-}
-
-/**
  * Build lines array from Monaco for AI
  * Uses in-memory stable IDs, parses levels, etc.
  */
@@ -469,24 +397,6 @@ function buildLinesFromMonaco(editor) {
   }
 
   return lines;
-}
-
-/**
- * Flatten Redux proposals to array for AiChangeManager
- */
-function flattenProposals(aiProposals) {
-  const changes = [];
-  Object.entries(aiProposals).forEach(([lineId, proposalArray]) => {
-    if (Array.isArray(proposalArray)) {
-      proposalArray.forEach((proposal) => {
-        changes.push({
-          ...proposal,
-          lineID: lineId,
-        });
-      });
-    }
-  });
-  return changes;
 }
 
 export default SimpleMonaco;

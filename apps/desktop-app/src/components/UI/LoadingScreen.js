@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { selectIsLoadingVisible } from '../store/uiSlice';
+import { selectIsLoadingVisible } from '../../store/uiSlice';
 
 /**
  * LoadingScreen - Simple loading overlay component

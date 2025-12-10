@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import './Settings.css';
-import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData, devBurnTokens } from '../utils/aiService';
+import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData, devBurnTokens } from '../../utils/aiService';
 import AccountAuthSection from './AccountAuthSection';
-import RefreshButton from './RefreshButton';
+import RefreshButton from '../UI/RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
-import { selectAnonId, selectAuthId, selectDeviceId, selectUserData, setAuthId as setReduxAuthId } from '../store/userSlice';
-import { setBackgroundImage, selectShowPreviewBar, selectShowMonacoLineNumbers, selectMonacoStickyTopBar, setShowPreviewBar, setShowMonacoLineNumbers, setMonacoStickyTopBar } from '../store/settingsSlice';
-import { setBackground } from '../utils/backgroundHelper';
+import { selectAnonId, selectAuthId, selectDeviceId, selectUserData, setAuthId as setReduxAuthId } from '../../store/userSlice';
+import { setBackgroundImage, selectShowPreviewBar, selectShowMonacoLineNumbers, selectMonacoStickyTopBar, setShowPreviewBar, setShowMonacoLineNumbers, setMonacoStickyTopBar } from '../../store/settingsSlice';
+import { setBackground } from '../../utils/backgroundHelper';
 
 /**
  * Settings - Settings management UI (refactored per v2 plan)

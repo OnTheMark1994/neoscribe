@@ -8,13 +8,13 @@ import {
   closeSettings,
   closeUnsavedDialog,
   closeDownloadModal,
-} from '../store/uiSlice';
-import { selectCurrentFilePath } from '../store/editorSlice';
-import { isWeb } from '../utils/environment';
-import { getTextFromLines } from '../utils/editorEngine';
-import { downloadTextFile } from '../utils/webFileOps';
+} from '../../store/uiSlice';
+import { selectCurrentFilePath } from '../../store/editorSlice';
+import { isWeb } from '../../utils/environment';
+import { getTextFromLines } from '../../utils/editorEngine';
+import { downloadTextFile } from '../../utils/webFileOps';
 import ConfirmCloseModal from './ConfirmCloseModal';
-import Settings from './Settings';
+import Settings from '../Settings/Settings';
 import Window from './Window';
 
 /**

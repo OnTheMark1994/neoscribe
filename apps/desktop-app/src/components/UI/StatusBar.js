@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectStatusMessage, selectStatusTimestamp, clearStatus } from '../store/statusSlice';
+import { selectStatusMessage, selectStatusTimestamp, clearStatus } from '../../store/statusSlice';
 
 /**
  * StatusBar - Displays temporary status messages to user

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './TokenUsageLog.css';
-import { API_BASE_URL } from '../utils/constants';
-import RefreshButton from './RefreshButton';
+import { API_BASE_URL } from '../../utils/constants';
+import RefreshButton from '../UI/RefreshButton';
 
 // Number of token_log entries to fetch per page (initial load and each "Load More" click)
 const TOKEN_LOG_PAGE_SIZE = 4;

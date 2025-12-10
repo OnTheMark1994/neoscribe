@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import './AISidebar.css';
-import TokenInfoModal from './TokenInfoModal';
-import RefreshButton from './RefreshButton';
-import { callDeepSeekServerAPI, calculateFullTokenEstimate, processChanges, processChangesForRedux, integrateChangesIntoLines, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl } from '../utils/aiService';
-import { getLines, updateLinesFromText, getTextFromLines } from '../utils/editorEngine';
-import { setProposals } from '../store/aiSlice';
-import { isWeb } from '../utils/environment';
-import { openSettings } from '../store/uiSlice';
-import { selectAnonId, selectAuthId, selectAvailableTokens, setAvailableTokens as setReduxAvailableTokens } from '../store/userSlice';
-import { selectDeveloperMode } from '../store/settingsSlice';
-import { WEB_PORTAL_BASE_URL } from '../utils/constants';
+import TokenInfoModal from '../Windows/TokenInfoModal';
+import RefreshButton from '../UI/RefreshButton';
+import { callDeepSeekServerAPI, calculateFullTokenEstimate, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl } from '../../utils/aiService';
+import { getLines, updateLinesFromText, getTextFromLines } from '../../utils/editorEngine';
+import { setProposals } from '../../store/aiSlice';
+import { isWeb } from '../../utils/environment';
+import { openSettings } from '../../store/uiSlice';
+import { selectAnonId, selectAuthId, selectAvailableTokens, setAvailableTokens as setReduxAvailableTokens } from '../../store/userSlice';
+import { selectDeveloperMode } from '../../store/settingsSlice';
+import { WEB_PORTAL_BASE_URL } from '../../utils/constants';
 
 // Duration to keep the refresh animation visible (ms)
 const REFRESH_ANIMATION_DURATION = 800;
@@ -363,50 +363,35 @@ function AISidebar({ onAIResponse, monacoRef }) {
 
       setIsThinking(false);
 
-      // Process changes once for legacy diff model, debug, and change counts
-      const processedChanges = processChanges(response.parsed);
+      // Store raw AI response in Redux (no inline diff processing)
+      console.log('🎯 [AI Response] Parsed:', response.parsed);
+      console.log('📦 [Redux] Storing AI response in ai.aiProposals ...');
 
-      // Process changes for Redux (View Zones format) - pass lines for originalText
-      const reduxProposals = processChangesForRedux(response.parsed, lines);
-      console.log('[AI] Redux proposals:', reduxProposals);
-      
-      // Dispatch to Redux to trigger View Zones
-      dispatch(setProposals(reduxProposals));
-      
-      // Also process for legacy format if onAIResponse callback exists
-      if (onAIResponse) {
-        const newLines = integrateChangesIntoLines(processedChanges, lines);
-        const allChangeIds = [];
-        newLines.forEach(line => {
-          if (line.proposedChangeId) {
-            allChangeIds.push(line.proposedChangeId);
-          }
-        });
-        onAIResponse(newLines, processedChanges, allChangeIds);
-      }
+      // For now we just drop the whole parsed object into aiSlice
+      // Caller can shape it later as needed
+      dispatch(setProposals(response.parsed));
 
-      // Create debug data
+      console.log('✅ [Redux] AI response stored');
+
+      // Create debug data for chat display
       const debugData = {
         userMessage: userPrompt,
         raw: response.raw,
         parsed: response.parsed,
         message: response.parsed.message,
-        changes: processedChanges,
         requestBody: response.requestBody,
         timestamp: new Date().toISOString()
       };
 
       const buttonFlag = response.parsed.button || null;
       addMessage('assistant', response.parsed.message, debugData, buttonFlag);
-      
-      // Count changes
-      let changeCount = 0;
-      Object.values(processedChanges).forEach(changes => {
-        changeCount += changes.length;
-      });
-      
+
+      // Log change count if present
+      const changeCount = Array.isArray(response.parsed.changes)
+        ? response.parsed.changes.length
+        : 0;
       if (changeCount > 0) {
-        console.log(`${changeCount} changes proposed`);
+        console.log(`📝 [AI] ${changeCount} changes received`);
       }
 
       // Refresh available tokens after a successful AI response
