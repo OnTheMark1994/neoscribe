@@ -1,56 +1,82 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectIsAIEnabled, setIsAIEnabled, setBackgroundImage } from '../store/settingsSlice';
-import { selectCurrentFilePath, selectIsModified } from '../store/editorSlice';
+import { selectCurrentFilePath, selectIsModified, selectContent, fileOpened, resetEditor, bumpFoldAllTrigger, bumpUnfoldAllTrigger, bumpSaveTrigger } from '../store/editorSlice';
 import { openSettings, openDownloadModal } from '../store/uiSlice';
+import { showStatus } from '../store/statusSlice';
 import { isElectron, isWeb } from '../utils/environment';
+import { EditorContext } from '../contexts/EditorContext';
+import * as fileOps from '../utils/fileOps';
+import { parseText } from '../utils/editorEngine';
 import './WebMenuBar.css';
 
 /**
  * WebMenuBar - Unified menu bar for BOTH web and Electron
  * 
- * ORGANIZATIONAL STANDARDS:
- * - Environment detection at the top (IS_WEB, IS_ELECTRON constants)
- * - Conditional logic for web vs Electron in handlers
- * - Single component for both environments (reusability)
- * - Redux for state (minimal prop drilling)
- * - Clear, readable function names
+ * WHAT: Provides File/Edit/View menu bar visible in both web mode and Electron
+ * 
+ * WHY UNIFIED: Previously separate implementations, now single component for maintainability
+ * 
+ * USES EditorContext: Calls editor methods directly (saveFile, openFile, foldAll, etc)
+ * NO CALLBACKS: Removed all callback props, uses useContext(EditorContext) instead
  * 
  * FEATURES:
- * - All features from native Electron menu
- * - All features from web menu
- * - Auto-hide in fullscreen (both environments)
- * - Environment-specific options (Exit, Save As, Themes for Electron only)
+ *   - File operations (New, Open, Save, Save As)
+ *   - View operations (Fold All, Unfold All)
+ *   - Settings and Help dialogs
+ *   - Auto-hide in fullscreen
+ *   - Environment-specific options (Electron has Save As, Exit, Themes)
+ * 
+ * ARCHITECTURE:
+ *   - Reads state from Redux (isAIEnabled, currentFilePath, isModified)
+ *   - Calls Editor methods via EditorContext (no prop drilling)
+ *   - Dispatches to Redux for settings/UI state (openSettings, setIsAIEnabled)
  */
 
-// ============================================================================
-// ENVIRONMENT DETECTION - Single source of truth
-// ============================================================================
+// WHAT: Runtime environment constants - single source of truth for conditional logic
+// WHY CONSTANTS: Avoid repeated function calls, clearer code intent
 const IS_WEB = isWeb();
 const IS_ELECTRON = isElectron();
-function WebMenuBar({ 
-  onNew, 
-  onOpen, 
-  onSave, // Electron: direct save, Web: handled via download modal action
-  onSaveAs, // Electron only
-  onFoldAll,
-  onUnfoldAll,
-}) {
+
+function WebMenuBar() {
+  // WHAT: Redux dispatch for settings/UI actions
+  // WHY: WebMenuBar can toggle AI, open settings, etc
   const dispatch = useDispatch();
   
-  // Read from Redux
+  // WHAT: Get editorRef from Context for view-related methods (foldAll, unfoldAll, save)
+  // NOTE: Open/New operations moved to fileOps utility (Design Principle 11)
+  // WHY SAVE STILL IN EDITOR: Save needs to extract content from active view (array/monaco/textarea)
+  // TODO: Move save operations out once content sync strategy is finalized
+  const editorContextValue = useContext(EditorContext);
+  const editorRef = editorContextValue || { current: null };
+  
+  // WHAT: Read global state from Redux for UI display
+  // isAIEnabled: Show AI toggle state in menu
+  // currentFilePath: Display filename in title, enable/disable save
+  // isModified: Show "*" indicator, enable/disable save
   const isAIEnabled = useSelector(selectIsAIEnabled);
   const currentFilePath = useSelector(selectCurrentFilePath);
   const isModified = useSelector(selectIsModified);
   
-  // Extract filename from path
+  // WHAT: Extract just the filename from full path for display
+  // WHY: Full path would be too long for menu bar
   const currentFileName = currentFilePath 
     ? currentFilePath.split(/[/\\]/).pop() 
     : null;
+  
+  // WHAT: Local UI state for menu bar behavior
+  // activeMenu: Which dropdown is open ('file', 'edit', 'view', 'help', or null)
+  // showBar: Whether menu bar is visible (auto-hide in fullscreen)
+  // isFullscreen: Whether app is in fullscreen mode
+  // themes: List of available themes (Electron only)
   const [activeMenu, setActiveMenu] = useState(null);
   const [showBar, setShowBar] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [themes, setThemes] = useState([]);
+  
+  // WHAT: Refs for menu behavior
+  // hideTimeoutRef: Debounce auto-hide in fullscreen
+  // menuRef: Detect clicks outside menu to close dropdown
   const hideTimeoutRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -74,30 +100,34 @@ function WebMenuBar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Comprehensive keyboard shortcuts for both web and Electron
+  // WHAT: Global keyboard shortcuts for menu actions
+  // WHY: Users expect shortcuts to work even when menu not focused
+  // USES: fileOps utilities + Redux for file operations, EditorContext for view operations
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = async (e) => {
       const ctrl = e.ctrlKey || e.metaKey;
       const shift = e.shiftKey;
       
       // File shortcuts
       if (ctrl && e.key === 'n') {
         e.preventDefault();
-        onNew?.();
+        handleNewFile();
       } else if (ctrl && e.key === 'o') {
         e.preventDefault();
-        onOpen?.();
+        handleOpenFile();
       } else if (ctrl && shift && e.key === 'S') {
-        // Ctrl+Shift+S - Save As (Electron only)
+        // Ctrl+Shift+S - Save As (Electron only) - handled via save flow in editor using saveTrigger
         e.preventDefault();
-        if (IS_ELECTRON) onSaveAs?.();
+        if (IS_ELECTRON) {
+          dispatch(bumpSaveTrigger());
+        }
       } else if (ctrl && e.key === 's') {
         // Ctrl+S - Save (Electron) or open Download modal (Web)
         e.preventDefault();
         if (IS_WEB) {
           dispatch(openDownloadModal());
         } else {
-          onSave?.();
+          dispatch(bumpSaveTrigger());
         }
       } else if (ctrl && e.key === ',') {
         e.preventDefault();
@@ -114,17 +144,39 @@ function WebMenuBar({
       } else if (ctrl && shift && e.key === '[') {
         // Ctrl+Shift+[ - Fold All
         e.preventDefault();
-        onFoldAll?.();
+        dispatch(bumpFoldAllTrigger());
       } else if (ctrl && shift && e.key === ']') {
         // Ctrl+Shift+] - Unfold All
         e.preventDefault();
-        onUnfoldAll?.();
+        dispatch(bumpUnfoldAllTrigger());
       }
     };
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onNew, onOpen, onSave, onSaveAs, onFoldAll, onUnfoldAll, isAIEnabled, dispatch]);
+  }, [editorRef, isAIEnabled, dispatch]);
+  
+  // File operation handlers using fileOps utility (Design Principle 11)
+  const handleNewFile = () => {
+    if (window.isModified) {
+      if (!window.confirm('You have unsaved changes. Continue?')) return;
+    }
+    dispatch(resetEditor());
+    parseText(''); // Clear editorEngine for array view
+  };
+  
+  const handleOpenFile = async () => {
+    const result = await fileOps.openFile();
+    if (result.success) {
+      dispatch(fileOpened({ filePath: result.filePath || result.fileName, content: result.content }));
+      parseText(result.content); // Update editorEngine for array view
+      if (result.filePath) {
+        localStorage.setItem('lastOpenedFile', result.filePath);
+      }
+    } else if (result.error) {
+      dispatch(showStatus('Failed to open file: ' + result.error));
+    }
+  };
 
   // Keep bar visibility in sync with fullscreen state (both web and Electron)
   useEffect(() => {
@@ -296,10 +348,10 @@ function WebMenuBar({
           </button>
           {activeMenu === 'file' && (
             <div className="web-menu-dropdown">
-              <button onClick={() => handleMenuClick(onNew)}>
+              <button onClick={() => handleMenuClick(handleNewFile)}>
                 <span>New</span><span className="shortcut">Ctrl+N</span>
               </button>
-              <button onClick={() => handleMenuClick(onOpen)}>
+              <button onClick={() => handleMenuClick(handleOpenFile)}>
                 <span>{IS_WEB ? 'Open / Upload...' : 'Open...'}</span>
                 <span className="shortcut">Ctrl+O</span>
               </button>
@@ -315,10 +367,10 @@ function WebMenuBar({
                 </button>
               ) : (
                 <>
-                  <button onClick={() => handleMenuClick(onSave)}>
+                  <button onClick={() => handleMenuClick(() => dispatch(bumpSaveTrigger()))}>
                     <span>Save</span><span className="shortcut">Ctrl+S</span>
                   </button>
-                  <button onClick={() => handleMenuClick(onSaveAs)}>
+                  <button onClick={() => handleMenuClick(() => dispatch(bumpSaveTrigger()))}>
                     <span>Save As</span><span className="shortcut">Ctrl+Shift+S</span>
                   </button>
                 </>
@@ -410,11 +462,11 @@ function WebMenuBar({
               <div className="web-menu-divider" />
 
               {/* Fold controls with shortcuts */}
-              <button onClick={() => handleMenuClick(onFoldAll)}>
+              <button onClick={() => handleMenuClick(() => dispatch(bumpFoldAllTrigger()))}>
                 <span>Fold All</span>
                 <span className="shortcut">Ctrl+Shift+[</span>
               </button>
-              <button onClick={() => handleMenuClick(onUnfoldAll)}>
+              <button onClick={() => handleMenuClick(() => dispatch(bumpUnfoldAllTrigger()))}>
                 <span>Unfold All</span>
                 <span className="shortcut">Ctrl+Shift+]</span>
               </button>

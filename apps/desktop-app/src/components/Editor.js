@@ -1,30 +1,54 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { parseText, getTextFromLines, updateLinesFromText, getLines } from '../utils/editorEngine';
-import { selectCurrentFilePath, selectIsModified, setIsModified, setCurrentFilePath } from '../store/editorSlice';
+import { selectCurrentFilePath, selectIsModified, selectContent, setIsModified, setCurrentFilePath } from '../store/editorSlice';
 import { selectIsAIEnabled, selectEditorViewMode } from '../store/settingsSlice';
+import { showStatus as showStatusRedux } from '../store/statusSlice';
 import FoldEditorView from './FoldEditorView';
 import TextareaEditorView from './TextareaEditorView';
 import MonacoEditorView from './MonacoEditorView';
+import FindBar from './FindBar/FindBar';
 import './Editor.css';
+// REMOVED IMPORTS: isWeb, uploadTextFile - file operations moved to WebMenuBar + fileOps
 
 /**
- * Editor - Main editor orchestrator (refactored per v2 plan)
+ * Editor - View orchestrator and content renderer
  * 
- * Now reads currentFilePath, isModified, isAIEnabled from Redux.
- * Callbacks are still passed as props from App for file operations.
+ * REFACTORED (Design Principle 11):
+ * - File operations (new/open) moved to WebMenuBar + fileOps utility
+ * - Editor now focuses on RENDERING content and managing VIEW state
+ * - Reads content from Redux (populated by file operations)
+ * 
+ * REMAINING RESPONSIBILITIES:
+ * - Manages three view modes: array (fold), monaco (code editor), textarea (plain text)
+ * - Save operations (temporary - needs view-specific content extraction)
+ * - Syncs content between views and editorEngine
+ * - Dispatches isModified to Redux on content changes
+ * 
+ * TODO:
+ * - Move save operations to shared module once content sync finalized
+ * - Remove fold/unfold from imperative API, trigger via Redux
+ * - Eliminate onEditorReady pattern entirely
+ * 
+ * STATE ARCHITECTURE:
+ * - Redux: currentFilePath, content, isModified (updated by WebMenuBar on file ops)
+ * - Local: viewMode (component-specific)
+ * - Refs: filePathRef, monacoRef, textareaRef (for synchronous access)
+ * - Module: editorEngine lines array (for fold view)
  */
-function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }) {
+function Editor({ onEditorReady }) {
+  // Redux dispatch - used to update global state directly (NO PROP DRILLING)
   const dispatch = useDispatch();
   
-  // Read from Redux
+  // Read from Redux - global state needed for UI sync
   const currentFilePath = useSelector(selectCurrentFilePath);
+  const reduxContent = useSelector(selectContent); // Content from file operations
   const isAIEnabled = useSelector(selectIsAIEnabled);
   const savedViewMode = useSelector(selectEditorViewMode);
   
-  const [content, setContent] = useState('');
-  // viewMode: 'array' | 'monaco' | 'textarea'
-  const [viewMode, setViewMode] = useState(() => {
+  // Local state - view-specific, doesn't need to be in Redux
+  const [content, setContent] = useState(''); // Plain text for Monaco/textarea views
+  const [viewMode, setViewMode] = useState(() => { // 'array' | 'monaco' | 'textarea'
     // Initialize from Redux/localStorage
     const saved = savedViewMode || localStorage.getItem('editorViewMode');
     // Migrate old 'fold' value to 'array'
@@ -32,36 +56,40 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
     if (saved === 'array' || saved === 'monaco' || saved === 'textarea') return saved;
     return 'array'; // default
   });
-  const [isArrayView, setIsArrayView] = useState(true);
-  const [renderTrigger, setRenderTrigger] = useState(0);
-  const editorRef = useRef(null);
-  const textareaRef = useRef(null);
-  const monacoRef = useRef(null);
-  const menuListenersSetupRef = useRef(false);
-  const openDialogActiveRef = useRef(false);
-  // Keep latest file path in a ref so menu callbacks always see the current value
+  const [isArrayView, setIsArrayView] = useState(true); // Legacy toggle for array view debug
+  const [renderTrigger, setRenderTrigger] = useState(0); // Forces re-render of fold view
+  
+  // Refs - for synchronous access without waiting for React re-render
+  const editorRef = useRef(null); // Fold view container
+  const textareaRef = useRef(null); // Direct access to textarea DOM
+  const monacoRef = useRef(null); // Direct access to Monaco instance
+  // REMOVED: menuListenersSetupRef, openDialogActiveRef - Electron native menu removed
+  
+  // CRITICAL: filePathRef is source of truth for save operations
+  // WHY: Redux updates are async, filePathRef is synchronous
+  // WHEN: Updated immediately when file opened/saved to prevent race condition on Ctrl+S
   const filePathRef = useRef(currentFilePath || null);
   const { currentChangeIdIndex, allChangeIds } = useSelector(state => state.aiChanges);
+  
+  // Find functionality - only for array/textarea views (Monaco has built-in Ctrl+F)
   const [isFindVisible, setIsFindVisible] = useState(false);
-  const [findQuery, setFindQuery] = useState('');
-  const [findMatches, setFindMatches] = useState([]);
-  const [currentFindIndex, setCurrentFindIndex] = useState(-1);
-  const findInputRef = useRef(null);
 
-  // Use refs to always have access to latest functions
-  const switchToViewModeRef = useRef(null);
-  const cycleViewModeRef = useRef(null);
+  // REMOVED: All function refs - no longer needed since Electron native menu removed
+  // WebMenuBar calls these functions directly, no stale closure issues
 
   // Expose imperative editor helpers to parent (App)
+  // NOTE (Design Principle 11 - Common Issues):
+  //   PROGRESS: newFile/openFile moved to WebMenuBar + fileOps utility ✓
+  //   PROGRESS: Electron native menu removed ✓
+  //   TODO: Move save operations once content sync strategy finalized
+  //   TODO: Move fold operations to Redux-triggered actions
   useEffect(() => {
     if (onEditorReady) {
       onEditorReady({
+        // AI operations - still here because they manipulate editorEngine directly
         updateLinesFromAI: (newLines) => {
-          // Replace lines in editorEngine
           const { setLines } = require('../utils/editorEngine');
           setLines(newLines);
-          // Keep plain-text content in sync so Monaco/Textarea views
-          // immediately reflect updates (web open, AI responses, etc.)
           try {
             const { getTextFromLines } = require('../utils/editorEngine');
             const text = getTextFromLines();
@@ -69,233 +97,123 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
           } catch (e) {
             // Fallback: just bump render if anything goes wrong
           }
-          setRenderTrigger(prev => prev + 1); // Trigger re-render
+          setRenderTrigger(prev => prev + 1);
         },
-        toggleFoldView: () => {
-          if (cycleViewModeRef.current) cycleViewModeRef.current();
-        },
-        toggleArrayView: () => {
-          setIsArrayView(prev => !prev);
-        },
-        setViewMode: (mode) => {
-          if (switchToViewModeRef.current) switchToViewModeRef.current(mode);
-        },
-        getViewMode: () => localStorage.getItem('editorViewMode') || 'array',
+        // View operations - closures capture latest function definitions
+        toggleFoldView: () => cycleViewMode(),
+        toggleArrayView: () => setIsArrayView(prev => !prev),
+        setViewMode: (mode) => switchToViewMode(mode),
+        getViewMode: () => viewMode,
+        // Save operations - still here because they extract content from active view
         saveFile: () => handleSave(),
         saveFileAs: () => handleSaveAs(),
+        // Fold operations - still here because they interact with view state
         foldAll: () => foldAll(),
         unfoldAll: () => unfoldAll()
+        // REMOVED: newFile, openFile - now handled by WebMenuBar + fileOps utility
       });
     }
-  }, [onEditorReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onEditorReady]); // Functions are stable, no need to re-create API on every change
 
-  // Listen for view mode changes from Settings (via localStorage)
+  // Sync Redux content to local state when file operations happen (open/new)
   useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'editorViewMode' && e.newValue) {
-        const newMode = e.newValue;
-        if ((newMode === 'array' || newMode === 'monaco' || newMode === 'textarea') && newMode !== viewMode) {
-          console.log('[EDITOR] View mode changed via storage:', newMode);
-          switchToViewMode(newMode, true); // Skip localStorage update since it came from there
-        }
-      }
-    };
+    if (reduxContent !== undefined && reduxContent !== null) {
+      setContent(reduxContent);
+      parseText(reduxContent);
+      renderEditor();
+    }
+  }, [reduxContent]);
 
-    // Also check periodically for changes (handles same-window updates from Settings modal)
-    const checkViewMode = () => {
-      const saved = localStorage.getItem('editorViewMode');
-      if (saved && saved !== viewMode && (saved === 'array' || saved === 'monaco' || saved === 'textarea')) {
-        console.log('[EDITOR] View mode changed via check:', saved);
-        switchToViewMode(saved, true); // Skip localStorage update
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(checkViewMode, 500);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, [viewMode]);
+  // Listen for view mode changes from Redux (no more polling!)
+  useEffect(() => {
+    if (savedViewMode && savedViewMode !== viewMode) {
+      console.log('[EDITOR] View mode changed via Redux:', savedViewMode);
+      switchToViewMode(savedViewMode, true);
+    }
+  }, [savedViewMode]);
 
   useEffect(() => {
     // Initialize editor
     parseText('');
     renderEditor();
 
-    // Load last opened file
-    const lastFile = localStorage.getItem('lastOpenedFile');
-    if (lastFile && window.electronAPI && window.electronAPI.openEncryptedFileWithPath) {
-      window.electronAPI.openEncryptedFileWithPath(lastFile).then(result => {
-        if (result && result.success) {
-          console.log('[EDITOR] Loaded last file:', result.filePath);
-          setContent(result.content);
-          onFileChange(result.filePath);
-          parseText(result.content);
-          renderEditor();
-        } else {
-          console.log('[EDITOR] Failed to load last file');
-        }
-      }).catch(err => {
-        console.log('Could not load last file:', err);
-        localStorage.removeItem('lastOpenedFile');
-      });
+    // REMOVED: Electron native menu listeners - unified WebMenuBar handles all menu actions
+    // File operations now handled by WebMenuBar + fileOps utility
+
+    // Hide loading screen immediately
+    const loadingScreen = document.getElementById('loadingScreen');
+    if (loadingScreen) {
+      loadingScreen.style.display = 'none';
     }
-
-    // Set up menu listeners - use ref to prevent multiple registrations
-    if (window.electronAPI && !menuListenersSetupRef.current) {
-      window.electronAPI.onMenuNew(() => handleNew());
-      window.electronAPI.onMenuOpen(() => handleOpen());
-      window.electronAPI.onMenuSave(() => handleSave());
-      window.electronAPI.onMenuSaveAs(() => handleSaveAs());
-      window.electronAPI.onToggleFoldView && window.electronAPI.onToggleFoldView(() => cycleViewMode());
-      window.electronAPI.onFoldAll(() => foldAll());
-      window.electronAPI.onUnfoldAll(() => unfoldAll());
-      window.electronAPI.onToggleArrayView && window.electronAPI.onToggleArrayView(() => {
-        setIsArrayView(prev => !prev);
-      });
-
-      menuListenersSetupRef.current = true;
-    }
-
-    // Hide loading screen
-    setTimeout(() => {
-      const loadingScreen = document.getElementById('loadingScreen');
-      if (loadingScreen) {
-        loadingScreen.classList.add('hidden');
-        setTimeout(() => {
-          loadingScreen.style.display = 'none';
-        }, 300);
-      }
-    }, 100);
   }, []);
 
-  // Listen for native AI context menu choices from Electron
-  useEffect(() => {
-    if (!window.electronAPI || !window.electronAPI.onAIContextChoice) return;
-
-    const handler = (data) => {
-      if (!data) return;
-      const { lineIdx, action, scope, option } = data;
-      const lines = getLines();
-
-      if (typeof lineIdx !== 'number' || !lines[lineIdx]) return;
-
-      // Fold/unfold toggle from native menu
-      if (action === 'foldToggle') {
-        toggleFold(lineIdx);
-        return;
-      }
-
-      if (option) {
-        if (scope === 'sections' && (lines[lineIdx].level === 1 || lines[lineIdx].level === 2)) {
-          applyAIModeToSections(lines, lineIdx, option);
-        } else {
-          // When setting a chapter to Summary mode, ensure it has a #summary block
-          if (option === 'summary' && lines[lineIdx].level === 1) {
-            ensureChapterSummarySection(lineIdx);
-          }
-          applyAIModeToLine(lines, lineIdx, option);
-        }
-        renderEditor();
-        onContentChange();
-      }
-    };
-
-    window.electronAPI.onAIContextChoice(handler);
-  }, [onContentChange]);
+  // REMOVED: Electron native AI context menu listener
+  // Unified WebMenuBar handles all menu interactions in both Electron and web
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ctrl+S: Save - centralized here so it works in all views
+      // Use capture phase (true) so we intercept before Monaco handles it
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
+        e.stopPropagation();
         console.log('[EDITOR] Ctrl+S intercepted in parent Editor component');
         handleSave();
         return;
       }
 
-      // Ctrl+F: Find - works in all views with the same UI
+      // Ctrl+F: Find
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
-        setIsFindVisible(true);
-        setTimeout(() => {
-          if (findInputRef.current) {
-            findInputRef.current.focus();
-            findInputRef.current.select();
+        e.stopPropagation();
+        
+        // Monaco has built-in find - trigger it
+        if (viewMode === 'monaco') {
+          if (monacoRef.current && window.monaco) {
+            const action = monacoRef.current.getAction('actions.find');
+            action && action.run();
           }
-        }, 0);
-        return;
-      }
-
-      // Escape: Close find box
-      if (e.key === 'Escape') {
-        if (isFindVisible) {
-          setIsFindVisible(false);
-          clearFindHighlight();
+          return;
         }
+        
+        // Array/Textarea: Show our custom FindBar
+        setIsFindVisible(true);
+        return;
+      }
+
+      // Escape: Close find box (Monaco handles its own Escape)
+      if (e.key === 'Escape' && isFindVisible) {
+        setIsFindVisible(false);
         return;
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    // Use capture phase (true) to intercept before Monaco or other components handle it
+    document.addEventListener('keydown', handleKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [isFindVisible, viewMode]);
+  }, [isFindVisible, viewMode, monacoRef]);
 
-  // Auto-highlight current match when index changes (after user types or navigates)
-  useEffect(() => {
-    if (currentFindIndex >= 0 && findMatches.length > 0) {
-      highlightCurrentFindMatch(currentFindIndex);
-    }
-  }, [currentFindIndex, findMatches]);
+  // REMOVED: Auto-highlight effect - now handled by FindBar component
 
   // Keep ref in sync with prop so async callbacks always see latest file path
   useEffect(() => {
     filePathRef.current = currentFilePath || null;
   }, [currentFilePath]);
 
-  const handleNew = () => {
-    if (window.isModified) {
-      if (window.confirm('You have unsaved changes. Continue?')) {
-        setContent('');
-        parseText('');
-        renderEditor();
-        onFileChange(null);
-      }
-    } else {
-      setContent('');
-      parseText('');
-      renderEditor();
-      onFileChange(null);
-    }
-  };
+  // ======================================================================
+  // REMOVED: handleNew, handleOpen, openFile - moved to WebMenuBar + fileOps
+  // File operations no longer live in Editor component
+  // ======================================================================
 
-  const handleOpen = async () => {
-    if (!window.electronAPI) return;
-    
-    // Guard against duplicate open dialogs (e.g. if menu-open fires twice)
-    if (openDialogActiveRef.current) {
-      console.log('[EDITOR] Open dialog already active, ignoring duplicate menu-open');
-      return;
-    }
-
-    openDialogActiveRef.current = true;
-
-    const result = await window.electronAPI.openEncryptedFile();
-
-    openDialogActiveRef.current = false;
-    if (result && result.success) {
-      setContent(result.content);
-      onFileChange(result.filePath);
-      parseText(result.content);
-      renderEditor();
-      localStorage.setItem('lastOpenedFile', result.filePath);
-    }
-  };
-
+  // ======================================================================
+  // STILL CALLED EXTERNALLY via editorRef (WebMenuBar, Electron menus)
+  // WHY: Needs to extract content from active view (array/monaco/textarea)
+  // TODO: Move to shared module once content sync strategy finalized
+  // ======================================================================
+  
   const handleSave = async () => {
     if (!window.electronAPI) return;
     
@@ -321,9 +239,9 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
         const result = await window.electronAPI.saveFile(filePath, textContent);
         if (result && result.success) {
           console.log('[EDITOR] File saved successfully');
-          showStatus('File saved successfully');
           window.isModified = false;
-          onSaveComplete && onSaveComplete();
+          // Dispatch to Redux: Clear modified flag
+          dispatch(setIsModified(false));
 
           // Read back from disk to verify what was written
           try {
@@ -337,11 +255,11 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
           }
         } else {
           console.log('[EDITOR] Save failed:', result?.error);
-          showStatus('Failed to save file: ' + (result?.error || 'Unknown error'));
+          dispatch(showStatusRedux('Failed to save file: ' + (result?.error || 'Unknown error')));
         }
       } catch (error) {
         console.log('[EDITOR] Save error:', error);
-        showStatus('Error saving file: ' + error.message);
+        dispatch(showStatusRedux('Error saving file: ' + error.message));
       }
     } else {
       console.log('[EDITOR] No currentFilePath, calling Save As');
@@ -366,8 +284,12 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
       const result = await window.electronAPI.saveFileAs(textContent);
       console.log('[EDITOR] Save As result:', result);
       if (result && result.success) {
-        console.log('[EDITOR] Calling onFileChange with:', result.filePath);
-        onFileChange(result.filePath);
+        console.log('[EDITOR] Updated file path to:', result.filePath);
+        // CRITICAL: Update filePathRef immediately so subsequent Ctrl+S uses correct path
+        filePathRef.current = result.filePath;
+        // Dispatch to Redux: Update global file path and clear modified flag
+        dispatch(setCurrentFilePath(result.filePath));
+        dispatch(setIsModified(false));
         localStorage.setItem('lastOpenedFile', result.filePath);
         showStatus('File saved successfully');
         window.isModified = false;
@@ -423,11 +345,22 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
     switchToViewMode(modes[nextIndex]);
   };
 
-  // Keep refs updated so parent can always call latest functions
-  switchToViewModeRef.current = switchToViewMode;
-  cycleViewModeRef.current = cycleViewMode;
-
   const foldAll = () => {
+    // CRITICAL: Check view mode FIRST - early return pattern (Common Issues 1d)
+    if (viewMode === 'monaco') {
+      // Monaco has native fold - no need to manipulate lines array
+      if (monacoRef.current && window.monaco) {
+        try {
+          const action = monacoRef.current.getAction('editor.foldAll');
+          action && action.run();
+        } catch (e) {
+          console.warn('[EDITOR] Monaco foldAll action failed:', e);
+        }
+      }
+      return; // Early return - don't do array operations for Monaco
+    }
+    
+    // Array view: manipulate lines array
     const lines = getLines();
     lines.forEach(line => {
       if (line.startIdx !== -1 && line.endIdx >= line.startIdx) {
@@ -437,20 +370,27 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
         }
       }
     });
-    // If currently in Monaco view, also trigger Monaco's built-in foldAll action
-    if (viewMode === 'monaco' && monacoRef.current && window.monaco) {
-      try {
-        const action = monacoRef.current.getAction('editor.foldAll');
-        action && action.run();
-      } catch (e) {
-        console.warn('[EDITOR] Monaco foldAll action failed:', e);
-      }
-    }
     renderEditor();
-    onContentChange();
+    // Dispatch to Redux: Mark as modified
+    dispatch(setIsModified(true));
   };
 
   const unfoldAll = () => {
+    // CRITICAL: Check view mode FIRST - early return pattern (Common Issues 1d)
+    if (viewMode === 'monaco') {
+      // Monaco has native unfold - no need to manipulate lines array
+      if (monacoRef.current && window.monaco) {
+        try {
+          const action = monacoRef.current.getAction('editor.unfoldAll');
+          action && action.run();
+        } catch (e) {
+          console.warn('[EDITOR] Monaco unfoldAll action failed:', e);
+        }
+      }
+      return; // Early return - don't do array operations for Monaco
+    }
+    
+    // Array view: manipulate lines array
     const lines = getLines();
     lines.forEach(line => {
       if (line.startIdx !== -1) {
@@ -458,22 +398,16 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
         line.text = line.text.replace(/#folded\b/gi, '').trim();
       }
     });
-    // If currently in Monaco view, also trigger Monaco's built-in unfoldAll action
-    if (viewMode === 'monaco' && monacoRef.current && window.monaco) {
-      try {
-        const action = monacoRef.current.getAction('editor.unfoldAll');
-        action && action.run();
-      } catch (e) {
-        console.warn('[EDITOR] Monaco unfoldAll action failed:', e);
-      }
-    }
     renderEditor();
-    onContentChange();
+    // Dispatch to Redux: Mark as modified
+    dispatch(setIsModified(true));
   };
 
   const renderEditor = () => {
     setRenderTrigger(prev => prev + 1);
   };
+
+  // REMOVED: All ref assignments - no longer needed without Electron native menu
 
   const getVisibleLines = () => {
     const lines = getLines();
@@ -724,7 +658,8 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
     const currentText2 = getTextFromLines();
     updateLinesFromText(currentText2);
     renderEditor();
-    onContentChange();
+    // Dispatch to Redux: Mark as modified
+    dispatch(setIsModified(true));
     
     // Focus new line and set cursor at start
     setTimeout(() => {
@@ -762,7 +697,8 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
     const currentText2 = getTextFromLines();
     updateLinesFromText(currentText2);
     renderEditor();
-    onContentChange();
+    // Dispatch to Redux: Mark as modified
+    dispatch(setIsModified(true));
     
     // Focus previous line and set cursor at merge position
     setTimeout(() => {
@@ -870,7 +806,8 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
       const newText = textLines.join('\n');
       updateLinesFromText(newText);
       renderEditor();
-      onContentChange();
+      // Dispatch to Redux: Mark as modified
+      dispatch(setIsModified(true));
     }
 
   };
@@ -886,11 +823,6 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
         level: line.level,
         isOpen: line.open
       });
-      return;
-    }
-    // If no Electron bridge is available, do nothing (DOM menu is disabled in favor of native OS menu).
-  };
-
   const isLineHidden = (lineIdx) => {
     const lines = getLines();
     for (let j = lineIdx - 1; j >= 0; j--) {
@@ -914,375 +846,45 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
     lines[idx].text = text;
 
     renderEditor();
-    onContentChange();
+    // Dispatch to Redux: Mark as modified
+    dispatch(setIsModified(true));
   };
 
   const handleLineEdit = (idx, newText) => {
     const lines = getLines();
     if (lines[idx]) {
       lines[idx].text = newText;
-      onContentChange();
+      // Dispatch to Redux: Mark as modified
+      dispatch(setIsModified(true));
     }
   };
 
+  // WHAT: Shows temporary status message to user
+  // WHY HERE: Helper to dispatch status message to Redux
+  // HOW IT WORKS: Dispatches to statusSlice → StatusBar component displays → auto-clears after 3s
+  // REPLACES: Old DOM manipulation (document.getElementById('status').textContent)
+  // USAGE: showStatus('File saved successfully') or showStatus('Error: ' + error.message)
   const showStatus = (message) => {
-    const statusBar = document.getElementById('status');
-    if (statusBar) {
-      statusBar.textContent = message;
-      setTimeout(() => {
-        statusBar.textContent = '';
-      }, 3000);
-    }
+    dispatch(showStatusRedux(message));
   };
 
-  const clearFindHighlight = () => {
-    const container = editorRef.current;
-    if (!container) return;
-
-    const highlights = container.querySelectorAll('.find-highlight, .find-highlight-current');
-    highlights.forEach(el => {
-      const parent = el.parentNode;
-      if (!parent) return;
-      parent.replaceChild(document.createTextNode(el.textContent), el);
-      parent.normalize();
-    });
-  };
-
-  const recomputeFindMatches = (query) => {
-    // Always start by clearing previous highlights so we work from plain text
-    clearFindHighlight();
-
-    if (!query) {
-      setFindMatches([]);
-      setCurrentFindIndex(-1);
-      return;
-    }
-
-    // Handle textarea view
-    if (viewMode === 'textarea') {
-      if (!textareaRef.current) {
-        setFindMatches([]);
-        setCurrentFindIndex(-1);
-        return;
-      }
-
-      const text = textareaRef.current.value || '';
-      const lowerText = text.toLowerCase();
-      const lowerQuery = query.toLowerCase();
-      const matches = [];
-      
-      let startIndex = 0;
-      while ((startIndex = lowerText.indexOf(lowerQuery, startIndex)) !== -1) {
-        matches.push({
-          startIndex,
-          endIndex: startIndex + query.length
-        });
-        startIndex += query.length;
-      }
-
-      setFindMatches(matches);
-      if (matches.length > 0) {
-        setCurrentFindIndex(0);
-      } else {
-        setCurrentFindIndex(-1);
-      }
-      return;
-    }
-
-    // Handle monaco view - use Monaco's built-in find
-    if (viewMode === 'monaco') {
-      if (!monacoRef.current) {
-        setFindMatches([]);
-        setCurrentFindIndex(-1);
-        return;
-      }
-
-      const model = monacoRef.current.getModel();
-      if (!model) {
-        setFindMatches([]);
-        setCurrentFindIndex(-1);
-        return;
-      }
-
-      const matches = model.findMatches(query, false, false, false, null, true);
-      setFindMatches(matches || []);
-      if (matches && matches.length > 0) {
-        setCurrentFindIndex(0);
-      } else {
-        setCurrentFindIndex(-1);
-      }
-      return;
-    }
-
-    // Handle array view
-    const container = editorRef.current;
-    if (!container) {
-      setFindMatches([]);
-      setCurrentFindIndex(-1);
-      return;
-    }
-
-    const q = query.toLowerCase();
-    const matches = [];
-
-    const lineContents = container.querySelectorAll('.line-content');
-    lineContents.forEach((lineContent, index) => {
-      const lineElement = lineContent.closest('.editor-line');
-      const lineIndex = parseInt(lineElement?.getAttribute('data-idx'), 10) || index;
-
-      searchInElement(lineContent, lineIndex, 'content');
-
-      if (isArrayView) {
-        const lineContainer = lineContent.closest('.array-line-container');
-        if (lineContainer) {
-          const gutter = lineContainer.querySelector('.array-index-gutter');
-          const idBox = lineContainer.querySelector('.array-id-box');
-          if (gutter) searchInElement(gutter, lineIndex, 'line-number');
-          if (idBox) searchInElement(idBox, lineIndex, 'id');
-        }
-      }
-    });
-
-    function searchInElement(element, lineIndex, type) {
-      const text = element.textContent || '';
-      const lowerText = text.toLowerCase();
-      const lowerQuery = q;
-      let startIndex = 0;
-      while ((startIndex = lowerText.indexOf(lowerQuery, startIndex)) !== -1) {
-        matches.push({
-          element,
-          lineIndex,
-          startIndex,
-          endIndex: startIndex + query.length,
-          type
-        });
-        startIndex += query.length;
-      }
-    }
-
-    // Highlight all matches by wrapping them in span elements
-    highlightAllMatches(matches, container);
-
-    setFindMatches(matches);
-    if (matches.length > 0) {
-      setCurrentFindIndex(0);
-    } else {
-      setCurrentFindIndex(-1);
-    }
-  };
-
-  const highlightCurrentFindMatch = (index) => {
-    if (findMatches.length === 0 || index < 0 || index >= findMatches.length) {
-      return;
-    }
-
-    // Handle textarea view
-    if (viewMode === 'textarea') {
-      if (!textareaRef.current) return;
-      const match = findMatches[index];
-      
-      const shouldFocus = document.activeElement !== findInputRef.current;
-      if (shouldFocus) {
-        textareaRef.current.focus();
-      }
-      
-      textareaRef.current.setSelectionRange(match.startIndex, match.endIndex);
-      
-      requestAnimationFrame(() => {
-        if (!textareaRef.current) return;
-        const text = textareaRef.current.value.substring(0, match.startIndex);
-        const lineNumber = (text.match(/\n/g) || []).length;
-        const lineHeight = parseFloat(getComputedStyle(textareaRef.current).lineHeight) || 28.8;
-        const matchTopPosition = lineNumber * lineHeight;
-        const viewportHeight = textareaRef.current.clientHeight;
-        const scrollPosition = matchTopPosition - (viewportHeight / 2) + (lineHeight / 2);
-        textareaRef.current.scrollTop = Math.max(0, scrollPosition);
-      });
-      return;
-    }
-
-    // Handle monaco view
-    if (viewMode === 'monaco') {
-      if (!monacoRef.current || !findMatches[index]) return;
-      const match = findMatches[index];
-      if (match.range) {
-        monacoRef.current.setSelection(match.range);
-        monacoRef.current.revealRangeInCenter(match.range);
-      }
-      return;
-    }
-
-    // Handle array view
-    const container = editorRef.current;
-    if (!container) return;
-
-    // Reset previous "current" highlight
-    container.querySelectorAll('.find-highlight-current').forEach(el => {
-      el.classList.remove('find-highlight-current');
-      el.classList.add('find-highlight');
-    });
-
-    const highlight = container.querySelector(`[data-find-index="${index}"]`);
-    if (highlight) {
-      highlight.classList.remove('find-highlight');
-      highlight.classList.add('find-highlight-current');
-      const containerEl = highlight.closest('.array-line-container, .editor-line') || highlight;
-      containerEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  };
-
-  const highlightAllMatches = (matches, container) => {
-    const matchesByElement = new Map();
-
-    matches.forEach((match, index) => {
-      if (!matchesByElement.has(match.element)) {
-        matchesByElement.set(match.element, []);
-      }
-      matchesByElement.get(match.element).push({ ...match, globalIndex: index });
-    });
-
-    matchesByElement.forEach((elementMatches, element) => {
-      if (!container.contains(element)) return;
-
-      const text = element.textContent || '';
-      const fragments = [];
-      let lastIndex = 0;
-
-      elementMatches.sort((a, b) => a.startIndex - b.startIndex);
-
-      elementMatches.forEach(match => {
-        if (match.startIndex > lastIndex) {
-          fragments.push(document.createTextNode(text.substring(lastIndex, match.startIndex)));
-        }
-
-        const highlight = document.createElement('span');
-        highlight.className = 'find-highlight';
-        highlight.textContent = text.substring(match.startIndex, match.endIndex);
-        highlight.dataset.findIndex = match.globalIndex;
-        if (match.type) {
-          highlight.classList.add(`find-${match.type}`);
-        }
-
-        fragments.push(highlight);
-        lastIndex = match.endIndex;
-      });
-
-      if (lastIndex < text.length) {
-        fragments.push(document.createTextNode(text.substring(lastIndex)));
-      }
-
-      element.innerHTML = '';
-      fragments.forEach(fragment => element.appendChild(fragment));
-    });
-  };
-
-  useEffect(() => {
-    if (!isFindVisible || !findQuery) {
-      clearFindHighlight();
-      return;
-    }
-    recomputeFindMatches(findQuery);
-    // We intentionally depend only on renderTrigger so eslint warning is acceptable here
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [renderTrigger]);
-
-  useEffect(() => {
-    if (!isFindVisible || findMatches.length === 0) {
-      clearFindHighlight();
-      return;
-    }
-    if (currentFindIndex >= 0 && currentFindIndex < findMatches.length) {
-      highlightCurrentFindMatch(currentFindIndex);
-    }
-  }, [currentFindIndex, findMatches, isFindVisible]);
-
-  const handleFindInputChange = (e) => {
-    const value = e.target.value;
-    setFindQuery(value);
-    
-    // Debounce search in array view to improve performance
-    if (viewMode === 'array') {
-      // Clear previous timeout
-      if (window.findDebounceTimeout) {
-        clearTimeout(window.findDebounceTimeout);
-      }
-      // Set new timeout - search after 150ms of no typing
-      window.findDebounceTimeout = setTimeout(() => {
-        recomputeFindMatches(value);
-      }, 150);
-    } else {
-      // In textarea view, search immediately (it's fast)
-      recomputeFindMatches(value);
-    }
-  };
-
-  const handleFindNext = () => {
-    if (findMatches.length === 0) return;
-    setCurrentFindIndex(prev => {
-      let next = prev + 1;
-      if (next >= findMatches.length) {
-        next = 0;
-      }
-      return next;
-      // Highlighting happens automatically in useEffect
-    });
-  };
-
-  const handleFindPrevious = () => {
-    if (findMatches.length === 0) return;
-    setCurrentFindIndex(prev => {
-      let next = prev - 1;
-      if (next < 0) {
-        next = findMatches.length - 1;
-      }
-      return next;
-      // Highlighting happens automatically in useEffect
-    });
-  };
-
-  const handleFindClose = () => {
-    setIsFindVisible(false);
-    clearFindHighlight();
-  };
+  // ======================================================================
+  // REMOVED: ~300 lines of find-related functions moved to FindBar component
+  // See src/components/FindBar/FindBar.js for all find functionality
+  // ======================================================================
 
   return (
     <>
-      {isFindVisible && (
-        <div className="find-box">
-          <input
-            ref={findInputRef}
-            type="text"
-            className="find-input"
-            value={findQuery}
-            onChange={handleFindInputChange}
-            placeholder="Find..."
-          />
-          <div className="find-counter">
-            {findMatches.length === 0
-              ? 'No results'
-              : `${currentFindIndex + 1} of ${findMatches.length}`}
-          </div>
-          <button
-            className="find-btn"
-            onClick={handleFindPrevious}
-            disabled={findMatches.length === 0}
-          >
-            ↑
-          </button>
-          <button
-            className="find-btn"
-            onClick={handleFindNext}
-            disabled={findMatches.length === 0}
-          >
-            ↓
-          </button>
-          <button
-            className="find-btn find-close-btn"
-            onClick={handleFindClose}
-          >
-            ×
-          </button>
-        </div>
+      {/* FindBar: Only shown for array/textarea views. Monaco has built-in Ctrl+F */}
+      {isFindVisible && viewMode !== 'monaco' && (
+        <FindBar
+          viewMode={viewMode}
+          editorRef={editorRef}
+          textareaRef={textareaRef}
+          renderTrigger={renderTrigger}
+          onClose={() => setIsFindVisible(false)}
+          isArrayView={isArrayView}
+        />
       )}
       {viewMode === 'array' && (
         <FoldEditorView
@@ -1290,7 +892,7 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
           visibleLines={getVisibleLines()}
           isArrayView={isArrayView}
           onToggleFold={toggleFold}
-          onContentChange={onContentChange}
+          onContentChange={() => dispatch(setIsModified(true))}
           onRenderEditor={renderEditor}
           currentChangeId={allChangeIds[currentChangeIdIndex]}
           onShowAIContextMenu={showAIContextMenu}
@@ -1302,12 +904,10 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
           monacoRef={monacoRef}
           content={content}
           onContentChange={(newContent) => {
-            // Keep local content state in sync for save operations
-            setContent(newContent);
-            // Update editorEngine lines so Array view sees latest text
-            updateLinesFromText(newContent);
-            // Notify parent (App) so Redux isModified flag stays accurate
-            onContentChange();
+            if (newContent !== null) {
+              setContent(newContent);
+            }
+            dispatch(setIsModified(true));
           }}
         />
       )}
@@ -1317,7 +917,7 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
           content={content}
           onContentChange={(newContent) => {
             setContent(newContent);
-            onContentChange();
+            dispatch(setIsModified(true));
           }}
           placeholder="Start typing or use File menu to open a file..."
         />
@@ -1325,5 +925,3 @@ function Editor({ onFileChange, onContentChange, onSaveComplete, onEditorReady }
     </>
   );
 }
-
-export default memo(Editor);

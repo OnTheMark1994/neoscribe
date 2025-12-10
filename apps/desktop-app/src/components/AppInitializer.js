@@ -9,10 +9,13 @@ import {
   setShowPreviewBar,
   setEditorViewMode,
 } from '../store/settingsSlice';
+import { fileOpened } from '../store/editorSlice';
 import { setLoadingVisible, openUnsavedDialog } from '../store/uiSlice';
 import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData } from '../utils/aiService';
 import { isElectron, isWeb, getWebAnonId } from '../utils/environment';
 import { setBackground, loadSavedBackground } from '../utils/backgroundHelper';
+import * as fileOps from '../utils/fileOps';
+import { parseText } from '../utils/editorEngine';
 
 /**
  * AppInitializer - Handles ALL initialization logic in one place
@@ -82,6 +85,26 @@ function AppInitializer() {
       dispatch(setAnonId(webAnonId));
       // Web mode has no deviceId
       dispatch(setDeviceId(undefined));
+    }
+
+    // Load last opened file (Electron only)
+    const lastFile = localStorage.getItem('lastOpenedFile');
+    if (lastFile && isElectron()) {
+      fileOps.openFileByPath(lastFile)
+        .then(result => {
+          if (result && result.success) {
+            console.log('[INIT] Loaded last file:', result.filePath);
+            dispatch(fileOpened({ filePath: result.filePath, content: result.content }));
+            parseText(result.content); // Initialize editorEngine for array view
+          } else {
+            console.log('[INIT] Failed to load last file');
+            localStorage.removeItem('lastOpenedFile');
+          }
+        })
+        .catch(err => {
+          console.log('[INIT] Could not load last file:', err);
+          localStorage.removeItem('lastOpenedFile');
+        });
     }
 
     // Hide loading screen after initial setup

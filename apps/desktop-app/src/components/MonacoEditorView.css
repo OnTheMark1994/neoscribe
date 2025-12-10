@@ -13,10 +13,22 @@
   background-color: transparent !important;
 }
 
+/* Remove box/border highlight around the active line */
+.monaco-editor .view-overlays .current-line,
+.monaco-editor .margin .current-line-margin {
+  border: none !important;
+  background-color: transparent !important;
+}
+
 /* Sticky scroll header at the top (shows current chapter/section) */
 .monaco-editor-container .monaco-editor .sticky-widget {
   background-color: rgba(255, 255, 255, 0.9) !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Adjust Ctrl+F (find) bar position to be nearly centered */
+.monaco-editor-container .monaco-editor .find-widget {
+  margin-right: calc(50% - 230px);
 }
 
 /* AI eye icon in glyph margin - Monaco applies class directly to glyph element */
@@ -36,17 +48,16 @@
   cursor: pointer !important;
 }
 
-/* Chapter line decoration - pink left border */
+/* Chapter line decoration - larger, bold text (no colored box) */
 .monaco-editor .chapter-line-decoration {
-  background-color: rgba(255, 121, 198, 0.1);
-  border-left: 3px solid #FF79C6;
+  font-weight: 700;
+  font-size: 1.18em;
 }
 
-/* Section line decoration - cyan left border */
+/* Section line decoration - slightly larger, bold text */
 .monaco-editor .section-line-decoration {
-  background-color: rgba(139, 233, 253, 0.08);
-  border-left: 3px solid #8BE9FD;
-  margin-left: 20px;
+  font-weight: 700;
+  font-size: 1.10em;
 }
 
 /* (No custom Monaco context menu styling here; Monaco uses the native OS menu for AI options) */
@@ -61,4 +72,27 @@
 .indent-level-2::before {
   content: "            ";  /* 12 spaces for level 2 (under section) */
   white-space: pre;
+}
+
+/* Remove focus/outline box around Monaco's internal native edit context */
+.monaco-editor .native-edit-context,
+.monaco-editor .native-edit-context:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Chapter / Section line styling in SimpleMonaco */
+.monaco-editor .monaco-chapter-line {
+  color: #000000 !important; /* black text */
+}
+
+.monaco-editor .monaco-section-line {
+  color: #000000 !important; /* black text */
+}
+
+/* When text is folded inline, show it as blue text with no background */
+.monaco-editor .inline-folded {
+  /* color: #3b82f6 !important; blue */
+  background-color: transparent !important;
 }

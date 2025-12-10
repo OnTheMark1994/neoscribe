@@ -6,7 +6,7 @@ import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from './RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
 import { selectAnonId, selectAuthId, selectDeviceId, selectUserData, setAuthId as setReduxAuthId } from '../store/userSlice';
-import { setBackgroundImage, selectShowPreviewBar, selectShowMonacoLineNumbers, setShowPreviewBar, setShowMonacoLineNumbers } from '../store/settingsSlice';
+import { setBackgroundImage, selectShowPreviewBar, selectShowMonacoLineNumbers, selectMonacoStickyTopBar, setShowPreviewBar, setShowMonacoLineNumbers, setMonacoStickyTopBar } from '../store/settingsSlice';
 import { setBackground } from '../utils/backgroundHelper';
 
 /**
@@ -30,7 +30,7 @@ function Settings({ onClose, initialTab = 'general' }) {
   const [aiService, setAiService] = useState('deepseek-server');
   const [apiKeys, setApiKeys] = useState({});
   const [authId, setAuthId] = useState(null);
-  const [developerMode, setDeveloperMode] = useState(true);
+  const [developerMode, setDeveloperMode] = useState(false);
   const [tokenCount, setTokenCount] = useState(0);
   const [tokenStats, setTokenStats] = useState(null);
   const [accountData, setAccountData] = useState(null);
@@ -41,6 +41,7 @@ function Settings({ onClose, initialTab = 'general' }) {
   const [developerToolsStatus, setDeveloperToolsStatus] = useState('');
   const showPreviewBar = useSelector(selectShowPreviewBar);
   const showMonacoLineNumbers = useSelector(selectShowMonacoLineNumbers);
+  const monacoStickyTopBar = useSelector(selectMonacoStickyTopBar);
   const [editorViewMode, setEditorViewMode] = useState(() => {
     const saved = localStorage.getItem('editorViewMode');
     if (saved === 'fold') return 'array'; // migrate old value
@@ -65,7 +66,7 @@ function Settings({ onClose, initialTab = 'general' }) {
     setAuthId(authIdFromRedux || savedAuthId);
 
     const savedDeveloperMode = localStorage.getItem('developerMode');
-    setDeveloperMode(savedDeveloperMode === null ? true : savedDeveloperMode === 'true');
+    setDeveloperMode(savedDeveloperMode === null ? false : savedDeveloperMode === 'true');
 
     // Load theme list
     if (window.electronAPI && window.electronAPI.getThemeList) {
@@ -442,6 +443,32 @@ function Settings({ onClose, initialTab = 'general' }) {
                 {editorViewMode === 'array' && 'Array view: Line-by-line editing with folding support'}
                 {editorViewMode === 'monaco' && 'Monaco view: VS Code-style editor with syntax highlighting'}
                 {editorViewMode === 'textarea' && 'Textarea view: Simple plain text editing'}
+              </p>
+            </div>
+          </div>
+
+          <div className="setting-section">
+            <h2>Monaco Sticky Top Bar</h2>
+            <div className="setting-item">
+              <div className="toggle-container">
+                <label>Show Sticky Top Bar (Monaco)</label>
+                <div
+                  className={`toggle-switch ${monacoStickyTopBar ? 'active' : ''}`}
+                  onClick={() => {
+                    const next = !monacoStickyTopBar;
+                    dispatch(setMonacoStickyTopBar(next));
+                    if (window.electronAPI && window.electronAPI.settingsSaved) {
+                      window.electronAPI.settingsSaved({ monacoStickyTopBar: next });
+                    }
+                  }}
+                >
+                  <div className="toggle-slider"></div>
+                </div>
+              </div>
+              <p className="setting-hint">
+                {monacoStickyTopBar
+                  ? 'Monaco view pins the current chapter/section header at the top while scrolling.'
+                  : 'Monaco view scrolls normally without a sticky top bar.'}
               </p>
             </div>
           </div>

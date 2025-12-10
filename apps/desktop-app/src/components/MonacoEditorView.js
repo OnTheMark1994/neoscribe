@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import Editor from '@monaco-editor/react';
-import { selectShowPreviewBar, selectShowMonacoLineNumbers, selectIsAIEnabled } from '../store/settingsSlice';
+import { selectShowPreviewBar, selectShowMonacoLineNumbers, selectMonacoStickyTopBar, selectIsAIEnabled } from '../store/settingsSlice';
 import './MonacoEditorView.css';
 
 /**
@@ -19,10 +19,12 @@ import './MonacoEditorView.css';
 function MonacoEditorView({ monacoRef, content, onContentChange }) {
   const foldingProviderRef = useRef(null);
   const decorationsRef = useRef([]);
+  const decorationsTimeoutRef = useRef(null);
   
   // Read from Redux instead of localStorage
   const showPreviewBar = useSelector(selectShowPreviewBar);
   const showLineNumbers = useSelector(selectShowMonacoLineNumbers);
+  const monacoStickyTopBar = useSelector(selectMonacoStickyTopBar);
   const isAIEnabled = useSelector(selectIsAIEnabled);
 
   // Update decorations when content changes
@@ -183,20 +185,27 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
         }
       });
 
-      // Define custom theme with transparent background
+      // Define custom theme with transparent background and neutral chapter/section styling
       monaco.editor.defineTheme('scribefold-dark', {
         base: 'vs-dark',
         inherit: true,
         rules: [
-          { token: 'keyword.chapter', foreground: 'FF79C6', fontStyle: 'bold' },
-          { token: 'keyword.section', foreground: '8BE9FD', fontStyle: 'bold' },
-          { token: 'keyword.summary', foreground: 'BD93F9', fontStyle: 'italic' },
+          // Chapter and section: bold, neutral color (actual size handled via CSS decorations)
+          { token: 'keyword.chapter', foreground: '000000', fontStyle: 'bold' },
+          { token: 'keyword.section', foreground: '000000', fontStyle: 'bold' },
+          { token: 'keyword.summary', foreground: '000000', fontStyle: 'italic' },
           { token: 'comment.folded', foreground: '6272A4', fontStyle: 'italic' },
-          { token: 'comment.ai', foreground: '50FA7B', fontStyle: 'italic' },
+          { token: 'comment.ai', foreground: '6272A4', fontStyle: 'italic' },
         ],
         colors: {
           'editor.background': '#00000000',
           'editorGutter.background': '#00000000',
+          // Remove focused line and occurrence highlight boxes
+          'editor.lineHighlightBackground': '#00000000',
+          'editor.lineHighlightBorder': '#00000000',
+          'editor.wordHighlightBackground': '#00000000',
+          'editor.wordHighlightStrongBackground': '#00000000',
+          'editor.selectionHighlightBackground': '#00000000',
         }
       });
 
@@ -210,6 +219,9 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
         indentation: true,
         highlightActiveIndentation: true,
       },
+      // Turn off occurrences/selection highlight boxes
+      selectionHighlight: false,
+      occurrencesHighlight: false,
     });
 
     // Inject runtime CSS so Monaco glyph margin eyes use the same PNG icons
@@ -257,11 +269,19 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
       updateDecorations(editor, monaco);
     };
 
-    // Set up change listener
+    // Set up change listener - debounce expensive operations
     editor.onDidChangeModelContent(() => {
-      const value = editor.getValue();
-      onContentChange(value);
-      updateDecorations(editor, monaco);
+      // Notify parent that content changed (for modified flag)
+      // Don't pass full value on every keystroke - parent can get it from monacoRef when needed
+      onContentChange(null);
+      
+      // Debounce decorations update - no need to run on every keystroke
+      if (decorationsTimeoutRef.current) {
+        clearTimeout(decorationsTimeoutRef.current);
+      }
+      decorationsTimeoutRef.current = setTimeout(() => {
+        updateDecorations(editor, monaco);
+      }, 800);
     });
 
     // Toggle AI visibility when clicking in the glyph margin on chapter/section lines
@@ -295,12 +315,15 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
     updateDecorations(editor, monaco);
   };
 
-  // Cleanup folding provider on unmount
+  // Cleanup folding provider and debounce timer on unmount
   useEffect(() => {
     return () => {
       if (foldingProviderRef.current) {
         foldingProviderRef.current.dispose();
         foldingProviderRef.current = null;
+      }
+      if (decorationsTimeoutRef.current) {
+        clearTimeout(decorationsTimeoutRef.current);
       }
     };
   }, []);
@@ -317,6 +340,7 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
           minimap: { enabled: showPreviewBar },
           fontSize: 14,
           lineNumbers: showLineNumbers ? 'on' : 'off',
+          stickyScroll: { enabled: monacoStickyTopBar },
           wordWrap: 'on',
           automaticLayout: true,
           scrollBeyondLastLine: false,
@@ -327,6 +351,15 @@ function MonacoEditorView({ monacoRef, content, onContentChange }) {
           foldingHighlight: true,
           showFoldingControls: 'always',
           glyphMargin: true,
+          quickSuggestions: false,
+          suggestOnTriggerCharacters: false,
+          wordBasedSuggestions: 'off',
+          parameterHints: { enabled: false },
+          acceptSuggestionOnEnter: 'off',
+          tabCompletion: 'off',
+          inlineSuggest: { enabled: false },
+          lightbulb: { enabled: false },
+          snippetSuggestions: 'none',
         }}
       />
     </div>

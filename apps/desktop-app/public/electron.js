@@ -6,12 +6,16 @@ const crypto = require('crypto');
 const isDev = require('electron-is-dev');
 const { machineIdSync } = require('node-machine-id');
 
-// Disable cache and GPU BEFORE anything else
-app.commandLine.appendSwitch('disable-http-cache');
-app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-gpu-compositing');
-app.commandLine.appendSwitch('disable-software-rasterizer');
-app.commandLine.appendSwitch('disable-gpu-sandbox');
+// NOTE: GPU acceleration is ENABLED for performance
+// Only disable cache in dev mode to ensure fresh reloads
+if (isDev) {
+  app.commandLine.appendSwitch('disable-http-cache');
+}
+
+// Hint Chromium to use modern GPU rendering paths
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blacklist');
 
 // Initialize electron-store
 const userDataPath = app.getPath('userData');
@@ -94,8 +98,10 @@ function createWindow() {
   
   mainWindow.loadURL(startUrl);
 
-  // DevTools will be opened by renderer if developerMode is enabled
-  // Don't open automatically here since developerMode is stored in localStorage (renderer)
+  // Auto-open DevTools in dev mode
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  }
 
   // Initialize anon_id and device_id
   anonId = getOrCreateAnonId();

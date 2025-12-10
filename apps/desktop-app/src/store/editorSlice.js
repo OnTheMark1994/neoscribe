@@ -1,55 +1,132 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 /**
- * editorSlice - Manages editor-wide state
+ * editorSlice - Redux slice for editor global state
  * 
- * Purpose: Centralize editor state that was previously scattered across App.js and Editor.js
- * This eliminates prop drilling for currentFilePath, isModified, viewMode, etc.
+ * PURPOSE: Manages state that multiple components need to read:
+ *   - currentFilePath: For window title (App), menu state (WebMenuBar), display (Editor)
+ *   - isModified: For window title "*" (App), save warnings (App), menu state (WebMenuBar)
+ *   - viewMode: For settings persistence (future)
+ *   - isArrayView: Legacy debug toggle
  * 
- * Note: Document content is NOT stored here for performance reasons.
- * Content lives in editorEngine.js (lines array) and local component state.
- * Redux dispatch on every keystroke would be a performance problem.
+ * WHY REDUX: These values are read by multiple components across the tree
+ * WHY NOT REDUX: Document content (too large, performance issue to dispatch on every keystroke)
+ * 
+ * PERSISTENCE: 
+ *   - currentFilePath: Also saved to localStorage 'lastOpenedFile' by Editor.js (manual sync)
+ *   - viewMode: Also saved to localStorage by Editor.js (manual sync)
+ *   - Pattern: Editor dispatches to Redux AND manually saves to localStorage
+ *   - On startup: Editor reads localStorage, dispatches to Redux
+ * 
+ * WHO UPDATES:
+ *   - Editor.js: All file operations (open, save, new) update currentFilePath and isModified
+ *   - Editor.js: View mode switches update viewMode
+ *   - Components NEVER update via callbacks - they import useDispatch and dispatch directly
  */
 
 const initialState = {
-  currentFilePath: null,        // Path of currently open file
-  isModified: false,            // Document has unsaved changes
-  viewMode: 'array',            // 'array' | 'monaco' | 'textarea'
-  isArrayView: true,            // Array view style toggle
+  // WHAT: Absolute path to currently open file (e.g., "C:\\Users\\...\\file.txt") or null if no file
+  // UPDATED BY: fileOps + WebMenuBar when file opened/saved/closed
+  // READ BY: App (for title), WebMenuBar (for menu state), Editor (for display)
+  // PERSISTENCE: Also in localStorage 'lastOpenedFile' (synced manually)
+  currentFilePath: null,
+  
+  // WHAT: Document content (text)
+  // UPDATED BY: ONLY on file operations (open, new), NOT on every keystroke
+  // READ BY: Editor/EditorNew for initial render
+  // WHY NOT UPDATE ON KEYSTROKE: Performance - local state handles typing, sync to Redux only on file ops
+  content: '',
+  
+  // WHAT: Boolean indicating if document has unsaved changes
+  // UPDATED BY: Editor/EditorNew on any content change or save
+  // READ BY: App (for title "*" and beforeunload warning), WebMenuBar (for menu state)
+  isModified: false,
+  
+  // WHAT: Current editor view mode
+  // VALUES: 'array' (fold view), 'monaco' (code editor), 'textarea' (plain text)
+  // UPDATED BY: Editor when user switches views
+  // READ BY: Editor (for rendering), potentially Settings in future
+  viewMode: 'array',
+  
+  // WHAT: Legacy debug toggle for array view styling
+  // TODO: Evaluate if still needed, possibly remove
+  isArrayView: true,
+
+  // WHAT: Triggers for editor actions that can't live in Redux directly
+  // HOW: Components increment these counters; editors watch with useEffect.
+  foldAllTrigger: 0,
+  unfoldAllTrigger: 0,
+  saveTrigger: 0,
 };
 
 const editorSlice = createSlice({
   name: 'editor',
   initialState,
   reducers: {
+    // WHAT: Updates the file path of currently open file
+    // WHEN: Called by Editor after file opened, saved-as, or closed (null)
+    // SIDE EFFECTS: None (pure Redux state update)
+    // NOTE: Editor also manually updates localStorage 'lastOpenedFile' after dispatching this
     setCurrentFilePath(state, action) {
       state.currentFilePath = action.payload || null;
     },
+    
+    // WHAT: Updates the modified flag indicating unsaved changes
+    // WHEN: Called by Editor on content changes (true) or after save (false)
+    // SIDE EFFECTS: Sets window.isModified for backwards compatibility with Electron beforeunload
+    // TODO: Remove window.isModified, use Redux selector everywhere
     setIsModified(state, action) {
       state.isModified = !!action.payload;
-      // Also expose to window for Electron's beforeunload checks
+      // ❌ BAD: Global variable pollution, should use Redux selector instead
+      // Kept for backwards compatibility with existing Electron code
       if (typeof window !== 'undefined') {
         window.isModified = state.isModified;
       }
     },
+    // WHAT: Updates the view mode
+    // WHEN: Called by Editor when user switches between array/monaco/textarea views
+    // VALIDATION: Only accepts valid mode strings, ignores invalid values
     setViewMode(state, action) {
       const mode = action.payload;
       if (mode === 'array' || mode === 'monaco' || mode === 'textarea') {
         state.viewMode = mode;
       }
     },
+    
+    // WHAT: Toggles array view styling (legacy debug feature)
+    // TODO: Evaluate if still needed
     setIsArrayView(state, action) {
       state.isArrayView = !!action.payload;
     },
+    
+    // WHAT: Resets editor to clean state (no file open, no changes)
+    // WHEN: Used for "New" operation
+    // NOTE: Preserves viewMode as user preference
     resetEditor(state) {
       state.currentFilePath = null;
+      state.content = '';
       state.isModified = false;
       // Keep viewMode and isArrayView as user preference
     },
-    // Combined action for file open/new operations
+
+    // WHAT: Bump fold/unfold/save triggers so editors can react via useEffect
+    bumpFoldAllTrigger(state) {
+      state.foldAllTrigger += 1;
+    },
+    bumpUnfoldAllTrigger(state) {
+      state.unfoldAllTrigger += 1;
+    },
+    bumpSaveTrigger(state) {
+      state.saveTrigger += 1;
+    },
+    
+    // WHAT: Combined action for file open/new operations
+    // WHY: Atomically updates filePath, content, and isModified in one dispatch
+    // WHEN: Called by WebMenuBar after fileOps.openFile() succeeds
     fileOpened(state, action) {
-      const { filePath } = action.payload || {};
+      const { filePath, content } = action.payload || {};
       state.currentFilePath = filePath || null;
+      state.content = content || '';
       state.isModified = false;
     },
   },
@@ -61,13 +138,34 @@ export const {
   setViewMode,
   setIsArrayView,
   resetEditor,
+  bumpFoldAllTrigger,
+  bumpUnfoldAllTrigger,
+  bumpSaveTrigger,
   fileOpened,
 } = editorSlice.actions;
 
-// Selectors
+// Selectors - Functions to read specific slices of state
+// WHY: Encapsulates state shape, if we reorganize Redux structure, only update selectors
+// USAGE: const filePath = useSelector(selectCurrentFilePath);
+
+// Returns currently open file path (absolute path string or null)
 export const selectCurrentFilePath = (state) => state.editor.currentFilePath;
+
+// Returns boolean indicating if document has unsaved changes
 export const selectIsModified = (state) => state.editor.isModified;
+
+// Returns current view mode string: 'array', 'monaco', or 'textarea'
 export const selectViewMode = (state) => state.editor.viewMode;
+
+// Returns boolean for array view styling (legacy)
 export const selectIsArrayView = (state) => state.editor.isArrayView;
+
+// Returns current document content
+export const selectContent = (state) => state.editor.content;
+
+// Returns action triggers
+export const selectFoldAllTrigger = (state) => state.editor.foldAllTrigger;
+export const selectUnfoldAllTrigger = (state) => state.editor.unfoldAllTrigger;
+export const selectSaveTrigger = (state) => state.editor.saveTrigger;
 
 export default editorSlice.reducer;

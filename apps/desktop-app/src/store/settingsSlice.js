@@ -47,10 +47,11 @@ const setStorageItem = (key, value) => {
 
 const initialState = {
   isAIEnabled: true,              // AI sidebar enabled
-  developerMode: true,            // Developer mode enabled
+  developerMode: false,           // Developer mode enabled (default OFF)
   backgroundImage: 'spacedreams.jpg',  // Background theme path
   showPreviewBar: false,          // Monaco minimap visible (default OFF)
   showMonacoLineNumbers: false,   // Monaco line numbers visible (default OFF)
+  monacoStickyTopBar: false,      // Monaco sticky top bar (default OFF)
   editorViewMode: 'array',        // Default editor view mode
   aiService: 'deepseek-server',   // Selected AI service
   apiKeys: {},                    // API keys by service
@@ -80,6 +81,10 @@ const settingsSlice = createSlice({
       state.showMonacoLineNumbers = !!action.payload;
       setStorageItem('showMonacoLineNumbers', state.showMonacoLineNumbers);
     },
+    setMonacoStickyTopBar(state, action) {
+      state.monacoStickyTopBar = !!action.payload;
+      setStorageItem('monacoStickyTopBar', state.monacoStickyTopBar);
+    },
     setEditorViewMode(state, action) {
       const mode = action.payload;
       if (mode === 'array' || mode === 'monaco' || mode === 'textarea') {
@@ -103,10 +108,11 @@ const settingsSlice = createSlice({
     // Load all settings from localStorage on app init
     loadAllSettings(state) {
       state.isAIEnabled = getStorageItem('aiEnabled', true);
-      state.developerMode = getStorageItem('developerMode', true);
+      state.developerMode = getStorageItem('developerMode', false);
       state.backgroundImage = getStorageItem('backgroundImage', 'spacedreams.jpg');
       state.showPreviewBar = getStorageItem('showPreviewBar', false);
       state.showMonacoLineNumbers = getStorageItem('showMonacoLineNumbers', false);
+      state.monacoStickyTopBar = getStorageItem('monacoStickyTopBar', false);
       
       // Handle editorViewMode with migration from 'fold' to 'array'
       let savedViewMode = getStorageItem('editorViewMode', 'array');
@@ -133,6 +139,7 @@ export const {
   setBackgroundImage,
   setShowPreviewBar,
   setShowMonacoLineNumbers,
+  setMonacoStickyTopBar,
   setEditorViewMode,
   setAiService,
   setApiKeys,
@@ -147,6 +154,7 @@ export const selectDeveloperMode = (state) => state.settings.developerMode;
 export const selectBackgroundImage = (state) => state.settings.backgroundImage;
 export const selectShowPreviewBar = (state) => state.settings.showPreviewBar;
 export const selectShowMonacoLineNumbers = (state) => state.settings.showMonacoLineNumbers;
+export const selectMonacoStickyTopBar = (state) => state.settings.monacoStickyTopBar;
 export const selectEditorViewMode = (state) => state.settings.editorViewMode;
 export const selectAiService = (state) => state.settings.aiService;
 export const selectApiKeys = (state) => state.settings.apiKeys;
