@@ -20,6 +20,7 @@ import { saveFile } from '../utils/fileOps';
 import { AiChangeManager } from './AiChangeManager';
 import { selectAiProposals, selectActiveChangeId, setActiveChangeId } from '../store/aiSlice';
 import './MonacoEditorView.css';
+import './AiInlineDiff.css';
 
 /**
  * SimpleMonaco - Monaco editor with AI proposal support
@@ -166,10 +167,7 @@ const SimpleMonaco = forwardRef((props, ref) => {
       monaco.editor.defineTheme('scribefold-dark', {
         base: 'vs-dark',
         inherit: true,
-        rules: [
-          // Make comments (where #__aid: lives) nearly invisible
-          { token: 'comment', foreground: '1a1a1a', fontStyle: '' },
-        ],
+        rules: [],
         colors: {
           'editor.background': '#00000000',
           'editorGutter.background': '#00000000',

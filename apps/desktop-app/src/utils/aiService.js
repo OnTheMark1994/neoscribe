@@ -658,9 +658,10 @@ function generateLineId() {
  * Convert AI response to Redux proposals format for View Zones
  * Groups insert changes into linesToInsert arrays
  * @param {Object} aiResponse - Raw AI response with changes array
+ * @param {Array} lines - Document lines array with id and text properties
  * @returns {Object} - { [lineId]: Proposal[] } for Redux
  */
-export function processChangesForRedux(aiResponse) {
+export function processChangesForRedux(aiResponse, lines = []) {
   try {
     const proposalsByLineID = {};
     
@@ -668,9 +669,18 @@ export function processChangesForRedux(aiResponse) {
       return { error: "No changes array found" };
     }
     
+    // Build map of lineID -> original text
+    const lineTextMap = {};
+    lines.forEach(line => {
+      if (line.id && line.text !== undefined) {
+        lineTextMap[line.id] = line.text;
+      }
+    });
+    
     // Process each change
     aiResponse.changes.forEach(change => {
       const lineID = change.lineID;
+      const originalText = lineTextMap[lineID] || '';
       
       if (!proposalsByLineID[lineID]) {
         proposalsByLineID[lineID] = [];
@@ -682,11 +692,13 @@ export function processChangesForRedux(aiResponse) {
           id: generateChangeId(lineID, 'modify'),
           type: 'modify',
           proposedText: change.proposedText,
+          originalText: originalText,
         });
       } else if (change.type === 'delete') {
         proposalsByLineID[lineID].push({
           id: generateChangeId(lineID, 'delete'),
           type: 'delete',
+          originalText: originalText,
         });
       } else if (change.type === 'insert' && Array.isArray(change.linesToInsert)) {
         // Keep linesToInsert as array for View Zones
@@ -694,6 +706,7 @@ export function processChangesForRedux(aiResponse) {
           id: generateChangeId(lineID, 'insert'),
           type: 'insert',
           linesToInsert: change.linesToInsert,
+          originalText: originalText,
         });
       }
     });

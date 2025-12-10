@@ -1,0 +1,68 @@
+/* AI Inline Diff Styling - Monaco view zones and decorations */
+
+/* Added lines (green background) */
+.inline-diff-added-line {
+  background-color: rgba(0, 255, 0, 0.15) !important;
+}
+
+/* Added lines gutter (green bar) */
+.inline-diff-added-gutter {
+  background-color: rgba(0, 255, 0, 0.4) !important;
+  width: 3px !important;
+}
+
+/* Removed lines zone widget */
+.removed-lines-zone-widget {
+  position: relative;
+  width: 100%;
+}
+
+/* Removed lines content */
+.inline-diff-removed-content {
+  position: absolute;
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.7;
+  text-decoration: line-through;
+  color: #ff6b6b;
+}
+
+/* Individual removed line */
+.inline-diff-removed-line {
+  position: absolute;
+  white-space: pre;
+}
+
+/* Diff button overlay widget */
+.diff-buttons-overlay-widget {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.diff-buttons-overlay-widget button {
+  background: #444;
+  color: #fff;
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.diff-buttons-overlay-widget button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.diff-buttons-overlay-widget button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

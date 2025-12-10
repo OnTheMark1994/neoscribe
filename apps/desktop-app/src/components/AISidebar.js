@@ -366,8 +366,8 @@ function AISidebar({ onAIResponse, monacoRef }) {
       // Process changes once for legacy diff model, debug, and change counts
       const processedChanges = processChanges(response.parsed);
 
-      // Process changes for Redux (View Zones format)
-      const reduxProposals = processChangesForRedux(response.parsed);
+      // Process changes for Redux (View Zones format) - pass lines for originalText
+      const reduxProposals = processChangesForRedux(response.parsed, lines);
       console.log('[AI] Redux proposals:', reduxProposals);
       
       // Dispatch to Redux to trigger View Zones
