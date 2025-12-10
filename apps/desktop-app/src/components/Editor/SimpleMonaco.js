@@ -15,7 +15,8 @@ import {
   selectMonacoStickyTopBar,
   selectIsAIEnabled,
 } from '../../store/settingsSlice';
-import Editor from '@monaco-editor/react';
+import { selectAiProposals } from '../../store/aiSlice';
+import Editor, { DiffEditor } from '@monaco-editor/react';
 import { saveFile } from '../../utils/fileOps';
 import './MonacoEditorView.css';
 
@@ -34,11 +35,17 @@ const SimpleMonaco = forwardRef((props, ref) => {
   const foldAllTrigger = useSelector(selectFoldAllTrigger);
   const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
   const saveTrigger = useSelector(selectSaveTrigger);
+  const aiProposals = useSelector(selectAiProposals);
 
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
   const decorationsRef = useRef([]);
   const foldingProviderRef = useRef(null);
+  const diffEditorRef = useRef(null);
+
+  // Check if we have AI proposals to show diff mode
+  const hasProposals = aiProposals && Object.keys(aiProposals).length > 0;
+  const showDiffMode = hasProposals;
 
   // Update editor when content changes (file opened)
   useEffect(() => {
@@ -289,14 +296,120 @@ const SimpleMonaco = forwardRef((props, ref) => {
   }, [saveTrigger, currentFilePath, dispatch]);
 
 
+  // Apply AI proposals to content to generate modified version
+  const applyProposalsToContent = (originalContent, proposals) => {
+    if (!originalContent || !proposals) return originalContent;
+
+    const lines = originalContent.split('\n');
+    const linesWithIds = buildLinesFromContent(originalContent);
+    const modifiedLines = [...lines];
+
+    // Apply each proposal
+    Object.entries(proposals).forEach(([lineId, proposalArray]) => {
+      if (!Array.isArray(proposalArray)) return;
+
+      // Find the line index for this lineId
+      const lineIndex = linesWithIds.findIndex(l => l.id === lineId);
+      if (lineIndex === -1) return;
+
+      proposalArray.forEach(proposal => {
+        if (proposal.type === 'modify' && proposal.proposedText != null) {
+          modifiedLines[lineIndex] = proposal.proposedText;
+        } else if (proposal.type === 'insert' && Array.isArray(proposal.linesToInsert)) {
+          // Insert after the current line
+          modifiedLines.splice(lineIndex + 1, 0, ...proposal.linesToInsert);
+        } else if (proposal.type === 'delete') {
+          modifiedLines[lineIndex] = ''; // Mark for deletion
+        }
+      });
+    });
+
+    return modifiedLines.filter(line => line !== '').join('\n');
+  };
+
+  // Generate modified content when proposals exist
+  const originalContent = content || '';
+  const modifiedContent = showDiffMode ? applyProposalsToContent(originalContent, aiProposals) : originalContent;
+
+  // Diff editor mount handler
+  const handleDiffMount = (editor, monaco) => {
+    diffEditorRef.current = editor;
+    monacoRef.current = monaco;
+
+    if (!window.__scribefoldDiffThemeRegistered) {
+      monaco.editor.defineTheme('scribefold-diff-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [],
+        colors: {
+          'editor.background': '#00000000',
+          'editorGutter.background': '#00000000',
+        },
+      });
+      window.__scribefoldDiffThemeRegistered = true;
+    }
+
+    monaco.editor.setTheme('scribefold-diff-dark');
+
+    const modifiedEditor = editor.getModifiedEditor();
+    if (modifiedEditor) {
+      modifiedEditor.focus();
+    }
+  };
+
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     prepareForAI: () => {
-      if (!editorRef.current || !monacoRef.current) return [];
-      return buildLinesFromMonaco(editorRef.current);
+      if (showDiffMode && diffEditorRef.current) {
+        const modEditor = diffEditorRef.current.getModifiedEditor();
+        if (modEditor) return buildLinesFromMonaco(modEditor);
+      }
+      if (editorRef.current && monacoRef.current) {
+        return buildLinesFromMonaco(editorRef.current);
+      }
+      return [];
     },
-    getEditor: () => editorRef.current,
+    getEditor: () => showDiffMode ? diffEditorRef.current?.getModifiedEditor() : editorRef.current,
   }));
+
+  // Conditionally render diff mode or normal editor
+  if (showDiffMode) {
+    return (
+      <div className="monaco-editor-container">
+        <DiffEditor
+          height="100%"
+          language="scribefold"
+          original={originalContent}
+          modified={modifiedContent}
+          onMount={handleDiffMount}
+          theme="scribefold-diff-dark"
+          options={{
+            lineNumbers: showLineNumbers ? 'on' : 'off',
+            minimap: { enabled: showPreviewBar },
+            renderSideBySide: true,
+            renderMarginRevertIcon: true,
+            ignoreTrimWhitespace: false,
+            diffWordWrap: 'on',
+            originalEditable: false,
+            readOnly: false,
+            wordWrap: 'on',
+            scrollBeyondLastLine: true,
+            fontSize: 14,
+            lineHeight: 24,
+            renderLineHighlight: 'none',
+            cursorBlinking: 'smooth',
+            cursorSmoothCaretAnimation: 'on',
+            smoothScrolling: true,
+            quickSuggestions: false,
+            suggestOnTriggerCharacters: false,
+            parameterHints: { enabled: false },
+            wordBasedSuggestions: false,
+            tabCompletion: 'off',
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="monaco-editor-container">
@@ -357,6 +470,46 @@ function generateStableId(index, text) {
     hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
   }
   return `l${index}_${Math.abs(hash).toString(36)}`;
+}
+
+/**
+ * Build lines array from content string for AI
+ * Uses in-memory stable IDs, parses levels, etc.
+ */
+function buildLinesFromContent(content) {
+  if (!content) return [];
+  
+  const textLines = content.split('\n');
+  const lines = [];
+  
+  textLines.forEach((fullLine, index) => {
+    const id = generateStableId(index + 1, fullLine);
+    const text = fullLine.trimEnd();
+    
+    // Parse level from #chapter/#section
+    let level = 0;
+    const trimmed = text.trim().toLowerCase();
+    if (/^#chapter\b/.test(trimmed)) level = 1;
+    else if (/^#section\b/.test(trimmed)) level = 2;
+    
+    // Determine sendToAI mode
+    let sendToAI = 'all';
+    if (/#ai-hide\b/i.test(text)) sendToAI = 'none';
+    else if (/#ai-title\b/i.test(text)) sendToAI = 'title';
+    else if (/#ai-summary\b/i.test(text)) sendToAI = 'summary';
+    
+    lines.push({
+      id,
+      text,
+      level,
+      startIdx: index,
+      endIdx: index,
+      sendToAI,
+      open: true,
+    });
+  });
+
+  return lines;
 }
 
 /**

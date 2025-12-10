@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import './AISidebar.css';
 import TokenInfoModal from '../Windows/TokenInfoModal';
 import RefreshButton from '../UI/RefreshButton';
-import { callDeepSeekServerAPI, calculateFullTokenEstimate, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl } from '../../utils/aiService';
+import { callDeepSeekServerAPI, calculateFullTokenEstimate, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl, processChangesForRedux } from '../../utils/aiService';
 import { getLines, updateLinesFromText, getTextFromLines } from '../../utils/editorEngine';
 import { setProposals } from '../../store/aiSlice';
 import { isWeb } from '../../utils/environment';
@@ -363,15 +363,12 @@ function AISidebar({ onAIResponse, monacoRef }) {
 
       setIsThinking(false);
 
-      // Store raw AI response in Redux (no inline diff processing)
+      // Shape AI changes for Redux proposals (original vs proposed text)
       console.log('🎯 [AI Response] Parsed:', response.parsed);
-      console.log('📦 [Redux] Storing AI response in ai.aiProposals ...');
-
-      // For now we just drop the whole parsed object into aiSlice
-      // Caller can shape it later as needed
-      dispatch(setProposals(response.parsed));
-
-      console.log('✅ [Redux] AI response stored');
+      const proposalsByLineId = processChangesForRedux(response.parsed, lines);
+      console.log('📦 [Redux] Storing AI proposals map in ai.aiProposals ...');
+      dispatch(setProposals(proposalsByLineId));
+      console.log('✅ [Redux] AI proposals stored');
 
       // Create debug data for chat display
       const debugData = {
