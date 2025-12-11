@@ -25,6 +25,10 @@ function FindBox({ visible, onClose, getEditorContainer }) {
 }
 ```
 
+In the same spirit:
+- Ctrl+F behavior (find state, next/previous handlers) belongs in the find box component, **not** in App.js.
+- AI diff navigation behavior (including opening folded parents for the current change) belongs in `DiffNavigation`, **not** in `EditorArray`.
+
 ---
 
 ## 2. Avoid "Boomerang State"

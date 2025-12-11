@@ -171,11 +171,8 @@ const EditorArray = forwardRef((props, ref) => {
     const lines = getLines();
 
     lines.forEach(line => {
-      if (line.startIdx !== -1 && line.endIdx >= line.startIdx) {
+      if (line.level !== 0) {
         line.open = false;
-        if (!line.text.includes('#folded')) {
-          line.text = line.text.trim() + ' #folded';
-        }
       }
     });
     recomputeVisibleLines();
@@ -190,9 +187,8 @@ const EditorArray = forwardRef((props, ref) => {
     const lines = getLines();
 
     lines.forEach(line => {
-      if (line.startIdx !== -1) {
+      if (line.level !== 0) {
         line.open = true;
-        line.text = line.text.replace(/#folded\b/gi, '').trim();
       }
     });
     recomputeVisibleLines();
@@ -207,13 +203,6 @@ const EditorArray = forwardRef((props, ref) => {
     const lines = getLines();
 
     lines[idx].open = !lines[idx].open;
-
-    // Keep #folded tag in sync with open state
-    let text = lines[idx].text.replace(/#folded\b/gi, '').trim();
-    if (!lines[idx].open) {
-      text += ' #folded';
-    }
-    lines[idx].text = text;
     recomputeVisibleLines();
     setRenderTrigger(prev => prev + 1);
     dispatch(setIsModified(true));

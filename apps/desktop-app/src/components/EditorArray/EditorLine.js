@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { getLines, getTextFromLines, updateLinesFromText, updateLineText, splitLine, mergeLine, addChapterAt, removeChapterAt, addSectionAt, removeSectionAt } from '../../utils/editorEngine';
+import { getLines, getTextFromLines, updateLinesFromText, updateLineText, splitLine, mergeLine, addChapterAt, removeChapterAt, addSectionAt, removeSectionAt, openLine } from '../../utils/editorEngine';
 
 /**
  * EditorLine - Individual line component for the array editor
@@ -47,6 +47,14 @@ function EditorLine({
     container.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [isCurrentChange, lineIndex, line.proposedChangeId]);
 
+    // Detect changes in header/section markers and trigger localized helpers
+    const classifyHeader = (text) => {
+      const trimmed = (text || '').trim();
+      if (/^#chapter(?:\s|$)/i.test(trimmed)) return 'chapter';
+      if (/^#section(?:\s|$)/i.test(trimmed)) return 'section';
+      return;
+    };
+
   /**
    * Handle content edits - updates the line text in editorEngine
    */
@@ -65,14 +73,6 @@ function EditorLine({
     }
 
     updateLineText(lineIndex, newText);
-
-    // Detect changes in header/section markers and trigger localized helpers
-    const classifyHeader = (text) => {
-      const trimmed = (text || '').trim();
-      if (/^#chapter(?:\s|$)/i.test(trimmed)) return 'chapter';
-      if (/^#section(?:\s|$)/i.test(trimmed)) return 'section';
-      return 'none';
-    };
 
     const prevType = classifyHeader(prevText);
     const newType = classifyHeader(newText);
@@ -159,6 +159,7 @@ function EditorLine({
 
     // Enter: Split line at cursor
     if (e.key === 'Enter') {
+      console.log("enter press")
       e.preventDefault();
 
       const sel = window.getSelection();
@@ -167,8 +168,14 @@ function EditorLine({
       const range = sel.getRangeAt(0);
       const offset = range.startOffset;
       splitLine(lineIndex, offset);
+      // If this is a header we will want to open it on enter press so the new line can be visible
+      console.log("classifyHeader():", classifyHeader(line.text))
+      if (classifyHeader(line.text)) {
+        openLine(lineIndex);
+      }
       onRenderEditor();
       onContentChange();
+
 
       // Focus the new line
       setTimeout(() => {

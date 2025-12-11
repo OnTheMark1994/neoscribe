@@ -34,81 +34,42 @@ export function parseText(text) {
     hidden: false
   }));
 
-  const stack = [];
-  
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].text.trim();
-    let level = 0, isHeader = false;
+    const lineText = (lines[i].text || '').trim();
+    let level = 0;
+    let isHeader = false;
 
-    if (line.match(/^#chapter(?:\s|$)/i)) { 
+    if (lineText.match(/^#chapter(?:\s|$)/i)) { 
       level = 1; 
       isHeader = true;
-    } else if (line.match(/^#section(?:\s|$)/i)) { 
+    } else if (lineText.match(/^#section(?:\s|$)/i)) { 
       level = 2; 
       isHeader = true;
     }
 
     lines[i].level = level;
-    
-    if (isHeader) {
-      // Determine AI sharing mode from tags on the header line
-      if (line.match(/#ai-hide\b/i) || line.match(/#aihide\b/i)) {
-        lines[i].sendToAI = 'none';
-      } else if (line.match(/#ai-summary\b/i) || line.match(/#aisummary\b/i)) {
-        lines[i].sendToAI = 'summary';
-      } else if (line.match(/#ai-title\b/i) || line.match(/#aititle\b/i)) {
-        lines[i].sendToAI = 'title';
-      }
-      
-      if (line.match(/#folded\b/i)) {
-        lines[i].open = false;
-      }
-    }
+    lines[i].hidden = false;
 
     if (isHeader) {
-      while (stack.length && stack[stack.length - 1].level >= level) {
-        const prev = stack.pop();
-        lines[prev.idx].endIdx = Math.max(prev.idx, i - 1);
-      }
-      lines[i].startIdx = i;
-      stack.push({ idx: i, level });
-    } else if (line.match(/^#chapterend$/i)) {
-      while (stack.length) {
-        const prev = stack.pop();
-        if (lines[prev.idx].level === 1) {
-          lines[prev.idx].endIdx = i;
-          break;
-        }
-      }
-    } else if (line.match(/^#sectionend$/i)) {
-      while (stack.length) {
-        const prev = stack.pop();
-        if (lines[prev.idx].level === 2) {
-          lines[prev.idx].endIdx = i;
-          break;
-        }
+      // Determine AI sharing mode from tags on the header line
+      if (lineText.match(/#ai-hide\b/i) || lineText.match(/#aihide\b/i)) {
+        lines[i].sendToAI = 'none';
+      } else if (lineText.match(/#ai-summary\b/i) || lineText.match(/#aisummary\b/i)) {
+        lines[i].sendToAI = 'summary';
+      } else if (lineText.match(/#ai-title\b/i) || lineText.match(/#aititle\b/i)) {
+        lines[i].sendToAI = 'title';
       }
     }
-  }
-  
-  while (stack.length) {
-    const prev = stack.pop();
-    lines[prev.idx].endIdx = lines.length - 1;
   }
 
   recomputeVisibleLines();
   return lines;
 }
 
-// Check if a line should be hidden
+// Check if a line should be hidden (now just reflects the computed hidden flag)
 export function isLineHidden(lineIdx) {
-  for (let j = lineIdx - 1; j >= 0; j--) {
-    const p = lines[j];
-    if (p.startIdx !== -1 && p.endIdx >= lineIdx && !p.open) {
-      return true;
-    }
-  }
-  return false;
+  if (!lines || lineIdx < 0 || lineIdx >= lines.length) return false;
+  return !!lines[lineIdx].hidden;
 }
 
 // Get all lines as text
@@ -120,8 +81,9 @@ export function getTextFromLines() {
 export function updateLinesFromText(text) {
   const oldOpenStates = {};
   
-  lines.forEach((l, i) => {
-    if (l.startIdx !== -1) {
+  // Preserve open state for header lines based on their text content
+  lines.forEach((l) => {
+    if (l.level !== 0) {
       oldOpenStates[l.text] = l.open;
     }
   });
@@ -129,7 +91,7 @@ export function updateLinesFromText(text) {
   parseText(text);
   
   lines.forEach(l => {
-    if (l.startIdx !== -1 && oldOpenStates[l.text] !== undefined) {
+    if (l.level !== 0 && oldOpenStates[l.text] !== undefined) {
       l.open = oldOpenStates[l.text];
     }
   });
@@ -283,9 +245,8 @@ export function splitLine(idx, offset) {
 function applyHeaderMetadataFromText(line) {
   const text = (line.text || '').trim();
 
-  // Reset to defaults first
+  // Reset to defaults first (open state is kept separate from tags)
   line.sendToAI = 'all';
-  line.open = true;
 
   // AI sharing tags
   if (text.match(/#ai-hide\b/i) || text.match(/#aihide\b/i)) {
@@ -294,11 +255,6 @@ function applyHeaderMetadataFromText(line) {
     line.sendToAI = 'summary';
   } else if (text.match(/#ai-title\b/i) || text.match(/#aititle\b/i)) {
     line.sendToAI = 'title';
-  }
-
-  // Folded state tag
-  if (text.match(/#folded\b/i)) {
-    line.open = false;
   }
 }
 
@@ -338,9 +294,6 @@ export function addChapterAt(idx) {
   const line = lines[idx];
   line.level = 1;
   applyHeaderMetadataFromText(line);
-  const range = computeHeaderRangeForward(idx, 1);
-  line.startIdx = range.startIdx;
-  line.endIdx = range.endIdx;
   recomputeVisibleLines();
 }
 
@@ -350,9 +303,6 @@ export function addSectionAt(idx) {
   const line = lines[idx];
   line.level = 2;
   applyHeaderMetadataFromText(line);
-  const range = computeHeaderRangeForward(idx, 2);
-  line.startIdx = range.startIdx;
-  line.endIdx = range.endIdx;
   recomputeVisibleLines();
 }
 
@@ -360,10 +310,9 @@ export function removeChapterAt(idx) {
   if (!lines || idx < 0 || idx >= lines.length) return;
   const line = lines[idx];
   line.level = 0;
-  line.startIdx = -1;
-  line.endIdx = -1;
   line.sendToAI = 'all';
   line.open = true;
+
   recomputeVisibleLines();
 }
 
@@ -371,10 +320,9 @@ export function removeSectionAt(idx) {
   if (!lines || idx < 0 || idx >= lines.length) return;
   const line = lines[idx];
   line.level = 0;
-  line.startIdx = -1;
-  line.endIdx = -1;
   line.sendToAI = 'all';
   line.open = true;
+
   recomputeVisibleLines();
 }
 
@@ -403,26 +351,46 @@ export function recomputeVisibleLines() {
   }
 
   const result = [];
-  let currentDepth = 0;
+  // Stack of active headers, each entry: { level, open, hidesDescendants }
+  const headerStack = [];
 
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
+    const level = l.level || 0;
+    let hidden = false;
+    let displayDepth = 0;
 
-    const derivedHidden = isLineHidden(i);
-    l.hidden = !!derivedHidden;
-    if (derivedHidden) continue;
+    if (level === 1 || level === 2) {
+      // Header line: update stack for this level
+      while (headerStack.length && headerStack[headerStack.length - 1].level >= level) {
+        headerStack.pop();
+      }
 
-    let displayDepth = currentDepth;
+      const parent = headerStack[headerStack.length - 1] || null;
+      const parentHides = parent ? parent.hidesDescendants : false;
+      hidden = !!parentHides;
 
-    if (l.startIdx !== -1 && l.endIdx !== -1) {
-      if (l.level === 1) {
+      const thisOpen = l.open !== false;
+      const hidesDescendants = parentHides || !thisOpen;
+      headerStack.push({ level, open: thisOpen, hidesDescendants });
+
+      // Chapters at depth 0, sections at depth 1
+      displayDepth = level === 1 ? 0 : 1;
+    } else {
+      // Non-header line: visibility depends on top of stack
+      const parent = headerStack[headerStack.length - 1] || null;
+      const parentHides = parent ? parent.hidesDescendants : false;
+      hidden = !!parentHides;
+      if (parent) {
+        // Lines under a chapter => depth 1, under a section => depth 2
+        displayDepth = parent.level === 1 ? 1 : 2;
+      } else {
         displayDepth = 0;
-        currentDepth = 1;
-      } else if (l.level === 2) {
-        displayDepth = 1;
-        currentDepth = 2;
       }
     }
+
+    l.hidden = hidden;
+    if (hidden) continue;
 
     result.push({ line: l, index: i, displayDepth });
   }
@@ -437,4 +405,20 @@ export function getVisibleLinesCached() {
     return recomputeVisibleLines();
   }
   return visibleLines || [];
+}
+
+export function openLine(idx){
+  console.log("opening line ", idx, lines[idx]);
+  if (!lines || idx < 0 || idx >= lines.length) return;
+  const line = lines[idx];
+  console.log("setting open ", idx, line);
+  line.open = true;
+  recomputeVisibleLines();
+}
+
+export function closeLine(idx){
+  if (!lines || idx < 0 || idx >= lines.length) return;
+  const line = lines[idx];
+  line.open = false;
+  recomputeVisibleLines();
 }

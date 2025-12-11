@@ -2,29 +2,37 @@ In array view when a sugested edit is in a folded chapter and the nav selects it
 
 - When the user places the caret on a **closed header line** (chapter/section) in array view and presses **Enter** partway through the line, the editor should **auto-open that header** and show the newly created line below it. Currently this can cause issues (including unhandled exceptions) because the new line is created inside a hidden range.
 
+Web View
 when we are in web view the accont portal link does not work
-
-AccountAuthSection.js:116 Failed to open URL externally: Error: Electron API not available - cannot open externally
-    at openExternalLink (AccountAuthSection.js:113:1)
-    at onClick (AccountAuthSection.js:207:1)
-openExternalLink	@	AccountAuthSection.js:116
-onClick	@	AccountAuthSection.js:207
-<button>		
-AccountAuthSection	@	AccountAuthSection.js:205
-<AccountAuthSection>		
-Settings	@	Settings.js:680
-<Settings>		
-Menus	@	Menus.js:83
-<Menus>		
-App	@	App.js:34
-<App>		
-./src/index.js	@	index.js:12
-options.factory	@	react refresh:37
-__webpack_require__	@	bootstrap:22
-(anonymous)	@	startup:7
-(anonymous)	@	startup:7
-
-
 when we log in it does not auto populate some data until refresh (it should)
-
 it seems to not persist the login aitj info sometimes
+
+Editor
+the right click menu does not show on the +- editor view line so we can not turn off ai view on the line
+Pressing enter on a section that is closed (and creating a new line in it) should open it. We might need to open the line in other situations too like if the change navigator goes to a prposed change that is in a closed section or chapter.  
+when clicking on an empty array line the focus is thre because typing works but no carrat shows
+
+save as just saves it does not open the save as dialogue (desktop)
+
+settings
+settings is not there for the line ids in array view this shoudl be off by default and a setting that can be switched
+we shoudl just have a dedicted display tab in settings
+it will have a collapsable area for array view and monaco
+there will be switcehs for each part:
+show array number, show side preview, etc, etc
+
+font color (with colro selector), size
+background color
+
+AI
+says all tokens have been used on first message 
+even when they are showing and not used
+
+
+Monaco
+talkes a very long time to load
+does not show arrow fold buttons sometimes for section or chapter
+no longer showing the grey / eye when ai hide is on
+
+
+
