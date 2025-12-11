@@ -190,8 +190,10 @@ We will refactor in **small, testable steps** so the editor remains usable after
   - `addSectionAt(index)` / `removeSectionAt(index)`
 - Each helper:
   - Updates the target line’s `level` (1 for chapter, 2 for section) and any related metadata.
-  - Recomputes structure **from that index forward** (levels and parent relationships) since lines before the insertion point are unchanged.
-  - Calls `recomputeVisibleLines()` so the view reflects the new structure.
+  - Recomputes structure **from that index forward only** (levels and parent relationships) since lines before the insertion point are unchanged, **until it finds a line whose level is >= its own level**. In other words: a section’s range stops at the next section *or* chapter; a chapter’s range continues through sections only until it reaches another chapter.
+  - Does **not** call `updateLinesFromText` or `parseText` for the whole document; it works directly on the existing `lines[]` model so the work is localized to that region.
+  - Handles conversions between header types (e.g. changing a `#chapter` line into `#section` or vice versa) by updating that line’s level and recalculating its forward range, without disturbing unrelated headers.
+  - Calls `recomputeVisibleLines()` after so the view reflects the new structure.
 - When the user turns a normal line into `#chapter` or `#section` (or removes such a marker), call the appropriate helper instead of re‑parsing the whole file.
 
 **Why:**

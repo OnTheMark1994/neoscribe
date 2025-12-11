@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { getLines, getTextFromLines, updateLinesFromText, updateLineText, splitLine, mergeLine } from '../../utils/editorEngine';
+import { getLines, getTextFromLines, updateLinesFromText, updateLineText, splitLine, mergeLine, addChapterAt, removeChapterAt, addSectionAt, removeSectionAt } from '../../utils/editorEngine';
 
 /**
  * EditorLine - Individual line component for the array editor
@@ -51,6 +51,10 @@ function EditorLine({
    * Handle content edits - updates the line text in editorEngine
    */
   const handleContentEdit = (e) => {
+    console.log("handleContentEdit: ", e)
+    const prevText = line.text || '';
+    const newText = e.target.textContent;
+
     // Capture caret offset within this line before React re-renders
     let caretOffset = null;
     const sel = window.getSelection();
@@ -61,7 +65,35 @@ function EditorLine({
       }
     }
 
-    updateLineText(lineIndex, e.target.textContent);
+    updateLineText(lineIndex, newText);
+
+    // Detect changes in header/section markers and trigger localized helpers
+    const classifyHeader = (text) => {
+      const trimmed = (text || '').trim();
+      if (/^#chapter(?:\s|$)/i.test(trimmed)) return 'chapter';
+      if (/^#section(?:\s|$)/i.test(trimmed)) return 'section';
+      return 'none';
+    };
+
+    const prevType = classifyHeader(prevText);
+    const newType = classifyHeader(newText);
+
+    console.log("prevType:", prevType)
+    console.log("newType:", newType)
+
+    if (prevType !== newType) {
+      if (newType === 'chapter') {
+        addChapterAt(lineIndex);
+      } else if (newType === 'section') {
+        addSectionAt(lineIndex);
+      } else if (prevType === 'chapter') {
+        removeChapterAt(lineIndex);
+      } else if (prevType === 'section') {
+        removeSectionAt(lineIndex);
+      }
+      // Header type changed, force EditorArray to re-read visibleLines
+      onRenderEditor();
+    }
     onContentChange();
 
     // Restore caret position after state updates
@@ -356,7 +388,7 @@ function EditorLine({
   };
 
   const isEditable = line.proposedChangeType !== 'insert';
-  const hasFoldButton = line.startIdx !== -1 && line.endIdx !== -1 && line.endIdx >= line.startIdx;
+  const hasFoldButton = line.level === 1 || line.level === 2;
   const aiClass = isAIEnabled ? (line.sendToAI === 'all' ? 'ai-full' : (line.sendToAI === 'title' ? 'ai-partial' : 'ai-none')) : '';
 
   // Render array view (with index gutter and ID box)

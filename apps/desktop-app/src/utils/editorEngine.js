@@ -278,6 +278,106 @@ export function splitLine(idx, offset) {
   updateLinesFromText(text);
 }
 
+// === Localized header helpers (Step 4) ===
+
+function applyHeaderMetadataFromText(line) {
+  const text = (line.text || '').trim();
+
+  // Reset to defaults first
+  line.sendToAI = 'all';
+  line.open = true;
+
+  // AI sharing tags
+  if (text.match(/#ai-hide\b/i) || text.match(/#aihide\b/i)) {
+    line.sendToAI = 'none';
+  } else if (text.match(/#ai-summary\b/i) || text.match(/#aisummary\b/i)) {
+    line.sendToAI = 'summary';
+  } else if (text.match(/#ai-title\b/i) || text.match(/#aititle\b/i)) {
+    line.sendToAI = 'title';
+  }
+
+  // Folded state tag
+  if (text.match(/#folded\b/i)) {
+    line.open = false;
+  }
+}
+
+function computeHeaderRangeForward(idx, level) {
+  if (!lines || idx < 0 || idx >= lines.length) return { startIdx: idx, endIdx: lines.length - 1 };
+
+  let end = lines.length - 1;
+
+  for (let i = idx + 1; i < lines.length; i++) {
+    const t = (lines[i].text || '').trim();
+
+    if (t.match(/^#chapterend$/i) && level === 1) {
+      end = i;
+      break;
+    }
+    if (t.match(/^#sectionend$/i) && level === 2) {
+      end = i;
+      break;
+    }
+
+    const isHeader = t.match(/^#chapter(?:\s|$)/i) || t.match(/^#section(?:\s|$)/i);
+    if (isHeader) {
+      const nextLevel = t.match(/^#chapter(?:\s|$)/i) ? 1 : 2;
+      if (nextLevel >= level) {
+        end = i - 1;
+        break;
+      }
+    }
+  }
+
+  if (end < idx) end = idx;
+  return { startIdx: idx, endIdx: end };
+}
+
+export function addChapterAt(idx) {
+  if (!lines || idx < 0 || idx >= lines.length) return;
+  const line = lines[idx];
+  line.level = 1;
+  applyHeaderMetadataFromText(line);
+  const range = computeHeaderRangeForward(idx, 1);
+  line.startIdx = range.startIdx;
+  line.endIdx = range.endIdx;
+  recomputeVisibleLines();
+}
+
+export function addSectionAt(idx) {
+  console.log("addSectionAt idx:", idx)
+  if (!lines || idx < 0 || idx >= lines.length) return;
+  const line = lines[idx];
+  line.level = 2;
+  applyHeaderMetadataFromText(line);
+  const range = computeHeaderRangeForward(idx, 2);
+  line.startIdx = range.startIdx;
+  line.endIdx = range.endIdx;
+  recomputeVisibleLines();
+}
+
+export function removeChapterAt(idx) {
+  if (!lines || idx < 0 || idx >= lines.length) return;
+  const line = lines[idx];
+  line.level = 0;
+  line.startIdx = -1;
+  line.endIdx = -1;
+  line.sendToAI = 'all';
+  line.open = true;
+  recomputeVisibleLines();
+}
+
+export function removeSectionAt(idx) {
+  if (!lines || idx < 0 || idx >= lines.length) return;
+  const line = lines[idx];
+  line.level = 0;
+  line.startIdx = -1;
+  line.endIdx = -1;
+  line.sendToAI = 'all';
+  line.open = true;
+  recomputeVisibleLines();
+}
+
 // Merge line at idx into the previous line.
 // Behaviour matches the existing EditorLine Backspace-at-start handler,
 // including a full rebuild of the model from current text.
