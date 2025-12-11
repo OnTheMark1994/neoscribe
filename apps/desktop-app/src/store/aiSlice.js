@@ -18,6 +18,15 @@ const aiSlice = createSlice({
     setProposals: (state, { payload }) => {
       // Merge new proposals with existing ones
       state.aiProposals = { ...state.aiProposals, ...payload };
+      
+      // Auto-select the first proposal if none is selected
+      if (!state.activeChangeId && Object.keys(payload).length > 0) {
+        const firstLineId = Object.keys(payload)[0];
+        const firstProposalArray = payload[firstLineId];
+        if (Array.isArray(firstProposalArray) && firstProposalArray.length > 0) {
+          state.activeChangeId = firstProposalArray[0].id;
+        }
+      }
     },
     clearProposalForId: (state, { payload: lineId }) => {
       delete state.aiProposals[lineId];

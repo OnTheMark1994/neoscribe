@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { createRoot } from 'react-dom/client';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   selectContent,
@@ -15,8 +16,10 @@ import {
   selectMonacoStickyTopBar,
   selectIsAIEnabled,
 } from '../../store/settingsSlice';
-import { selectAiProposals } from '../../store/aiSlice';
+import { selectAiProposals, selectActiveChangeId } from '../../store/aiSlice';
 import Editor, { DiffEditor } from '@monaco-editor/react';
+import DiffActionButtons from '../AI/DiffActionButtons';
+import DiffNavigation from '../AI/DiffNavigation';
 import { saveFile } from '../../utils/fileOps';
 import './MonacoEditorView.css';
 
@@ -36,12 +39,15 @@ const SimpleMonaco = forwardRef((props, ref) => {
   const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
   const saveTrigger = useSelector(selectSaveTrigger);
   const aiProposals = useSelector(selectAiProposals);
+  const activeChangeId = useSelector(selectActiveChangeId);
 
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
   const decorationsRef = useRef([]);
   const foldingProviderRef = useRef(null);
   const diffEditorRef = useRef(null);
+  const diffZonesRef = useRef([]);
+  const diffZoneRootsRef = useRef([]);
 
   // Check if we have AI proposals to show diff mode
   const hasProposals = aiProposals && Object.keys(aiProposals).length > 0;
@@ -355,6 +361,128 @@ const SimpleMonaco = forwardRef((props, ref) => {
     if (modifiedEditor) {
       modifiedEditor.focus();
     }
+
+    // Initial placement of diff action buttons when diff editor mounts
+    // Add small delay to ensure editor is fully ready
+    setTimeout(() => {
+      console.log('[DiffMount] Calling updateDiffActionZones after mount');
+      updateDiffActionZones();
+    }, 100);
+  };
+
+  // Create / update Monaco view zones for DiffActionButtons on modified side
+  const updateDiffActionZones = () => {
+    console.log('[DiffZones] updateDiffActionZones called', {
+      showDiffMode,
+      hasDiffEditor: !!diffEditorRef.current,
+      hasOriginalContent: !!originalContent,
+      aiProposalsKeys: Object.keys(aiProposals || {}),
+    });
+
+    if (!showDiffMode || !diffEditorRef.current || !originalContent) {
+      console.log('[DiffZones] Early return - missing prerequisites');
+      return;
+    }
+
+    const diffEditor = diffEditorRef.current;
+    const monaco = monacoRef.current;
+    if (!monaco) {
+      console.log('[DiffZones] No monaco instance');
+      return;
+    }
+
+    const modifiedEditor = diffEditor.getModifiedEditor();
+    if (!modifiedEditor) {
+      console.log('[DiffZones] No modified editor');
+      return;
+    }
+
+    const model = modifiedEditor.getModel();
+    if (!model) {
+      console.log('[DiffZones] No model');
+      return;
+    }
+
+    const linesWithIds = buildLinesFromContent(originalContent);
+    console.log('[DiffZones] Lines with IDs:', linesWithIds.length, linesWithIds.map(l => ({ id: l.id, text: l.text.substring(0, 30) })));
+
+    // Clear existing zones and unmount React roots
+    modifiedEditor.changeViewZones(accessor => {
+      diffZonesRef.current.forEach(id => accessor.removeZone(id));
+      diffZonesRef.current = [];
+    });
+    
+    // Unmount all React roots
+    diffZoneRootsRef.current.forEach(root => {
+      try {
+        root.unmount();
+      } catch (e) {
+        console.warn('[DiffZones] Error unmounting root:', e);
+      }
+    });
+    diffZoneRootsRef.current = [];
+
+    // Add a view zone after each line with proposals
+    let zonesAdded = 0;
+    modifiedEditor.changeViewZones(accessor => {
+      Object.entries(aiProposals || {}).forEach(([lineId, proposalArray]) => {
+        console.log('[DiffZones] Processing lineId:', lineId, 'proposals:', proposalArray);
+        
+        if (!Array.isArray(proposalArray) || proposalArray.length === 0) {
+          console.log('[DiffZones] Skipping - not an array or empty');
+          return;
+        }
+
+        const lineIndex = linesWithIds.findIndex(l => l.id === lineId);
+        console.log('[DiffZones] Line index for', lineId, ':', lineIndex);
+        
+        if (lineIndex === -1) {
+          console.log('[DiffZones] Skipping - lineId not found in linesWithIds');
+          return;
+        }
+
+        // Use the first proposal object for button props (type/id etc.)
+        const proposal = proposalArray[0];
+
+        let afterLineNumber = lineIndex + 1;
+        if (proposal.type === 'insert' && Array.isArray(proposal.linesToInsert)) {
+          // Place buttons after the inserted block in the modified view
+          afterLineNumber = lineIndex + 1 + proposal.linesToInsert.length;
+        }
+
+        if (afterLineNumber > model.getLineCount()) {
+          afterLineNumber = model.getLineCount();
+        }
+
+        console.log('[DiffZones] Adding zone after line', afterLineNumber, 'for proposal type:', proposal.type);
+
+        const domNode = document.createElement('div');
+        domNode.style.zIndex = '1000';
+        domNode.style.position = 'relative';
+
+        const zoneId = accessor.addZone({
+          afterLineNumber,
+          heightInPx: 60,
+          domNode,
+        });
+
+        diffZonesRef.current.push(zoneId);
+        zonesAdded++;
+
+        // Use React 18's createRoot API
+        const root = createRoot(domNode);
+        root.render(
+          <DiffActionButtons
+            proposedChangeId={proposal.id}
+            changeType={proposal.type}
+            activeChangeId={activeChangeId}
+          />
+        );
+        diffZoneRootsRef.current.push(root);
+      });
+    });
+    
+    console.log('[DiffZones] Total zones added:', zonesAdded);
   };
 
   // Expose methods to parent via ref
@@ -372,42 +500,50 @@ const SimpleMonaco = forwardRef((props, ref) => {
     getEditor: () => showDiffMode ? diffEditorRef.current?.getModifiedEditor() : editorRef.current,
   }));
 
+  // Rebuild diff action zones whenever proposals, content, or active ID changes
+  useEffect(() => {
+    updateDiffActionZones();
+  }, [showDiffMode, aiProposals, originalContent, activeChangeId]);
+
   // Conditionally render diff mode or normal editor
   if (showDiffMode) {
     return (
-      <div className="monaco-editor-container">
-        <DiffEditor
-          height="100%"
-          language="scribefold"
-          original={originalContent}
-          modified={modifiedContent}
-          onMount={handleDiffMount}
-          theme="scribefold-diff-dark"
-          options={{
-            lineNumbers: showLineNumbers ? 'on' : 'off',
-            minimap: { enabled: showPreviewBar },
-            renderSideBySide: true,
-            renderMarginRevertIcon: true,
-            ignoreTrimWhitespace: false,
-            diffWordWrap: 'on',
-            originalEditable: false,
-            readOnly: false,
-            wordWrap: 'on',
-            scrollBeyondLastLine: true,
-            fontSize: 14,
-            lineHeight: 24,
-            renderLineHighlight: 'none',
-            cursorBlinking: 'smooth',
-            cursorSmoothCaretAnimation: 'on',
-            smoothScrolling: true,
-            quickSuggestions: false,
-            suggestOnTriggerCharacters: false,
-            parameterHints: { enabled: false },
-            wordBasedSuggestions: false,
-            tabCompletion: 'off',
-          }}
-        />
-      </div>
+      <>
+        <div className="monaco-editor-container">
+          <DiffEditor
+            height="100%"
+            language="scribefold"
+            original={originalContent}
+            modified={modifiedContent}
+            onMount={handleDiffMount}
+            theme="scribefold-diff-dark"
+            options={{
+              lineNumbers: showLineNumbers ? 'on' : 'off',
+              minimap: { enabled: showPreviewBar },
+              renderSideBySide: true,
+              renderMarginRevertIcon: true,
+              ignoreTrimWhitespace: false,
+              diffWordWrap: 'on',
+              originalEditable: false,
+              readOnly: false,
+              wordWrap: 'on',
+              scrollBeyondLastLine: true,
+              fontSize: 14,
+              lineHeight: 24,
+              renderLineHighlight: 'none',
+              cursorBlinking: 'smooth',
+              cursorSmoothCaretAnimation: 'on',
+              smoothScrolling: true,
+              quickSuggestions: false,
+              suggestOnTriggerCharacters: false,
+              parameterHints: { enabled: false },
+              wordBasedSuggestions: false,
+              tabCompletion: 'off',
+            }}
+          />
+        </div>
+        <DiffNavigation />
+      </>
     );
   }
 

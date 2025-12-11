@@ -1,0 +1,84 @@
+/* Diff Navigation Bar at Bottom */
+.diff-navigation-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background-color: rgba(44, 44, 44, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px 8px 0 0;
+  z-index: 1000;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.diff-counter {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 120px;
+  text-align: center;
+}
+
+.diff-nav-btn {
+  padding: 8px 16px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.diff-nav-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.diff-nav-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.diff-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.diff-nav-divider {
+  width: 1px;
+  height: 24px;
+  background-color: rgba(255, 255, 255, 0.2);
+  margin: 0 8px;
+}
+
+.diff-nav-accept-all {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #4CAF50;
+  border-color: rgba(76, 175, 80, 0.4);
+  white-space: nowrap;
+  min-width: 100px;
+}
+
+.diff-nav-accept-all:hover:not(:disabled) {
+  background-color: rgba(76, 175, 80, 0.3);
+  border-color: #4CAF50;
+}
+
+.diff-nav-reject-all {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+  border-color: rgba(244, 67, 54, 0.4);
+  white-space: nowrap;
+  min-width: 100px;
+}
+
+.diff-nav-reject-all:hover:not(:disabled) {
+  background-color: rgba(244, 67, 54, 0.3);
+  border-color: #f44336;
+}
