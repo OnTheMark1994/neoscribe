@@ -1,0 +1,83 @@
+/**
+ * FindBox.css - Styles for find functionality in EditorArray
+ */
+
+.find-box {
+  position: fixed;
+  top: 50px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: rgba(44, 44, 44, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.find-input {
+  width: 200px;
+  padding: 6px 10px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.find-input:focus {
+  outline: none;
+  border-color: rgba(74, 109, 167, 0.6);
+  box-shadow: 0 0 0 2px rgba(74, 109, 167, 0.2);
+}
+
+.find-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.find-counter {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.find-btn {
+  padding: 4px 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.find-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.find-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.find-close-btn {
+  font-size: 18px;
+  padding: 2px 8px;
+}
+
+/* Find highlight styles */
+.find-highlight {
+  background-color: rgba(255, 200, 0, 0.4);
+  border-radius: 2px;
+}
+
+.find-highlight-current {
+  background-color: rgba(255, 150, 0, 0.7);
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(255, 150, 0, 0.5);
+}

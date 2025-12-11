@@ -11,11 +11,17 @@ const aiChangesSlice = createSlice({
   reducers: {
     setAIChanges: (state, action) => {
       const { allChangeIds, processedChanges } = action.payload;
+      console.log('[aiChangesSlice] setAIChanges:', {
+        count: allChangeIds ? allChangeIds.length : 0,
+        allChangeIds,
+        processedChanges,
+      });
       state.allChangeIds = allChangeIds;
       state.processedChangesByLineID = processedChanges;
       state.currentChangeIdIndex = 0;
     },
     clearAIChanges: (state) => {
+      console.log('[aiChangesSlice] clearAIChanges');
       state.allChangeIds = [];
       state.currentChangeIdIndex = 0;
       state.processedChangesByLineID = null;
@@ -41,13 +47,18 @@ const aiChangesSlice = createSlice({
     },
     rebuildChangeIds: (state, action) => {
       // Rebuild allChangeIds from lines array
-      const lines = action.payload;
-      state.allChangeIds = [];
+      const lines = action.payload || [];
+      const rebuiltIds = [];
       lines.forEach(line => {
         if (line.proposedChangeId) {
-          state.allChangeIds.push(line.proposedChangeId);
+          rebuiltIds.push(line.proposedChangeId);
         }
       });
+      console.log('[aiChangesSlice] rebuildChangeIds from lines:', {
+        lineCount: lines.length,
+        allChangeIds: rebuiltIds,
+      });
+      state.allChangeIds = rebuiltIds;
       // Adjust current index if needed
       if (state.currentChangeIdIndex >= state.allChangeIds.length) {
         state.currentChangeIdIndex = Math.max(0, state.allChangeIds.length - 1);

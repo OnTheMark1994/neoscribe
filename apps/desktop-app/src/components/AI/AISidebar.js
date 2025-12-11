@@ -3,9 +3,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import './AISidebar.css';
 import TokenInfoModal from '../Windows/TokenInfoModal';
 import RefreshButton from '../UI/RefreshButton';
-import { callDeepSeekServerAPI, calculateFullTokenEstimate, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl, processChangesForRedux } from '../../utils/aiService';
-import { getLines, updateLinesFromText, getTextFromLines } from '../../utils/editorEngine';
+import { callDeepSeekServerAPI, calculateFullTokenEstimate, fetchUserTokens, fetchUserAccount, buildWebPortalAutoLoginUrl, processChangesForRedux, processChanges, integrateChangesIntoLines } from '../../utils/aiService';
+import { getLines, updateLinesFromText, getTextFromLines, setLines } from '../../utils/editorEngine';
 import { setProposals } from '../../store/aiSlice';
+import { setAIChanges } from '../../store/aiChangesSlice';
+import { selectViewType } from '../../store/editorSlice';
 import { isWeb } from '../../utils/environment';
 import { openSettings } from '../../store/uiSlice';
 import { selectAnonId, selectAuthId, selectAvailableTokens, setAvailableTokens as setReduxAvailableTokens } from '../../store/userSlice';
@@ -29,6 +31,7 @@ function AISidebar({ onAIResponse, monacoRef }) {
   const authId = useSelector(selectAuthId);
   const developerMode = useSelector(selectDeveloperMode);
   const reduxAvailableTokens = useSelector(selectAvailableTokens);
+  const viewType = useSelector(selectViewType); // 'array' or 'monaco'
   
   const [messages, setMessages] = useState([]);
   // In developer mode start with a sample prompt, otherwise start empty and show placeholder only
@@ -363,21 +366,71 @@ function AISidebar({ onAIResponse, monacoRef }) {
 
       setIsThinking(false);
 
-      // Shape AI changes for Redux proposals (original vs proposed text)
+      // Process AI changes differently based on viewType
       console.log('🎯 [AI Response] Parsed:', response.parsed);
-      const proposalsByLineId = processChangesForRedux(response.parsed, lines);
-      console.log('📦 [Redux] Storing AI proposals map in ai.aiProposals ...');
-      dispatch(setProposals(proposalsByLineId));
-      console.log('✅ [Redux] AI proposals stored');
+      console.log('📋 [AI] Current viewType:', viewType);
+      console.log('🧵 [AI] Original lines snapshot length:', lines.length);
+      
+      if (viewType === 'array') {
+        // ARRAY EDITOR: Integrate changes directly into lines
+        // processChanges expects the full parsed response object (with .changes property)
+        const processedChanges = processChanges(response.parsed);
+        console.log('🧩 [AI/Array] processChanges result:', processedChanges);
+        
+        // Check if processChanges returned an error
+        if (processedChanges.error) {
+          console.warn('⚠️ [AI/Array] processChanges error:', processedChanges.error);
+          // No changes to integrate, skip
+        } else {
+          const newLines = integrateChangesIntoLines(processedChanges, lines);
+          console.log('🧬 [AI/Array] integrateChangesIntoLines produced lines:', newLines.length);
+          
+          // Build list of all change IDs
+          const allChangeIds = [];
+          newLines.forEach(line => {
+            if (line.proposedChangeId) {
+              allChangeIds.push(line.proposedChangeId);
+            }
+          });
+          console.log('🧭 [AI/Array] All change IDs for array editor:', allChangeIds);
+          
+          // Update lines in editorEngine
+          console.log('💾 [AI/Array] Writing newLines into editorEngine via setLines');
+          setLines(newLines);
+          
+          // Store changes in Redux (aiChangesSlice)
+          console.log('📥 [Redux] Dispatching setAIChanges with allChangeIds + processedChanges');
+          dispatch(setAIChanges({ allChangeIds, processedChanges }));
+          console.log('✅ [Redux] AI changes stored in aiChangesSlice');
+          
+          // Notify editor to re-render
+          if (monacoRef && monacoRef.current && monacoRef.current.updateLinesFromAI) {
+            console.log('🔄 [AI/Array] Calling editorRef.updateLinesFromAI(newLines)');
+            monacoRef.current.updateLinesFromAI(newLines);
+          } else {
+            console.log('ℹ️ [AI/Array] editorRef.updateLinesFromAI not available');
+          }
+        }
+      } else {
+        // MONACO EDITOR: Shape AI changes for Redux proposals (original vs proposed text)
+        const proposalsByLineId = processChangesForRedux(response.parsed, lines);
+        console.log('📦 [Redux] Storing AI proposals map in ai.aiProposals ...');
+        dispatch(setProposals(proposalsByLineId));
+        console.log('✅ [Redux] AI proposals stored');
+      }
 
-      // Create debug data for chat display
+      // Create debug data for chat display (also used in debug popup window)
       const debugData = {
         userMessage: userPrompt,
         raw: response.raw,
         parsed: response.parsed,
         message: response.parsed.message,
         requestBody: response.requestBody,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        // NOTE: For array view, additional details about processedChanges/newLines
+        // are logged to the console. If needed later, we can plumb them in via
+        // Redux or a higher-scope variable instead of referencing block-scoped
+        // variables here.
       };
 
       const buttonFlag = response.parsed.button || null;

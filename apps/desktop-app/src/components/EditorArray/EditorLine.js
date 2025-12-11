@@ -43,10 +43,22 @@ function EditorLine({
   useEffect(() => {
     if (!isCurrentChange || !contentRef.current) return;
 
+    console.log('[EditorLine] Scrolling to current change lineIndex=', lineIndex, 'changeId=', line.proposedChangeId);
     const container =
       contentRef.current.closest('.array-line-container, .editor-line') || contentRef.current;
     container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [isCurrentChange]);
+  }, [isCurrentChange, lineIndex, line.proposedChangeId]);
+
+  if (line.proposedChangeType) {
+    console.log('[EditorLine] Rendering diff line', {
+      lineIndex,
+      id: line.id,
+      proposedChangeType: line.proposedChangeType,
+      proposedChangeId: line.proposedChangeId,
+      currentChangeId,
+      isCurrentChange,
+    });
+  }
 
   /**
    * Handle content edits - updates the line text in editorEngine

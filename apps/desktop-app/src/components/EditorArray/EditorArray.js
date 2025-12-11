@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, memo } from 'react';
+
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   selectContent, 
@@ -9,13 +10,12 @@ import {
   setIsModified 
 } from '../../store/editorSlice';
 import { selectIsAIEnabled } from '../../store/settingsSlice';
-import { selectActiveChangeId, selectAllChangeIds } from '../../store/aiSlice';
 import { showStatus } from '../../store/statusSlice';
 import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines } from '../../utils/editorEngine';
 import { saveFile } from '../../utils/fileOps';
 import EditorLine from './EditorLine';
-import DiffActionButtons from '../AI/DiffActionButtons';
-import DiffNavigation from '../AI/DiffNavigation';
+import DiffActionButtons from './AI/DiffActionButtons';
+import DiffNavigation from './AI/DiffNavigation';
 import './EditorArray.css';
 
 /**
@@ -38,21 +38,24 @@ const EditorArray = forwardRef((props, ref) => {
   const foldAllTrigger = useSelector(selectFoldAllTrigger);
   const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
   const saveTrigger = useSelector(selectSaveTrigger);
-  const activeChangeId = useSelector(selectActiveChangeId);
-  const allChangeIds = useSelector(selectAllChangeIds);
+  
+  // AI changes from aiChangesSlice (for array editor)
+  const { allChangeIds, currentChangeIdIndex, processedChangesByLineID } = useSelector(state => state.aiChanges);
+  const currentChangeId = allChangeIds[currentChangeIdIndex] || null;
   
   // Local state
-  const [isArrayView, setIsArrayView] = useState(true);
   const [renderTrigger, setRenderTrigger] = useState(0);
   const [isFindVisible, setIsFindVisible] = useState(false);
   const [findQuery, setFindQuery] = useState('');
   const [findMatches, setFindMatches] = useState([]);
   const [currentFindIndex, setCurrentFindIndex] = useState(-1);
+
+  // EditorArray is always array view (no toggle needed)
+  const isArrayView = true;
   
   // Refs
   const editorRef = useRef(null);
   const findInputRef = useRef(null);
-  const menuListenersSetupRef = useRef(false);
   const filePathRef = useRef(currentFilePath);
 
   // Keep file path ref in sync
@@ -60,32 +63,26 @@ const EditorArray = forwardRef((props, ref) => {
     filePathRef.current = currentFilePath;
   }, [currentFilePath]);
 
-  // Expose imperative API for AI integration
+  /**
+   * Expose imperative API for parent components (AISidebar)
+   *
+   * AISidebar uses these to integrate AI responses for the array editor.
+   */
   useImperativeHandle(ref, () => ({
-    /**
-     * Prepare lines for AI - returns current lines array
-     */
     prepareForAI: () => {
-      return getLines();
+      const lines = getLines();
+      console.log('[EditorArray] prepareForAI lines:', lines);
+      return lines;
     },
-    /**
-     * Update lines from AI response
-     */
     updateLinesFromAI: (newLines) => {
+      console.log('[EditorArray] updateLinesFromAI received lines:', newLines);
       setLines(newLines);
       setRenderTrigger(prev => prev + 1);
     },
-    /**
-     * Toggle array view mode
-     */
-    toggleArrayView: () => {
-      setIsArrayView(prev => !prev);
-    },
-    /**
-     * Get current text content
-     */
     getContent: () => {
-      return getTextFromLines();
+      const text = getTextFromLines();
+      console.log('[EditorArray] getContent length:', text.length);
+      return text;
     }
   }));
 
@@ -97,18 +94,7 @@ const EditorArray = forwardRef((props, ref) => {
     }
   }, [content]);
 
-  // Set up Electron menu listeners (once)
-  useEffect(() => {
-    if (window.electronAPI && !menuListenersSetupRef.current) {
-      // Toggle array view from menu
-      if (window.electronAPI.onToggleArrayView) {
-        window.electronAPI.onToggleArrayView(() => {
-          setIsArrayView(prev => !prev);
-        });
-      }
-      menuListenersSetupRef.current = true;
-    }
-  }, []);
+  // NOTE: No Electron menu listeners are used. All view switching is via WebMenuBar/Redux.
 
   // Respond to fold all trigger
   useEffect(() => {
@@ -261,23 +247,6 @@ const EditorArray = forwardRef((props, ref) => {
       dispatch(showStatus('File saved'));
     } else if (result.error) {
       dispatch(showStatus('Failed to save: ' + result.error));
-    }
-  };
-
-  /**
-   * Show AI context menu (for Electron native menu)
-   */
-  const showAIContextMenu = (x, y, lineIdx) => {
-    const lines = getLines();
-    const line = lines[lineIdx];
-
-    if (window.electronAPI && window.electronAPI.showAIContextMenu && line) {
-      window.electronAPI.showAIContextMenu({
-        lineIdx,
-        sendToAI: line.sendToAI,
-        level: line.level,
-        isOpen: line.open
-      });
     }
   };
 
@@ -551,6 +520,16 @@ const EditorArray = forwardRef((props, ref) => {
 
   // Get visible lines for rendering
   const visibleLines = getVisibleLines();
+  const proposedVisible = visibleLines.filter(v => v.line && v.line.proposedChangeType);
+  console.log('[EditorArray] visibleLines count:', visibleLines.length, 'proposedVisible:', proposedVisible.map(v => ({
+    index: v.index,
+    id: v.line.id,
+    type: v.line.proposedChangeType,
+  })), 'aiChanges:', {
+    allChangeIds,
+    currentChangeIdIndex,
+    processedChangesByLineID,
+  });
 
   return (
     <>
@@ -605,15 +584,15 @@ const EditorArray = forwardRef((props, ref) => {
               onToggleFold={toggleFold}
               onContentChange={handleContentChange}
               onRenderEditor={handleRenderEditor}
-              currentChangeId={activeChangeId}
-              onShowAIContextMenu={showAIContextMenu}
+              currentChangeId={currentChangeId}
               isAIEnabled={isAIEnabled}
             />
             {line.proposedChangeType && (
               <DiffActionButtons
                 proposedChangeId={line.proposedChangeId}
                 changeType={line.proposedChangeType}
-                activeChangeId={activeChangeId}
+                onUpdate={handleRenderEditor}
+                onContentChange={handleContentChange}
               />
             )}
           </React.Fragment>
@@ -621,7 +600,12 @@ const EditorArray = forwardRef((props, ref) => {
       </div>
 
       {/* Diff Navigation (shown when AI proposals exist) */}
-      {allChangeIds && allChangeIds.length > 0 && <DiffNavigation />}
+      {allChangeIds && allChangeIds.length > 0 && (
+        <>
+          {console.log('[EditorArray] Rendering DiffNavigation, allChangeIds:', allChangeIds)}
+          <DiffNavigation onUpdate={handleRenderEditor} />
+        </>
+      )}
     </>
   );
 });

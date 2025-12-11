@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import aiReducer from './aiSlice';
+import aiChangesReducer from './aiChangesSlice';
 import userReducer from './userSlice';
 import uiReducer from './uiSlice';
 import editorReducer from './editorSlice';
@@ -13,10 +14,11 @@ import statusReducer from './statusSlice';
  * 
  * Slices:
  * - user: User identity, authentication, token state
- * - editor: Editor state (currentFilePath, isModified, viewMode)
+ * - editor: Editor state (currentFilePath, isModified, viewType)
  * - settings: All persistent settings synced with localStorage
  * - ui: Transient UI state (modals, loading screen)
- * - ai: AI proposals storage (raw response from API)
+ * - ai: AI proposals storage for Monaco (raw response from API)
+ * - aiChanges: AI changes storage for EditorArray (line-embedded proposals)
  * - status: Temporary status messages ("File saved", errors, etc)
  */
 export const store = configureStore({
@@ -26,6 +28,7 @@ export const store = configureStore({
     settings: settingsReducer,
     ui: uiReducer,
     ai: aiReducer,
+    aiChanges: aiChangesReducer,
     status: statusReducer,
   },
 });

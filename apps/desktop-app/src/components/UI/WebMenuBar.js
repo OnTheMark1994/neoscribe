@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectIsAIEnabled, setIsAIEnabled, setBackgroundImage } from '../../store/settingsSlice';
-import { selectCurrentFilePath, selectIsModified, selectContent, fileOpened, resetEditor, bumpFoldAllTrigger, bumpUnfoldAllTrigger, bumpSaveTrigger } from '../../store/editorSlice';
+import { selectCurrentFilePath, selectIsModified, selectContent, selectViewType, setViewType, fileOpened, resetEditor, bumpFoldAllTrigger, bumpUnfoldAllTrigger, bumpSaveTrigger } from '../../store/editorSlice';
 import { openSettings, openDownloadModal } from '../../store/uiSlice';
 import { showStatus } from '../../store/statusSlice';
 import { isElectron, isWeb } from '../../utils/environment';
@@ -57,6 +57,7 @@ function WebMenuBar() {
   const isAIEnabled = useSelector(selectIsAIEnabled);
   const currentFilePath = useSelector(selectCurrentFilePath);
   const isModified = useSelector(selectIsModified);
+  const viewType = useSelector(selectViewType); // 'array' or 'monaco'
   
   // WHAT: Extract just the filename from full path for display
   // WHY: Full path would be too long for menu bar
@@ -472,33 +473,26 @@ function WebMenuBar() {
               </button>
               <div className="web-menu-divider" />
 
-              {/* View modes - direct selectors */}
+              {/* View modes - switch between Array Editor and Monaco Editor */}
               <button
                 onClick={() => {
                   setActiveMenu(null);
-                  localStorage.setItem('editorViewMode', 'array');
-                  window.dispatchEvent(new StorageEvent('storage', { key: 'editorViewMode', newValue: 'array' }));
+                  dispatch(setViewType('array'));
                 }}
+                className={viewType === 'array' ? 'active' : ''}
               >
-                <span>Array View</span>
+                <span>Array Editor</span>
+                {viewType === 'array' && <span className="checkmark">✓</span>}
               </button>
               <button
                 onClick={() => {
                   setActiveMenu(null);
-                  localStorage.setItem('editorViewMode', 'textarea');
-                  window.dispatchEvent(new StorageEvent('storage', { key: 'editorViewMode', newValue: 'textarea' }));
+                  dispatch(setViewType('monaco'));
                 }}
+                className={viewType === 'monaco' ? 'active' : ''}
               >
-                <span>Textarea View</span>
-              </button>
-              <button
-                onClick={() => {
-                  setActiveMenu(null);
-                  localStorage.setItem('editorViewMode', 'monaco');
-                  window.dispatchEvent(new StorageEvent('storage', { key: 'editorViewMode', newValue: 'monaco' }));
-                }}
-              >
-                <span>Monaco View</span>
+                <span>Monaco Editor</span>
+                {viewType === 'monaco' && <span className="checkmark">✓</span>}
               </button>
             </div>
           )}
