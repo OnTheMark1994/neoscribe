@@ -51,7 +51,6 @@ function EditorLine({
    * Handle content edits - updates the line text in editorEngine
    */
   const handleContentEdit = (e) => {
-    console.log("handleContentEdit: ", e)
     const prevText = line.text || '';
     const newText = e.target.textContent;
 
@@ -77,9 +76,6 @@ function EditorLine({
 
     const prevType = classifyHeader(prevText);
     const newType = classifyHeader(newText);
-
-    console.log("prevType:", prevType)
-    console.log("newType:", newType)
 
     if (prevType !== newType) {
       if (newType === 'chapter') {

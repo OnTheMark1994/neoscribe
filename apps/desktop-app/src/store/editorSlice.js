@@ -125,6 +125,12 @@ const editorSlice = createSlice({
       // Keep viewMode and isArrayView as user preference
     },
 
+    // WHAT: Sets document content explicitly (used for view-mode sync, not keystrokes)
+    // WHEN: Called when switching from array view to Monaco so Monaco can read latest text
+    setContent(state, action) {
+      state.content = action.payload || '';
+    },
+    
     // WHAT: Bump fold/unfold/save triggers so editors can react via useEffect
     bumpFoldAllTrigger(state) {
       state.foldAllTrigger += 1;
@@ -158,6 +164,7 @@ export const {
   bumpFoldAllTrigger,
   bumpUnfoldAllTrigger,
   bumpSaveTrigger,
+  setContent,
   fileOpened,
 } = editorSlice.actions;
 

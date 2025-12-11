@@ -240,6 +240,8 @@ We will refactor in **small, testable steps** so the editor remains usable after
   - Load the main text into Redux / `editorEngine`.
   - Attempt to load the sidecar file.
   - Apply stored metadata to `editorEngine.lines` (e.g., `open` / `hidden`, view hints) and recompute visible lines.
+- On change view we should save the metadata and transfer it
+- This metadata structure needs to be able to natively tell monaco which lines to fold, and also be used in the editor array  
 
 **Why:**
 - Keeps the main text file clean while preserving rich per-document state.
