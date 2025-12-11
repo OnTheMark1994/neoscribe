@@ -1,0 +1,191 @@
+/* TokenUsageLog - Foldable transaction log panel */
+
+.token-usage-log {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 12px;
+}
+
+.token-usage-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.token-usage-log-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.token-usage-log-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.token-usage-log-toggle-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 300;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+}
+
+.token-usage-log-toggle-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.token-usage-log-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.token-usage-log-body {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+}
+
+.token-usage-log-controls {
+  margin-bottom: 10px;
+}
+
+.token-usage-log-checkbox {
+  font-size: 13px;
+  color: #b0b0b0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.token-usage-log-checkbox input {
+  cursor: pointer;
+}
+
+.token-usage-log-status {
+  font-size: 13px;
+  color: #a0a0a0;
+  padding: 8px 0;
+}
+
+.token-usage-log-status--error {
+  color: #ff6b6b;
+}
+
+.token-usage-log-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px; /* space between content and scrollbar */
+  margin-right: -6px; /* avoid extra space to the right of the scrollbar */
+}
+
+.token-usage-log-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.token-usage-log-row:last-child {
+  border-bottom: none;
+}
+
+.token-usage-log-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.token-usage-log-note {
+  font-size: 14px;
+  color: #ffffff;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.token-usage-log-meta {
+  font-size: 11px;
+  color: #909090;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.token-usage-log-date {
+  color: #a0a0a0;
+}
+
+.token-usage-log-id,
+.token-usage-log-user-id {
+  color: #707070;
+}
+
+.token-usage-log-tokens-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 90px;
+}
+
+.token-usage-log-tokens {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.token-usage-log-tokens-label {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.token-usage-log-tokens--positive {
+  color: #4CAF50;
+}
+
+.token-usage-log-tokens--negative {
+  color: #ff6b6b;
+}
+
+.token-usage-log-footer {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.token-usage-log-load-more {
+  padding: 8px 20px;
+  font-size: 13px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.token-usage-log-load-more:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+.token-usage-log-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

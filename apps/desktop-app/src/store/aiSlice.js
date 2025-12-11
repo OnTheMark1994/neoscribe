@@ -57,6 +57,20 @@ export const {
 export const selectAiProposals = (state) => state.ai.aiProposals;
 export const selectActiveChangeId = (state) => state.ai.activeChangeId;
 
+// Get all change IDs as a flat array for navigation
+export const selectAllChangeIds = (state) => {
+  const proposals = state.ai.aiProposals;
+  const ids = [];
+  Object.values(proposals).forEach((proposalArray) => {
+    if (Array.isArray(proposalArray)) {
+      proposalArray.forEach((proposal) => {
+        if (proposal.id) ids.push(proposal.id);
+      });
+    }
+  });
+  return ids;
+};
+
 // Flatten proposals to array for navigation
 export const selectFlattenedChanges = (state) => {
   const proposals = state.ai.aiProposals;

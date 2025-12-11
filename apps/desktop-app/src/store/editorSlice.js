@@ -48,6 +48,13 @@ const initialState = {
   // READ BY: Editor (for rendering), potentially Settings in future
   viewMode: 'array',
   
+  // WHAT: Which editor component to render
+  // VALUES: 'array' (EditorArray - line-based fold editor), 'monaco' (SimpleMonaco)
+  // UPDATED BY: Settings or WebMenuBar toggle
+  // READ BY: App.js to conditionally render editor component
+  // DEFAULT: 'array' for array view as requested
+  viewType: 'array',
+  
   // WHAT: Legacy debug toggle for array view styling
   // TODO: Evaluate if still needed, possibly remove
   isArrayView: true,
@@ -99,6 +106,15 @@ const editorSlice = createSlice({
       state.isArrayView = !!action.payload;
     },
     
+    // WHAT: Sets which editor component to render (array or monaco)
+    // WHEN: Called when user toggles between EditorArray and SimpleMonaco
+    setViewType(state, action) {
+      const type = action.payload;
+      if (type === 'array' || type === 'monaco') {
+        state.viewType = type;
+      }
+    },
+    
     // WHAT: Resets editor to clean state (no file open, no changes)
     // WHEN: Used for "New" operation
     // NOTE: Preserves viewMode as user preference
@@ -136,6 +152,7 @@ export const {
   setCurrentFilePath,
   setIsModified,
   setViewMode,
+  setViewType,
   setIsArrayView,
   resetEditor,
   bumpFoldAllTrigger,
@@ -159,6 +176,9 @@ export const selectViewMode = (state) => state.editor.viewMode;
 
 // Returns boolean for array view styling (legacy)
 export const selectIsArrayView = (state) => state.editor.isArrayView;
+
+// Returns which editor component to render: 'array' or 'monaco'
+export const selectViewType = (state) => state.editor.viewType;
 
 // Returns current document content
 export const selectContent = (state) => state.editor.content;

@@ -1,0 +1,530 @@
+import React, { useRef, useEffect } from 'react';
+import { getLines, getTextFromLines, updateLinesFromText } from '../utils/editorEngine';
+
+function EditorLine({ 
+  line, 
+  lineIndex, 
+  displayDepth, 
+  isArrayView, 
+  onToggleFold, 
+  onContentChange,
+  onRenderEditor,
+  currentChangeId,
+  onShowAIContextMenu,
+  isAIEnabled
+}) {
+  const contentRef = useRef(null);
+
+  // Determine CSS classes based on proposed change type
+  const isCurrentChange = line.proposedChangeId && currentChangeId === line.proposedChangeId;
+  const activeClass = isCurrentChange ? 'diff-line-active' : '';
+  
+  let editorLineClasses = `editor-line ${isArrayView ? 'array-view-line' : ''}`;
+  if (line.proposedChangeType === 'insert') {
+    editorLineClasses += ` diff-line-insert ${activeClass}`;
+  } else if (line.proposedChangeType === 'delete') {
+    editorLineClasses += ` diff-line-delete ${activeClass}`;
+  } else if (line.proposedChangeType === 'modify') {
+    editorLineClasses += ` diff-line-modify ${activeClass}`;
+  }
+
+  const depthClass = isArrayView ? `nesting-depth-${displayDepth}` : '';
+
+  useEffect(() => {
+    if (!isCurrentChange || !contentRef.current) return;
+
+    const container =
+      contentRef.current.closest('.array-line-container, .editor-line') || contentRef.current;
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [isCurrentChange]);
+
+  const handleContentEdit = (e) => {
+    const lines = getLines();
+
+    // Capture caret offset within this line before React re-renders
+    let caretOffset = null;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && contentRef.current) {
+      const range = sel.getRangeAt(0);
+      if (contentRef.current.contains(range.startContainer)) {
+        caretOffset = range.startOffset;
+      }
+    }
+
+    lines[lineIndex].text = e.target.textContent;
+    console.log('[EDITORLINE] handleContentEdit line', lineIndex, 'new text:', lines[lineIndex].text);
+    onContentChange();
+
+    if (caretOffset !== null) {
+      // After state updates, restore caret to the same offset inside this line
+      setTimeout(() => {
+        if (!contentRef.current) return;
+        const node = contentRef.current;
+        const textNode = node.firstChild || node;
+        const len = (textNode.textContent || '').length;
+        const safeOffset = Math.min(caretOffset, len);
+
+        const range2 = document.createRange();
+        const sel2 = window.getSelection();
+        try {
+          range2.setStart(textNode, safeOffset);
+        } catch (err) {
+          return;
+        }
+        range2.collapse(true);
+        sel2.removeAllRanges();
+        sel2.addRange(range2);
+      }, 0);
+    }
+  };
+
+  const handleMouseUp = () => {
+    // In some browsers the caret can jump to the start of the line after a click
+    // if the line is re-rendered. We only restore the caret when the selection
+    // is a single caret (collapsed). For range selections (double-click word
+    // selection, spellcheck selections, click+drag, etc.), we leave the native
+    // selection entirely alone so highlighting and spellcheck can work normally.
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !contentRef.current) return;
+
+    const range = sel.getRangeAt(0);
+
+    // If there is an active range selection, do not modify it.
+    if (!range.collapsed) return;
+
+    if (!contentRef.current.contains(range.startContainer)) return;
+
+    const offset = range.startOffset;
+
+    setTimeout(() => {
+      const node = contentRef.current;
+      if (!node) return;
+      const textNode = node.firstChild || node;
+      const len = (textNode.textContent || '').length;
+      const safeOffset = Math.min(offset, len);
+
+      const range2 = document.createRange();
+      const sel2 = window.getSelection();
+      try {
+        range2.setStart(textNode, safeOffset);
+      } catch (e) {
+        return;
+      }
+      range2.collapse(true);
+      sel2.removeAllRanges();
+      sel2.addRange(range2);
+    }, 0);
+  };
+
+  const handleKeyDown = (e) => {
+    // Note: Ctrl+S is now handled in parent Editor.js, not here
+    const lines = getLines();
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+
+      const range = sel.getRangeAt(0);
+      const offset = range.startOffset;
+
+      const currentText = contentRef.current ? contentRef.current.textContent : lines[lineIndex].text || '';
+      const beforeCursor = currentText.substring(0, offset);
+      const afterCursor = currentText.substring(offset);
+
+      lines[lineIndex].text = beforeCursor;
+
+      lines.splice(lineIndex + 1, 0, {
+        text: afterCursor,
+        open: true,
+        level: 0,
+        startIdx: -1,
+        endIdx: -1,
+        sendToAI: 'all',
+        id: Math.random().toString(36).substr(2, 9)
+      });
+
+      const currentText2 = getTextFromLines();
+      updateLinesFromText(currentText2);
+      onRenderEditor();
+      onContentChange();
+
+      setTimeout(() => {
+        const newLineElement = document.querySelector(`[data-idx="${lineIndex + 1}"] .line-content`);
+        if (newLineElement) {
+          newLineElement.focus();
+          const range = document.createRange();
+          const sel2 = window.getSelection();
+          range.setStart(newLineElement.firstChild || newLineElement, 0);
+          range.collapse(true);
+          sel2.removeAllRanges();
+          sel2.addRange(range);
+        }
+      }, 0);
+    } else if (e.key === 'Backspace') {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+
+      const range = sel.getRangeAt(0);
+
+      // If there is a selection (not just a caret), and it covers the entire line, clear the line
+      if (!range.collapsed) {
+        const currentText = contentRef.current ? contentRef.current.textContent : lines[lineIndex].text || '';
+        const selectedText = range.toString();
+
+        if (selectedText.length === currentText.length && lineIndex >= 0) {
+          e.preventDefault();
+
+          lines[lineIndex].text = '';
+
+          const currentText2 = getTextFromLines();
+          updateLinesFromText(currentText2);
+          onRenderEditor();
+          onContentChange();
+
+          setTimeout(() => {
+            const lineElement = document.querySelector(`[data-idx="${lineIndex}"] .line-content`);
+            if (lineElement) {
+              lineElement.focus();
+              const range2 = document.createRange();
+              const sel2 = window.getSelection();
+              if (lineElement.firstChild) {
+                range2.setStart(lineElement.firstChild, 0);
+              } else {
+                range2.setStart(lineElement, 0);
+              }
+              range2.collapse(true);
+              sel2.removeAllRanges();
+              sel2.addRange(range2);
+            }
+          }, 0);
+
+          return;
+        }
+
+        // For partial selections, let the browser handle deletion normally
+        return;
+      }
+
+      const cursorOffset = range.startOffset;
+
+      // Only merge with previous line when cursor is at the very start and there is no selection
+      if (cursorOffset === 0 && lineIndex > 0) {
+        e.preventDefault();
+
+        const currentText = lines[lineIndex].text;
+        const prevText = lines[lineIndex - 1].text;
+        const mergePosition = prevText.length;
+        const mergedText = prevText + currentText;
+
+        lines[lineIndex - 1].text = mergedText;
+        lines.splice(lineIndex, 1);
+
+        const currentText2 = getTextFromLines();
+        updateLinesFromText(currentText2);
+        onRenderEditor();
+        onContentChange();
+
+        setTimeout(() => {
+          const prevLineElement = document.querySelector(`[data-idx="${lineIndex - 1}"] .line-content`);
+          if (prevLineElement) {
+            prevLineElement.focus();
+            const range2 = document.createRange();
+            const sel2 = window.getSelection();
+            const pos = Math.min(mergePosition, prevLineElement.textContent.length);
+            if (prevLineElement.firstChild) {
+              range2.setStart(prevLineElement.firstChild, pos);
+            } else {
+              range2.setStart(prevLineElement, 0);
+            }
+            range2.collapse(true);
+            sel2.removeAllRanges();
+            sel2.addRange(range2);
+          }
+        }, 0);
+      }
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+
+      const currentIdx = lineIndex;
+      const goingDown = e.key === 'ArrowDown';
+
+      let targetIdx = currentIdx;
+      if (goingDown) {
+        for (let i = currentIdx + 1; i < lines.length; i++) {
+          if (!isLineHidden(i, lines)) {
+            targetIdx = i;
+            break;
+          }
+        }
+      } else {
+        for (let i = currentIdx - 1; i >= 0; i--) {
+          if (!isLineHidden(i, lines)) {
+            targetIdx = i;
+            break;
+          }
+        }
+      }
+
+      if (targetIdx !== currentIdx) {
+        setTimeout(() => {
+          const targetElement = document.querySelector(`[data-idx="${targetIdx}"] .line-content`);
+          if (targetElement) {
+            targetElement.focus();
+            const range = document.createRange();
+            const sel2 = window.getSelection();
+            if (goingDown) {
+              range.setStart(targetElement.firstChild || targetElement, 0);
+            } else {
+              const len = targetElement.textContent.length;
+              if (targetElement.firstChild) {
+                range.setStart(targetElement.firstChild, len);
+              } else {
+                range.setStart(targetElement, 0);
+              }
+            }
+            range.collapse(true);
+            sel2.removeAllRanges();
+            sel2.addRange(range);
+          }
+        }, 0);
+      }
+    }
+  };
+
+  const handleFoldClick = () => {
+    onToggleFold(lineIndex);
+  };
+
+  const handleFoldContextMenu = (e) => {
+    if (!onShowAIContextMenu) return;
+    e.preventDefault();
+    onShowAIContextMenu(e.clientX, e.clientY, lineIndex);
+  };
+
+  // Find the effective AI mode for this line, taking parent chapter into account
+  const getEffectiveSendToAI = () => {
+    const ownMode = line.sendToAI || 'all';
+
+    // Only sections can be overridden by a parent chapter
+    if (line.level !== 2) {
+      return ownMode;
+    }
+
+    const lines = getLines();
+    let parentChapterMode = null;
+
+    for (let j = lineIndex - 1; j >= 0; j--) {
+      const candidate = lines[j];
+      if (candidate.level === 1 && candidate.startIdx !== -1 && candidate.endIdx >= lineIndex) {
+        parentChapterMode = candidate.sendToAI || 'all';
+        break;
+      }
+    }
+
+    // If parent chapter is limited/hidden, this section is effectively hidden
+    if (parentChapterMode && parentChapterMode !== 'all') {
+      return 'none';
+    }
+
+    return ownMode;
+  };
+
+  const getEyeIconSrc = () => {
+    const effectiveMode = getEffectiveSendToAI();
+
+    // If this section wants to share but its parent chapter hides/limits it,
+    // show a grey eye to indicate it is not actually being shared.
+    if (
+      line.level === 2 &&
+      effectiveMode === 'none' &&
+      (line.sendToAI === 'all' || line.sendToAI === 'title' || line.sendToAI === 'summary')
+    ) {
+      return '/app-images/scribefold-ai-eye-grey.png';
+    }
+
+    if (effectiveMode === 'summary') {
+      return '/app-images/scribefold-ai-eye-partial.png';
+    }
+    if (effectiveMode === 'title') {
+      return '/app-images/scribefold-ai-eye-partial-less.png';
+    }
+    if (effectiveMode === 'all') {
+      return '/app-images/scribefold-ai-eye.png';
+    }
+    return null;
+  };
+
+  // Get text to display based on change type
+  const getDisplayText = () => {
+    if (line.proposedChangeType === 'modify') {
+      return line.modifyFrom;
+    } else if (line.proposedChangeType === 'insert') {
+      return line.text; // Show inserted text
+    } else if (line.proposedChangeType === 'delete') {
+      return line.text; // Show text to be deleted
+    } else {
+      return line.text; // Normal line
+    }
+  };
+
+  const isEditable = line.proposedChangeType !== 'insert';
+
+  return (
+    <>
+      {isArrayView && (
+        <div className="array-line-container" data-level={line.level}>
+          <div className="array-index-gutter">{lineIndex}:</div>
+          <div 
+            className={`${editorLineClasses} ${depthClass}`} 
+            data-idx={lineIndex} 
+            data-level={line.level}
+            data-change-id={line.proposedChangeId || ''}
+          >
+            <div className="array-id-box">{line.id}:</div>
+            
+            {line.startIdx !== -1 && line.endIdx !== -1 && line.endIdx >= line.startIdx ? (
+              <button 
+                className={`fold-btn ${isAIEnabled ? (line.sendToAI === 'all' ? 'ai-full' : (line.sendToAI === 'title' ? 'ai-partial' : 'ai-none')) : ''}`}
+                data-idx={lineIndex}
+                onClick={handleFoldClick}
+                onContextMenu={handleFoldContextMenu}
+              >
+                {line.open ? '−' : '+'}
+                {isAIEnabled && getEyeIconSrc() && (
+                  <img
+                    src={getEyeIconSrc()}
+                    alt="AI sharing"
+                    className="fold-btn-eye"
+                    draggable="false"
+                  />
+                )}
+              </button>
+            ) : (
+              <span className="fold-spacer"></span>
+            )}
+            
+            {line.proposedChangeType === 'modify' ? (
+              <div className="modify-stack">
+                <div
+                  ref={contentRef}
+                  className="line-content diff-line-delete"
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  onInput={handleContentEdit}
+                  onKeyDown={handleKeyDown}
+                  onMouseUp={handleMouseUp}
+                  data-idx={lineIndex}
+                >
+                  {line.modifyFrom}
+                </div>
+                <div
+                  className="line-content diff-line-insert"
+                  contentEditable={false}
+                  suppressContentEditableWarning={true}
+                  data-idx={lineIndex}
+                >
+                  {line.modifyTo || line.text || ''}
+                </div>
+              </div>
+            ) : (
+              <div 
+                ref={contentRef}
+                className="line-content" 
+                contentEditable={isEditable}
+                suppressContentEditableWarning={true}
+                onInput={handleContentEdit}
+                onKeyDown={handleKeyDown}
+                onMouseUp={handleMouseUp}
+                data-idx={lineIndex}
+              >
+                {getDisplayText()}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {!isArrayView && (
+        <div 
+          className={`${editorLineClasses} ${depthClass}`} 
+          data-idx={lineIndex} 
+          data-level={line.level}
+          data-change-id={line.proposedChangeId || ''}
+        >
+          {line.startIdx !== -1 && line.endIdx !== -1 && line.endIdx >= line.startIdx ? (
+            <button 
+              className={`fold-btn ${isAIEnabled ? (line.sendToAI === 'all' ? 'ai-full' : (line.sendToAI === 'title' ? 'ai-partial' : 'ai-none')) : ''}`}
+              data-idx={lineIndex}
+              onClick={handleFoldClick}
+              onContextMenu={handleFoldContextMenu}
+            >
+              {line.open ? '−' : '+'}
+              {isAIEnabled && getEyeIconSrc() && (
+                <img
+                  src={getEyeIconSrc()}
+                  alt="AI sharing"
+                  className="fold-btn-eye"
+                  draggable="false"
+                />
+              )}
+            </button>
+          ) : (
+            <span className="fold-spacer"></span>
+          )}
+          
+          {line.proposedChangeType === 'modify' ? (
+            <div className="modify-stack">
+              <div 
+                ref={contentRef}
+                className="line-content diff-line-delete" 
+                contentEditable={true}
+                suppressContentEditableWarning={true}
+                onInput={handleContentEdit}
+                onKeyDown={handleKeyDown}
+                onMouseUp={handleMouseUp}
+                data-idx={lineIndex}
+              >
+                {line.modifyFrom}
+              </div>
+              <div 
+                className="line-content diff-line-insert" 
+                contentEditable={false}
+                suppressContentEditableWarning={true}
+                data-idx={lineIndex}
+              >
+                {line.modifyTo || line.text || ''}
+              </div>
+            </div>
+          ) : (
+            <div 
+              ref={contentRef}
+              className="line-content" 
+              contentEditable={isEditable}
+              suppressContentEditableWarning={true}
+              onInput={handleContentEdit}
+              onKeyDown={handleKeyDown}
+              onMouseUp={handleMouseUp}
+              data-idx={lineIndex}
+            >
+              {getDisplayText()}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+const isLineHidden = (lineIdx, lines) => {
+  for (let j = lineIdx - 1; j >= 0; j--) {
+    const p = lines[j];
+    if (p.startIdx !== -1 && p.endIdx >= lineIdx && !p.open) {
+      return true;
+    }
+  }
+  return false;
+};
+
+export default EditorLine;

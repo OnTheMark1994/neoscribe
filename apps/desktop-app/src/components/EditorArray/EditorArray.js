@@ -1,0 +1,629 @@
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, memo } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { 
+  selectContent, 
+  selectCurrentFilePath,
+  selectFoldAllTrigger,
+  selectUnfoldAllTrigger,
+  selectSaveTrigger,
+  setIsModified 
+} from '../../store/editorSlice';
+import { selectIsAIEnabled } from '../../store/settingsSlice';
+import { selectActiveChangeId, selectAllChangeIds } from '../../store/aiSlice';
+import { showStatus } from '../../store/statusSlice';
+import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines } from '../../utils/editorEngine';
+import { saveFile } from '../../utils/fileOps';
+import EditorLine from './EditorLine';
+import DiffActionButtons from '../AI/DiffActionButtons';
+import DiffNavigation from '../AI/DiffNavigation';
+import './EditorArray.css';
+
+/**
+ * EditorArray - Line-based fold editor component
+ * 
+ * A contenteditable line-by-line editor with:
+ * - Collapsible #chapter and #section folding
+ * - Array view with line indexes and IDs
+ * - AI proposal diff highlighting
+ * - Find functionality (Ctrl+F)
+ * - Integration with editorEngine for state management
+ */
+const EditorArray = forwardRef((props, ref) => {
+  const dispatch = useDispatch();
+  
+  // Redux selectors
+  const content = useSelector(selectContent);
+  const currentFilePath = useSelector(selectCurrentFilePath);
+  const isAIEnabled = useSelector(selectIsAIEnabled);
+  const foldAllTrigger = useSelector(selectFoldAllTrigger);
+  const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
+  const saveTrigger = useSelector(selectSaveTrigger);
+  const activeChangeId = useSelector(selectActiveChangeId);
+  const allChangeIds = useSelector(selectAllChangeIds);
+  
+  // Local state
+  const [isArrayView, setIsArrayView] = useState(true);
+  const [renderTrigger, setRenderTrigger] = useState(0);
+  const [isFindVisible, setIsFindVisible] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [findMatches, setFindMatches] = useState([]);
+  const [currentFindIndex, setCurrentFindIndex] = useState(-1);
+  
+  // Refs
+  const editorRef = useRef(null);
+  const findInputRef = useRef(null);
+  const menuListenersSetupRef = useRef(false);
+  const filePathRef = useRef(currentFilePath);
+
+  // Keep file path ref in sync
+  useEffect(() => {
+    filePathRef.current = currentFilePath;
+  }, [currentFilePath]);
+
+  // Expose imperative API for AI integration
+  useImperativeHandle(ref, () => ({
+    /**
+     * Prepare lines for AI - returns current lines array
+     */
+    prepareForAI: () => {
+      return getLines();
+    },
+    /**
+     * Update lines from AI response
+     */
+    updateLinesFromAI: (newLines) => {
+      setLines(newLines);
+      setRenderTrigger(prev => prev + 1);
+    },
+    /**
+     * Toggle array view mode
+     */
+    toggleArrayView: () => {
+      setIsArrayView(prev => !prev);
+    },
+    /**
+     * Get current text content
+     */
+    getContent: () => {
+      return getTextFromLines();
+    }
+  }));
+
+  // Initialize editor when content changes
+  useEffect(() => {
+    if (content !== undefined) {
+      parseText(content);
+      setRenderTrigger(prev => prev + 1);
+    }
+  }, [content]);
+
+  // Set up Electron menu listeners (once)
+  useEffect(() => {
+    if (window.electronAPI && !menuListenersSetupRef.current) {
+      // Toggle array view from menu
+      if (window.electronAPI.onToggleArrayView) {
+        window.electronAPI.onToggleArrayView(() => {
+          setIsArrayView(prev => !prev);
+        });
+      }
+      menuListenersSetupRef.current = true;
+    }
+  }, []);
+
+  // Respond to fold all trigger
+  useEffect(() => {
+    if (!foldAllTrigger) return;
+    foldAll();
+  }, [foldAllTrigger]);
+
+  // Respond to unfold all trigger
+  useEffect(() => {
+    if (!unfoldAllTrigger) return;
+    unfoldAll();
+  }, [unfoldAllTrigger]);
+
+  // Respond to save trigger
+  useEffect(() => {
+    if (!saveTrigger) return;
+    handleSave();
+  }, [saveTrigger]);
+
+  // Keyboard shortcuts (Find, Escape)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ctrl+S: Save
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+
+      // Ctrl+F: Find
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setIsFindVisible(true);
+        setTimeout(() => {
+          if (findInputRef.current) {
+            findInputRef.current.focus();
+            findInputRef.current.select();
+          }
+        }, 0);
+        return;
+      }
+
+      // Escape: Close find box
+      if (e.key === 'Escape') {
+        if (isFindVisible) {
+          setIsFindVisible(false);
+          clearFindHighlight();
+        }
+        return;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFindVisible]);
+
+  // Auto-highlight current match when index changes
+  useEffect(() => {
+    if (currentFindIndex >= 0 && findMatches.length > 0) {
+      highlightCurrentFindMatch(currentFindIndex);
+    }
+  }, [currentFindIndex, findMatches]);
+
+  // Re-compute find matches when content changes
+  useEffect(() => {
+    if (!isFindVisible || !findQuery) {
+      clearFindHighlight();
+      return;
+    }
+    recomputeFindMatches(findQuery);
+  }, [renderTrigger]);
+
+  /**
+   * Fold all collapsible sections
+   */
+  const foldAll = () => {
+    const lines = getLines();
+    lines.forEach(line => {
+      if (line.startIdx !== -1 && line.endIdx >= line.startIdx) {
+        line.open = false;
+        if (!line.text.includes('#folded')) {
+          line.text = line.text.trim() + ' #folded';
+        }
+      }
+    });
+    setRenderTrigger(prev => prev + 1);
+    dispatch(setIsModified(true));
+  };
+
+  /**
+   * Unfold all sections
+   */
+  const unfoldAll = () => {
+    const lines = getLines();
+    lines.forEach(line => {
+      if (line.startIdx !== -1) {
+        line.open = true;
+        line.text = line.text.replace(/#folded\b/gi, '').trim();
+      }
+    });
+    setRenderTrigger(prev => prev + 1);
+    dispatch(setIsModified(true));
+  };
+
+  /**
+   * Toggle fold state for a specific line
+   */
+  const toggleFold = (idx) => {
+    const lines = getLines();
+    lines[idx].open = !lines[idx].open;
+
+    // Keep #folded tag in sync with open state
+    let text = lines[idx].text.replace(/#folded\b/gi, '').trim();
+    if (!lines[idx].open) {
+      text += ' #folded';
+    }
+    lines[idx].text = text;
+
+    setRenderTrigger(prev => prev + 1);
+    dispatch(setIsModified(true));
+  };
+
+  /**
+   * Handle content change from line edits
+   */
+  const handleContentChange = () => {
+    dispatch(setIsModified(true));
+  };
+
+  /**
+   * Re-render editor
+   */
+  const handleRenderEditor = () => {
+    setRenderTrigger(prev => prev + 1);
+  };
+
+  /**
+   * Handle save
+   */
+  const handleSave = async () => {
+    const textContent = getTextFromLines();
+    const filePath = filePathRef.current;
+
+    const result = await saveFile(filePath, textContent);
+    if (result.success) {
+      dispatch(setIsModified(false));
+      if (result.filePath) {
+        dispatch({ type: 'editor/setCurrentFilePath', payload: result.filePath });
+      }
+      dispatch(showStatus('File saved'));
+    } else if (result.error) {
+      dispatch(showStatus('Failed to save: ' + result.error));
+    }
+  };
+
+  /**
+   * Show AI context menu (for Electron native menu)
+   */
+  const showAIContextMenu = (x, y, lineIdx) => {
+    const lines = getLines();
+    const line = lines[lineIdx];
+
+    if (window.electronAPI && window.electronAPI.showAIContextMenu && line) {
+      window.electronAPI.showAIContextMenu({
+        lineIdx,
+        sendToAI: line.sendToAI,
+        level: line.level,
+        isOpen: line.open
+      });
+    }
+  };
+
+  /**
+   * Check if a line is hidden (inside a collapsed fold)
+   */
+  const isLineHidden = (lineIdx) => {
+    const lines = getLines();
+    for (let j = lineIdx - 1; j >= 0; j--) {
+      const p = lines[j];
+      if (p.startIdx !== -1 && p.endIdx >= lineIdx && !p.open) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  /**
+   * Recalculate fold ranges to include proposed lines
+   */
+  const recalculateFoldRanges = (lines) => {
+    const stack = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const text = line.text.trim();
+      const isHeader = text.match(/^#chapter(?:\s|$)/i) || text.match(/^#section(?:\s|$)/i);
+      
+      if (isHeader) {
+        const level = text.match(/^#chapter(?:\s|$)/i) ? 1 : 2;
+        
+        while (stack.length && stack[stack.length - 1].level >= level) {
+          const prev = stack.pop();
+          lines[prev.idx].endIdx = Math.max(prev.idx, i - 1);
+        }
+        
+        lines[i].startIdx = i;
+        stack.push({ idx: i, level });
+      } else if (text.match(/^#chapterend$/i)) {
+        while (stack.length) {
+          const prev = stack.pop();
+          if (lines[prev.idx].level === 1) {
+            lines[prev.idx].endIdx = i;
+            break;
+          }
+        }
+      } else if (text.match(/^#sectionend$/i)) {
+        while (stack.length) {
+          const prev = stack.pop();
+          if (lines[prev.idx].level === 2) {
+            lines[prev.idx].endIdx = i;
+            break;
+          }
+        }
+      }
+    }
+    
+    while (stack.length) {
+      const prev = stack.pop();
+      lines[prev.idx].endIdx = lines.length - 1;
+    }
+  };
+
+  /**
+   * Get visible lines (not hidden by collapsed folds)
+   */
+  const getVisibleLines = () => {
+    const lines = getLines();
+    recalculateFoldRanges(lines);
+    
+    const visible = [];
+    let currentDepth = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      
+      if (isLineHidden(i)) continue;
+      
+      let displayDepth = currentDepth;
+      
+      // Update nesting context
+      if (l.startIdx !== -1 && l.endIdx !== -1) {
+        if (l.level === 1) {
+          displayDepth = 0;
+          currentDepth = 1;
+        } else if (l.level === 2) {
+          displayDepth = 1;
+          currentDepth = 2;
+        }
+      }
+      
+      visible.push({ line: l, index: i, displayDepth });
+    }
+    
+    return visible;
+  };
+
+  // === FIND FUNCTIONALITY ===
+
+  const clearFindHighlight = () => {
+    const container = editorRef.current;
+    if (!container) return;
+
+    const highlights = container.querySelectorAll('.find-highlight, .find-highlight-current');
+    highlights.forEach(el => {
+      const parent = el.parentNode;
+      if (!parent) return;
+      parent.replaceChild(document.createTextNode(el.textContent), el);
+      parent.normalize();
+    });
+  };
+
+  const recomputeFindMatches = (query) => {
+    clearFindHighlight();
+
+    if (!query) {
+      setFindMatches([]);
+      setCurrentFindIndex(-1);
+      return;
+    }
+
+    const container = editorRef.current;
+    if (!container) {
+      setFindMatches([]);
+      setCurrentFindIndex(-1);
+      return;
+    }
+
+    const q = query.toLowerCase();
+    const matches = [];
+
+    const lineContents = container.querySelectorAll('.line-content');
+    lineContents.forEach((lineContent, index) => {
+      const lineElement = lineContent.closest('.editor-line');
+      const lineIndex = parseInt(lineElement?.getAttribute('data-idx'), 10) || index;
+
+      searchInElement(lineContent, lineIndex, 'content');
+
+      if (isArrayView) {
+        const lineContainer = lineContent.closest('.array-line-container');
+        if (lineContainer) {
+          const gutter = lineContainer.querySelector('.array-index-gutter');
+          const idBox = lineContainer.querySelector('.array-id-box');
+          if (gutter) searchInElement(gutter, lineIndex, 'line-number');
+          if (idBox) searchInElement(idBox, lineIndex, 'id');
+        }
+      }
+    });
+
+    function searchInElement(element, lineIndex, type) {
+      const text = element.textContent || '';
+      const lowerText = text.toLowerCase();
+      let startIndex = 0;
+      while ((startIndex = lowerText.indexOf(q, startIndex)) !== -1) {
+        matches.push({
+          element,
+          lineIndex,
+          startIndex,
+          endIndex: startIndex + query.length,
+          type
+        });
+        startIndex += query.length;
+      }
+    }
+
+    highlightAllMatches(matches, container);
+
+    setFindMatches(matches);
+    if (matches.length > 0) {
+      setCurrentFindIndex(0);
+    } else {
+      setCurrentFindIndex(-1);
+    }
+  };
+
+  const highlightCurrentFindMatch = (index) => {
+    if (findMatches.length === 0 || index < 0 || index >= findMatches.length) {
+      return;
+    }
+
+    const container = editorRef.current;
+    if (!container) return;
+
+    // Reset previous "current" highlight
+    container.querySelectorAll('.find-highlight-current').forEach(el => {
+      el.classList.remove('find-highlight-current');
+      el.classList.add('find-highlight');
+    });
+
+    const highlight = container.querySelector(`[data-find-index="${index}"]`);
+    if (highlight) {
+      highlight.classList.remove('find-highlight');
+      highlight.classList.add('find-highlight-current');
+      const containerEl = highlight.closest('.array-line-container, .editor-line') || highlight;
+      containerEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const highlightAllMatches = (matches, container) => {
+    const matchesByElement = new Map();
+
+    matches.forEach((match, index) => {
+      if (!matchesByElement.has(match.element)) {
+        matchesByElement.set(match.element, []);
+      }
+      matchesByElement.get(match.element).push({ ...match, globalIndex: index });
+    });
+
+    matchesByElement.forEach((elementMatches, element) => {
+      if (!container.contains(element)) return;
+
+      const text = element.textContent || '';
+      const fragments = [];
+      let lastIndex = 0;
+
+      elementMatches.sort((a, b) => a.startIndex - b.startIndex);
+
+      elementMatches.forEach(match => {
+        if (match.startIndex > lastIndex) {
+          fragments.push(document.createTextNode(text.substring(lastIndex, match.startIndex)));
+        }
+
+        const highlight = document.createElement('span');
+        highlight.className = 'find-highlight';
+        highlight.textContent = text.substring(match.startIndex, match.endIndex);
+        highlight.dataset.findIndex = match.globalIndex;
+        if (match.type) {
+          highlight.classList.add(`find-${match.type}`);
+        }
+
+        fragments.push(highlight);
+        lastIndex = match.endIndex;
+      });
+
+      if (lastIndex < text.length) {
+        fragments.push(document.createTextNode(text.substring(lastIndex)));
+      }
+
+      element.innerHTML = '';
+      fragments.forEach(fragment => element.appendChild(fragment));
+    });
+  };
+
+  const handleFindInputChange = (e) => {
+    const value = e.target.value;
+    setFindQuery(value);
+    
+    // Debounce search for better performance
+    if (window.findDebounceTimeout) {
+      clearTimeout(window.findDebounceTimeout);
+    }
+    window.findDebounceTimeout = setTimeout(() => {
+      recomputeFindMatches(value);
+    }, 150);
+  };
+
+  const handleFindNext = () => {
+    if (findMatches.length === 0) return;
+    setCurrentFindIndex(prev => (prev + 1) % findMatches.length);
+  };
+
+  const handleFindPrevious = () => {
+    if (findMatches.length === 0) return;
+    setCurrentFindIndex(prev => prev <= 0 ? findMatches.length - 1 : prev - 1);
+  };
+
+  const handleFindClose = () => {
+    setIsFindVisible(false);
+    clearFindHighlight();
+  };
+
+  // Get visible lines for rendering
+  const visibleLines = getVisibleLines();
+
+  return (
+    <>
+      {/* Find Box */}
+      {isFindVisible && (
+        <div className="find-box">
+          <input
+            ref={findInputRef}
+            type="text"
+            className="find-input"
+            value={findQuery}
+            onChange={handleFindInputChange}
+            placeholder="Find..."
+          />
+          <div className="find-counter">
+            {findMatches.length === 0
+              ? 'No results'
+              : `${currentFindIndex + 1} of ${findMatches.length}`}
+          </div>
+          <button
+            className="find-btn"
+            onClick={handleFindPrevious}
+            disabled={findMatches.length === 0}
+          >
+            ↑
+          </button>
+          <button
+            className="find-btn"
+            onClick={handleFindNext}
+            disabled={findMatches.length === 0}
+          >
+            ↓
+          </button>
+          <button
+            className="find-btn find-close-btn"
+            onClick={handleFindClose}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Editor Display */}
+      <div id="editor-display" className="editor-display" ref={editorRef}>
+        {visibleLines.map(({ line, index, displayDepth }) => (
+          <React.Fragment key={line.id || index}>
+            <EditorLine
+              line={line}
+              lineIndex={index}
+              displayDepth={displayDepth}
+              isArrayView={isArrayView}
+              onToggleFold={toggleFold}
+              onContentChange={handleContentChange}
+              onRenderEditor={handleRenderEditor}
+              currentChangeId={activeChangeId}
+              onShowAIContextMenu={showAIContextMenu}
+              isAIEnabled={isAIEnabled}
+            />
+            {line.proposedChangeType && (
+              <DiffActionButtons
+                proposedChangeId={line.proposedChangeId}
+                changeType={line.proposedChangeType}
+                activeChangeId={activeChangeId}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Diff Navigation (shown when AI proposals exist) */}
+      {allChangeIds && allChangeIds.length > 0 && <DiffNavigation />}
+    </>
+  );
+});
+
+export default memo(EditorArray);
