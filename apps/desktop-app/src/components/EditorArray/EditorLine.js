@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { getLines, getTextFromLines, updateLinesFromText } from '../../utils/editorEngine';
+import { getLines, getTextFromLines, updateLinesFromText, updateLineText, splitLine, mergeLine } from '../../utils/editorEngine';
 
 /**
  * EditorLine - Individual line component for the array editor
@@ -42,30 +42,15 @@ function EditorLine({
   // Auto-scroll to current change when navigating diffs
   useEffect(() => {
     if (!isCurrentChange || !contentRef.current) return;
-
-    console.log('[EditorLine] Scrolling to current change lineIndex=', lineIndex, 'changeId=', line.proposedChangeId);
     const container =
       contentRef.current.closest('.array-line-container, .editor-line') || contentRef.current;
     container.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [isCurrentChange, lineIndex, line.proposedChangeId]);
 
-  if (line.proposedChangeType) {
-    console.log('[EditorLine] Rendering diff line', {
-      lineIndex,
-      id: line.id,
-      proposedChangeType: line.proposedChangeType,
-      proposedChangeId: line.proposedChangeId,
-      currentChangeId,
-      isCurrentChange,
-    });
-  }
-
   /**
    * Handle content edits - updates the line text in editorEngine
    */
   const handleContentEdit = (e) => {
-    const lines = getLines();
-
     // Capture caret offset within this line before React re-renders
     let caretOffset = null;
     const sel = window.getSelection();
@@ -76,7 +61,7 @@ function EditorLine({
       }
     }
 
-    lines[lineIndex].text = e.target.textContent;
+    updateLineText(lineIndex, e.target.textContent);
     onContentChange();
 
     // Restore caret position after state updates
@@ -153,25 +138,7 @@ function EditorLine({
 
       const range = sel.getRangeAt(0);
       const offset = range.startOffset;
-
-      const currentText = contentRef.current ? contentRef.current.textContent : lines[lineIndex].text || '';
-      const beforeCursor = currentText.substring(0, offset);
-      const afterCursor = currentText.substring(offset);
-
-      lines[lineIndex].text = beforeCursor;
-
-      lines.splice(lineIndex + 1, 0, {
-        text: afterCursor,
-        open: true,
-        level: 0,
-        startIdx: -1,
-        endIdx: -1,
-        sendToAI: 'all',
-        id: Math.random().toString(36).substr(2, 9)
-      });
-
-      const currentText2 = getTextFromLines();
-      updateLinesFromText(currentText2);
+      splitLine(lineIndex, offset);
       onRenderEditor();
       onContentChange();
 
@@ -203,7 +170,7 @@ function EditorLine({
 
         if (selectedText.length === currentText.length && lineIndex >= 0) {
           e.preventDefault();
-          lines[lineIndex].text = '';
+          updateLineText(lineIndex, '');
           const currentText2 = getTextFromLines();
           updateLinesFromText(currentText2);
           onRenderEditor();
@@ -235,17 +202,10 @@ function EditorLine({
       // Only merge with previous line when cursor is at the very start
       if (cursorOffset === 0 && lineIndex > 0) {
         e.preventDefault();
-
-        const currentText = lines[lineIndex].text;
-        const prevText = lines[lineIndex - 1].text;
+        const prevText = lines[lineIndex - 1].text || '';
         const mergePosition = prevText.length;
-        const mergedText = prevText + currentText;
 
-        lines[lineIndex - 1].text = mergedText;
-        lines.splice(lineIndex, 1);
-
-        const currentText2 = getTextFromLines();
-        updateLinesFromText(currentText2);
+        mergeLine(lineIndex);
         onRenderEditor();
         onContentChange();
 

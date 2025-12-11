@@ -34,12 +34,8 @@ function AISidebar({ onAIResponse, monacoRef }) {
   const viewType = useSelector(selectViewType); // 'array' or 'monaco'
   
   const [messages, setMessages] = useState([]);
-  // In developer mode start with a sample prompt that asks the AI to make multiple edits for testing
-  const [prompt, setPrompt] = useState(() => (
-    developerMode
-      ? 'please add content in several places of your choosing. '
-      : ''
-  ));
+  // Always start with a sample prompt that asks the AI to make multiple edits for testing
+  const [prompt, setPrompt] = useState('please add content of your choosing in various places ');
   const [tokenCount, setTokenCount] = useState(0);
   const [isThinking, setIsThinking] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);

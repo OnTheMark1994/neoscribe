@@ -11,7 +11,7 @@ import {
 } from '../../store/editorSlice';
 import { selectIsAIEnabled } from '../../store/settingsSlice';
 import { showStatus } from '../../store/statusSlice';
-import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines } from '../../utils/editorEngine';
+import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines, recomputeVisibleLines, getVisibleLinesCached } from '../../utils/editorEngine';
 import { saveFile } from '../../utils/fileOps';
 import EditorLine from './EditorLine';
 import DiffActionButtons from './AI/DiffActionButtons';
@@ -71,17 +71,15 @@ const EditorArray = forwardRef((props, ref) => {
   useImperativeHandle(ref, () => ({
     prepareForAI: () => {
       const lines = getLines();
-      console.log('[EditorArray] prepareForAI lines:', lines);
       return lines;
     },
     updateLinesFromAI: (newLines) => {
-      console.log('[EditorArray] updateLinesFromAI received lines:', newLines);
       setLines(newLines);
+      recomputeVisibleLines();
       setRenderTrigger(prev => prev + 1);
     },
     getContent: () => {
       const text = getTextFromLines();
-      console.log('[EditorArray] getContent length:', text.length);
       return text;
     }
   }));
@@ -90,11 +88,10 @@ const EditorArray = forwardRef((props, ref) => {
   useEffect(() => {
     if (content !== undefined) {
       parseText(content);
+      recomputeVisibleLines();
       setRenderTrigger(prev => prev + 1);
     }
   }, [content]);
-
-  // NOTE: No Electron menu listeners are used. All view switching is via WebMenuBar/Redux.
 
   // Respond to fold all trigger
   useEffect(() => {
@@ -172,6 +169,7 @@ const EditorArray = forwardRef((props, ref) => {
    */
   const foldAll = () => {
     const lines = getLines();
+
     lines.forEach(line => {
       if (line.startIdx !== -1 && line.endIdx >= line.startIdx) {
         line.open = false;
@@ -180,6 +178,7 @@ const EditorArray = forwardRef((props, ref) => {
         }
       }
     });
+    recomputeVisibleLines();
     setRenderTrigger(prev => prev + 1);
     dispatch(setIsModified(true));
   };
@@ -189,12 +188,14 @@ const EditorArray = forwardRef((props, ref) => {
    */
   const unfoldAll = () => {
     const lines = getLines();
+
     lines.forEach(line => {
       if (line.startIdx !== -1) {
         line.open = true;
         line.text = line.text.replace(/#folded\b/gi, '').trim();
       }
     });
+    recomputeVisibleLines();
     setRenderTrigger(prev => prev + 1);
     dispatch(setIsModified(true));
   };
@@ -204,6 +205,7 @@ const EditorArray = forwardRef((props, ref) => {
    */
   const toggleFold = (idx) => {
     const lines = getLines();
+
     lines[idx].open = !lines[idx].open;
 
     // Keep #folded tag in sync with open state
@@ -212,7 +214,7 @@ const EditorArray = forwardRef((props, ref) => {
       text += ' #folded';
     }
     lines[idx].text = text;
-
+    recomputeVisibleLines();
     setRenderTrigger(prev => prev + 1);
     dispatch(setIsModified(true));
   };
@@ -251,101 +253,8 @@ const EditorArray = forwardRef((props, ref) => {
   };
 
   /**
-   * Check if a line is hidden (inside a collapsed fold)
+   * Clear find highlight
    */
-  const isLineHidden = (lineIdx) => {
-    const lines = getLines();
-    for (let j = lineIdx - 1; j >= 0; j--) {
-      const p = lines[j];
-      if (p.startIdx !== -1 && p.endIdx >= lineIdx && !p.open) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  /**
-   * Recalculate fold ranges to include proposed lines
-   */
-  const recalculateFoldRanges = (lines) => {
-    const stack = [];
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const text = line.text.trim();
-      const isHeader = text.match(/^#chapter(?:\s|$)/i) || text.match(/^#section(?:\s|$)/i);
-      
-      if (isHeader) {
-        const level = text.match(/^#chapter(?:\s|$)/i) ? 1 : 2;
-        
-        while (stack.length && stack[stack.length - 1].level >= level) {
-          const prev = stack.pop();
-          lines[prev.idx].endIdx = Math.max(prev.idx, i - 1);
-        }
-        
-        lines[i].startIdx = i;
-        stack.push({ idx: i, level });
-      } else if (text.match(/^#chapterend$/i)) {
-        while (stack.length) {
-          const prev = stack.pop();
-          if (lines[prev.idx].level === 1) {
-            lines[prev.idx].endIdx = i;
-            break;
-          }
-        }
-      } else if (text.match(/^#sectionend$/i)) {
-        while (stack.length) {
-          const prev = stack.pop();
-          if (lines[prev.idx].level === 2) {
-            lines[prev.idx].endIdx = i;
-            break;
-          }
-        }
-      }
-    }
-    
-    while (stack.length) {
-      const prev = stack.pop();
-      lines[prev.idx].endIdx = lines.length - 1;
-    }
-  };
-
-  /**
-   * Get visible lines (not hidden by collapsed folds)
-   */
-  const getVisibleLines = () => {
-    const lines = getLines();
-    recalculateFoldRanges(lines);
-    
-    const visible = [];
-    let currentDepth = 0;
-    
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i];
-      
-      if (isLineHidden(i)) continue;
-      
-      let displayDepth = currentDepth;
-      
-      // Update nesting context
-      if (l.startIdx !== -1 && l.endIdx !== -1) {
-        if (l.level === 1) {
-          displayDepth = 0;
-          currentDepth = 1;
-        } else if (l.level === 2) {
-          displayDepth = 1;
-          currentDepth = 2;
-        }
-      }
-      
-      visible.push({ line: l, index: i, displayDepth });
-    }
-    
-    return visible;
-  };
-
-  // === FIND FUNCTIONALITY ===
-
   const clearFindHighlight = () => {
     const container = editorRef.current;
     if (!container) return;
@@ -519,17 +428,7 @@ const EditorArray = forwardRef((props, ref) => {
   };
 
   // Get visible lines for rendering
-  const visibleLines = getVisibleLines();
-  const proposedVisible = visibleLines.filter(v => v.line && v.line.proposedChangeType);
-  console.log('[EditorArray] visibleLines count:', visibleLines.length, 'proposedVisible:', proposedVisible.map(v => ({
-    index: v.index,
-    id: v.line.id,
-    type: v.line.proposedChangeType,
-  })), 'aiChanges:', {
-    allChangeIds,
-    currentChangeIdIndex,
-    processedChangesByLineID,
-  });
+  const visibleLines = getVisibleLinesCached();
 
   return (
     <>
@@ -601,10 +500,7 @@ const EditorArray = forwardRef((props, ref) => {
 
       {/* Diff Navigation (shown when AI proposals exist) */}
       {allChangeIds && allChangeIds.length > 0 && (
-        <>
-          {console.log('[EditorArray] Rendering DiffNavigation, allChangeIds:', allChangeIds)}
-          <DiffNavigation onUpdate={handleRenderEditor} />
-        </>
+        <DiffNavigation onUpdate={handleRenderEditor} />
       )}
     </>
   );
