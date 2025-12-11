@@ -23,10 +23,14 @@
 /* Chapter / Section line styling */
 .monaco-editor .monaco-chapter-line {
   color: #000000 !important;
+  font-weight: bold;
+  font-size: 1.15em;
 }
 
 .monaco-editor .monaco-section-line {
   color: #000000 !important;
+  font-weight: bold;
+  font-size: 1.08em;
 }
 
 /* AI eye icons in glyph margin */

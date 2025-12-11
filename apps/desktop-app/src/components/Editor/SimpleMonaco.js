@@ -165,14 +165,17 @@ const SimpleMonaco = forwardRef((props, ref) => {
         },
       });
 
-      // Define and apply custom theme with transparent background and no line highlight boxes
+      // Define and apply custom theme with transparent background and black text
+      // Use a light base theme so black foreground looks natural while we
+      // keep the editor background transparent to match the array view.
       monaco.editor.defineTheme('scribefold-dark', {
-        base: 'vs-dark',
+        base: 'vs',
         inherit: true,
         rules: [],
         colors: {
           'editor.background': '#00000000',
           'editorGutter.background': '#00000000',
+          'editor.foreground': '#000000',
           // Remove any grey background used for folded regions
           'editor.foldBackground': '#00000000',
           'editor.lineHighlightBackground': '#00000000',
@@ -344,12 +347,13 @@ const SimpleMonaco = forwardRef((props, ref) => {
 
     if (!window.__scribefoldDiffThemeRegistered) {
       monaco.editor.defineTheme('scribefold-diff-dark', {
-        base: 'vs-dark',
+        base: 'vs',
         inherit: true,
         rules: [],
         colors: {
           'editor.background': '#00000000',
           'editorGutter.background': '#00000000',
+          'editor.foreground': '#000000',
         },
       });
       window.__scribefoldDiffThemeRegistered = true;
