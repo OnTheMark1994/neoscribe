@@ -8,13 +8,16 @@ In array view when a sugested edit is in a folded chapter and the nav selects it
 
 - When the user places the caret on a **closed header line** (chapter/section) in array view and presses **Enter** partway through the line, the editor should **auto-open that header** and show the newly created line below it. Currently this can cause issues (including unhandled exceptions) because the new line is created inside a hidden range.
 
+new file error
 ctrl n opens a new file but also opens the save as menu for some reason
 (this was seen while in monaco editor but may be project wide)
+this only happens after we've made a save
+so we can open a file, press new and it works propely, then open a file edit and save, then press file new and it creates new and then opens save as dialogue window. 
 
 Web View
 when we are in web view the accont portal link does not work
 when we log in it does not auto populate some data until refresh (it should)
-it seems to not persist the login aitj info sometimes
+it seems to not persist the login info sometimes
 
 Editor
 when clicking on an empty array line the focus is thre because typing works but no carrat shows
@@ -44,6 +47,20 @@ navigator goes to a prposed change that is in a closed section
 Monaco
 talkes a very long time to load
 does not show arrow fold buttons sometimes for section or chapter
+
+AI sideber
+make the estimated token have a , between 1000s 
+ex 125416 to 125,416
+and put an alert if its over 10,000
+and a double alert if its over 100,000
+
+Monaco
+hide the #ai-hide and other tags, maybe we can structure it an a way that all tags are placed in text in a way that is easy to hide
+use #tags?aiShow=<hide, show, titleOnly etc>&folded=true etc
+set these on change like when eye is clicked or on open/close
+we had this before it was putting #folded or #ai-hide on the line text when we opened or close it, maybe it still is
+
+
 
 ---
 

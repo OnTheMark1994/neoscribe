@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectIsAIEnabled, setIsAIEnabled, setBackgroundImage } from '../../store/settingsSlice';
-import { selectCurrentFilePath, selectIsModified, selectContent, selectViewType, setViewType, fileOpened, resetEditor, bumpFoldAllTrigger, bumpUnfoldAllTrigger, bumpSaveTrigger, bumpSaveAsTrigger } from '../../store/editorSlice';
+import { selectCurrentFilePath, selectIsModified, selectViewType, setViewType, fileOpened, resetEditor, setIsModified, setCurrentFilePath, bumpFoldAllTrigger, bumpUnfoldAllTrigger } from '../../store/editorSlice';
 import { openSettings, openDownloadModal } from '../../store/uiSlice';
 import { showStatus } from '../../store/statusSlice';
 import { isElectron, isWeb } from '../../utils/environment';
-import { EditorContext } from '../../contexts/EditorContext';
 import * as fileOps from '../../utils/fileOps';
 import { parseText } from '../../utils/editorEngine';
 import './WebMenuBar.css';
@@ -17,8 +16,7 @@ import './WebMenuBar.css';
  * 
  * WHY UNIFIED: Previously separate implementations, now single component for maintainability
  * 
- * USES EditorContext: Calls editor methods directly (saveFile, openFile, foldAll, etc)
- * NO CALLBACKS: Removed all callback props, uses useContext(EditorContext) instead
+ * USES editorRef from App: Calls editor methods directly (saveFile, openFile, foldAll, etc)
  * 
  * FEATURES:
  *   - File operations (New, Open, Save, Save As)
@@ -38,17 +36,10 @@ import './WebMenuBar.css';
 const IS_WEB = isWeb();
 const IS_ELECTRON = isElectron();
 
-function WebMenuBar() {
+function WebMenuBar({ editorViewType, editorRef }) {
   // WHAT: Redux dispatch for settings/UI actions
   // WHY: WebMenuBar can toggle AI, open settings, etc
   const dispatch = useDispatch();
-  
-  // WHAT: Get editorRef from Context for view-related methods (foldAll, unfoldAll, save)
-  // NOTE: Open/New operations moved to fileOps utility (Design Principle 11)
-  // WHY SAVE STILL IN EDITOR: Save needs to extract content from active view (array/monaco/textarea)
-  // TODO: Move save operations out once content sync strategy is finalized
-  const editorContextValue = useContext(EditorContext);
-  const editorRef = editorContextValue || { current: null };
   
   // WHAT: Read global state from Redux for UI display
   // isAIEnabled: Show AI toggle state in menu
@@ -57,7 +48,8 @@ function WebMenuBar() {
   const isAIEnabled = useSelector(selectIsAIEnabled);
   const currentFilePath = useSelector(selectCurrentFilePath);
   const isModified = useSelector(selectIsModified);
-  const viewType = useSelector(selectViewType); // 'array' or 'monaco'
+  const reduxViewType = useSelector(selectViewType); // 'array' or 'monaco'
+  const viewType = editorViewType || reduxViewType;
   
   // WHAT: Extract just the filename from full path for display
   // WHY: Full path would be too long for menu bar
@@ -120,16 +112,12 @@ function WebMenuBar() {
         // Ctrl+Shift+S - Save As (Electron only) - ALWAYS opens save dialog
         e.preventDefault();
         if (IS_ELECTRON) {
-          dispatch(bumpSaveAsTrigger());
+          await handleSaveAs();
         }
       } else if (ctrl && e.key === 's') {
         // Ctrl+S - Save (Electron) or open Download modal (Web)
         e.preventDefault();
-        if (IS_WEB) {
-          dispatch(openDownloadModal());
-        } else {
-          dispatch(bumpSaveTrigger());
-        }
+        await handleSave();
       } else if (ctrl && e.key === ',') {
         e.preventDefault();
         dispatch(openSettings({ tab: 'general' }));
@@ -155,7 +143,7 @@ function WebMenuBar() {
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [editorRef, isAIEnabled, dispatch]);
+  }, [editorRef, isAIEnabled, dispatch, currentFilePath, viewType]);
   
   // File operation handlers using fileOps utility (Design Principle 11)
   const handleNewFile = () => {
@@ -176,6 +164,71 @@ function WebMenuBar() {
       }
     } else if (result.error) {
       dispatch(showStatus('Failed to open file: ' + result.error));
+    }
+  };
+
+  const getCurrentEditorContent = () => {
+    if (!editorRef || !editorRef.current) return '';
+
+    if (viewType === 'array') {
+      if (typeof editorRef.current.getContent === 'function') {
+        return editorRef.current.getContent() || '';
+      }
+      return '';
+    }
+
+    if (viewType === 'monaco') {
+      if (typeof editorRef.current.getEditor === 'function') {
+        const monacoEditor = editorRef.current.getEditor();
+        if (monacoEditor && typeof monacoEditor.getValue === 'function') {
+          return monacoEditor.getValue() || '';
+        }
+      }
+      return '';
+    }
+
+    return '';
+  };
+
+  const handleSave = async () => {
+    if (IS_WEB) {
+      dispatch(openDownloadModal());
+      return;
+    }
+
+    const textContent = getCurrentEditorContent();
+    const result = await fileOps.saveFile(currentFilePath, textContent);
+
+    if (result.success) {
+      dispatch(setIsModified(false));
+      if (result.filePath) {
+        dispatch(setCurrentFilePath(result.filePath));
+      }
+      dispatch(showStatus('File saved'));
+    } else if (result.error) {
+      dispatch(showStatus('Failed to save file: ' + result.error));
+    }
+  };
+
+  const handleSaveAs = async () => {
+    if (!IS_ELECTRON) {
+      // In web mode we just reuse the normal save/download flow
+      await handleSave();
+      return;
+    }
+
+    const textContent = getCurrentEditorContent();
+    const result = await fileOps.saveFileAs(textContent);
+
+    if (result.success) {
+      dispatch(setIsModified(false));
+      if (result.filePath) {
+        dispatch(setCurrentFilePath(result.filePath));
+        localStorage.setItem('lastOpenedFile', result.filePath);
+      }
+      dispatch(showStatus('File saved'));
+    } else if (result.error) {
+      dispatch(showStatus('Failed to save file: ' + result.error));
     }
   };
 
@@ -361,17 +414,17 @@ function WebMenuBar() {
                 <button
                   onClick={() => {
                     setActiveMenu(null);
-                    dispatch(openDownloadModal());
+                    handleSave();
                   }}
                 >
                   <span>Save/Download</span><span className="shortcut">Ctrl+S</span>
                 </button>
               ) : (
                 <>
-                  <button onClick={() => handleMenuClick(() => dispatch(bumpSaveTrigger()))}>
+                  <button onClick={() => handleMenuClick(() => handleSave())}>
                     <span>Save</span><span className="shortcut">Ctrl+S</span>
                   </button>
-                  <button onClick={() => handleMenuClick(() => dispatch(bumpSaveAsTrigger()))}>
+                  <button onClick={() => handleMenuClick(() => handleSaveAs())}>
                     <span>Save As</span><span className="shortcut">Ctrl+Shift+S</span>
                   </button>
                 </>

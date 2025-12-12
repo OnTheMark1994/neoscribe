@@ -238,6 +238,7 @@ const AccountPage = () => {
 
   useEffect(() => {
     const loadStats = async () => {
+      console.log('Debug: Starting token stats load for user ID: ' + (user ? user.id : 'null'));
       if (!user) return;
       setStatsLoading(true);
       try {

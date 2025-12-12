@@ -97,7 +97,7 @@ function App() {
       <AppInitializer />
       <LoadingScreen />
       <Menus />
-      <WebMenuBar />
+      <WebMenuBar editorViewType={viewMode} editorRef={editorRef} />
 
       <div id="backgroundContainer" className="background-container" />
 

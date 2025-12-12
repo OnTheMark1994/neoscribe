@@ -6,16 +6,15 @@ import {
   selectCurrentFilePath,
   selectFoldAllTrigger,
   selectUnfoldAllTrigger,
-  selectSaveTrigger,
-  selectSaveAsTrigger,
   setIsModified,
   setCurrentFilePath,
 } from '../../store/editorSlice';
+
 import { selectIsAIEnabled, selectDeveloperMode, selectShowArrayLineNumbers } from '../../store/settingsSlice';
 import { showStatus } from '../../store/statusSlice';
 
 import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines, recomputeVisibleLines, getVisibleLinesCached } from '../../utils/editorEngine';
-import { saveFile, saveFileAs } from '../../utils/fileOps';
+
 import EditorLine from './EditorLine';
 
 import DiffActionButtons from './AI/DiffActionButtons';
@@ -38,14 +37,13 @@ const EditorArray = forwardRef((props, ref) => {
   // Redux selectors
   const content = useSelector(selectContent);
   const currentFilePath = useSelector(selectCurrentFilePath);
+
   const isAIEnabled = useSelector(selectIsAIEnabled);
   const developerMode = useSelector(selectDeveloperMode);
   const showArrayLineNumbers = useSelector(selectShowArrayLineNumbers);
   const foldAllTrigger = useSelector(selectFoldAllTrigger);
   const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
-  const saveTrigger = useSelector(selectSaveTrigger);
-  const saveAsTrigger = useSelector(selectSaveAsTrigger);
-  
+
   // AI changes from aiChangesSlice (for array editor)
   const { allChangeIds, currentChangeIdIndex, processedChangesByLineID } = useSelector(state => state.aiChanges);
   const currentChangeId = allChangeIds[currentChangeIdIndex] || null;
@@ -112,28 +110,9 @@ const EditorArray = forwardRef((props, ref) => {
     unfoldAll();
   }, [unfoldAllTrigger]);
 
-  // Respond to save trigger
-  useEffect(() => {
-    if (!saveTrigger) return;
-    handleSave();
-  }, [saveTrigger]);
-
-  // Respond to Save As trigger - ALWAYS opens save dialog
-  useEffect(() => {
-    if (!saveAsTrigger) return;
-    handleSaveAs();
-  }, [saveAsTrigger]);
-
   // Keyboard shortcuts (Find, Escape)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl+S: Save
-      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
-        e.preventDefault();
-        handleSave();
-        return;
-      }
-
       // Ctrl+F: Find
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
@@ -233,44 +212,6 @@ const EditorArray = forwardRef((props, ref) => {
    */
   const handleRenderEditor = () => {
     setRenderTrigger(prev => prev + 1);
-  };
-
-  /**
-   * Handle save
-   */
-  const handleSave = async () => {
-    const textContent = getTextFromLines();
-    const filePath = filePathRef.current;
-
-    const result = await saveFile(filePath, textContent);
-    if (result.success) {
-      dispatch(setIsModified(false));
-      if (result.filePath) {
-        dispatch(setCurrentFilePath(result.filePath));
-      }
-      dispatch(showStatus('File saved'));
-    } else if (result.error) {
-      dispatch(showStatus('Failed to save: ' + result.error));
-    }
-  };
-
-  /**
-   * Handle Save As - ALWAYS opens save dialog regardless of existing filePath
-   */
-  const handleSaveAs = async () => {
-    const textContent = getTextFromLines();
-
-    const result = await saveFileAs(textContent);
-    if (result.success) {
-      dispatch(setIsModified(false));
-      if (result.filePath) {
-        dispatch(setCurrentFilePath(result.filePath));
-        localStorage.setItem('lastOpenedFile', result.filePath);
-      }
-      dispatch(showStatus('File saved'));
-    } else if (result.error) {
-      dispatch(showStatus('Failed to save: ' + result.error));
-    }
   };
 
   /**

@@ -17,6 +17,7 @@ Short, opinionated guide to recurring problems in this codebase.
 - **10. Missing Justification in Components** – Extra components with no reason.
 - **11. Parents/Menus Calling Child Functions** – Menus reaching down into component internals.
 - **12. Inline Styles in React Components** – Styling logic baked into JS instead of feature CSS.
+- **13. Unnecessary Providers** – Adding React Context for values that can be passed one level via props.
 
 Each section below keeps a **very short summary**, with optional extra details collapsed.
 

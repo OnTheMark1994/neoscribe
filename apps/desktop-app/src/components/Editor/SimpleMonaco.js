@@ -6,12 +6,7 @@ import {
   selectCurrentFilePath,
   selectFoldAllTrigger,
   selectUnfoldAllTrigger,
-  selectSaveTrigger,
-  selectSaveAsTrigger,
-  setIsModified,
-  setCurrentFilePath,
 } from '../../store/editorSlice';
-import { showStatus } from '../../store/statusSlice';
 import {
   selectShowPreviewBar,
   selectShowMonacoLineNumbers,
@@ -23,7 +18,6 @@ import { showAiContextMenu, selectAiDecorationsNonce } from '../../store/aiUiSli
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import DiffActionButtons from '../AI/DiffActionButtons';
 import DiffNavigation from '../AI/DiffNavigation';
-import { saveFile, saveFileAs } from '../../utils/fileOps';
 import './MonacoEditorView.css';
 
 /**
@@ -40,8 +34,6 @@ const SimpleMonaco = forwardRef((props, ref) => {
   const currentFilePath = useSelector(selectCurrentFilePath);
   const foldAllTrigger = useSelector(selectFoldAllTrigger);
   const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
-  const saveTrigger = useSelector(selectSaveTrigger);
-  const saveAsTrigger = useSelector(selectSaveAsTrigger);
   const aiDecorationsNonce = useSelector(selectAiDecorationsNonce);
   const aiProposals = useSelector(selectAiProposals);
   const activeChangeId = useSelector(selectActiveChangeId);
@@ -330,52 +322,6 @@ const SimpleMonaco = forwardRef((props, ref) => {
     const action = editor.getAction('editor.unfoldAll');
     if (action) action.run();
   }, [unfoldAllTrigger]);
-
-  // Respond to save trigger (Electron): save file using current content
-  useEffect(() => {
-    if (!saveTrigger) return;
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const text = editor.getValue();
-
-    (async () => {
-      const result = await saveFile(currentFilePath, text);
-      if (result.success) {
-        dispatch(setIsModified(false));
-        if (result.filePath) {
-          // If saveAs returned a new path, update Redux
-          dispatch(setCurrentFilePath(result.filePath));
-        }
-        dispatch(showStatus('File saved'));
-      } else if (result.error) {
-        dispatch(showStatus('Failed to save file: ' + result.error));
-      }
-    })();
-  }, [saveTrigger, currentFilePath, dispatch]);
-
-  // Respond to Save As trigger (Electron): ALWAYS open save dialog regardless of current filePath
-  useEffect(() => {
-    if (!saveAsTrigger) return;
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const text = editor.getValue();
-
-    (async () => {
-      const result = await saveFileAs(text);
-      if (result.success) {
-        dispatch(setIsModified(false));
-        if (result.filePath) {
-          dispatch(setCurrentFilePath(result.filePath));
-          localStorage.setItem('lastOpenedFile', result.filePath);
-        }
-        dispatch(showStatus('File saved'));
-      } else if (result.error) {
-        dispatch(showStatus('Failed to save file: ' + result.error));
-      }
-    })();
-  }, [saveAsTrigger, dispatch]);
 
 
   // Apply AI proposals to content to generate modified version

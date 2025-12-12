@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
     let ignore = false;
 
     const init = async () => {
+      console.log('Debug: Starting auth initialization');
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -22,6 +23,7 @@ export const AuthProvider = ({ children }) => {
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((_event, newSession) => {
+        console.log('Debug: Auth state changed, event: ' + _event + ', user: ' + JSON.stringify(newSession?.user));
         setUser(newSession?.user ?? null);
       });
 
