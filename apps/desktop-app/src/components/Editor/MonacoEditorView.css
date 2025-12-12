@@ -41,7 +41,8 @@
 }
 
 .ai-hide-icon {
+  background: url("../../../public/app-images/scribefold-ai-eye-grey.png") center center no-repeat !important;
   background-size: 14px 14px !important;
   cursor: pointer !important;
-  opacity: 0.5;
+  opacity: 0.7;
 }

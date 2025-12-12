@@ -52,6 +52,7 @@ const initialState = {
   showPreviewBar: false,          // Monaco minimap visible (default OFF)
   showMonacoLineNumbers: false,   // Monaco line numbers visible (default OFF)
   monacoStickyTopBar: false,      // Monaco sticky top bar (default OFF)
+  showArrayLineNumbers: false,    // Array editor line numbers visible (default OFF)
   editorViewMode: 'array',        // Default editor view mode
   aiService: 'deepseek-server',   // Selected AI service
   apiKeys: {},                    // API keys by service
@@ -113,6 +114,7 @@ const settingsSlice = createSlice({
       state.showPreviewBar = getStorageItem('showPreviewBar', false);
       state.showMonacoLineNumbers = getStorageItem('showMonacoLineNumbers', false);
       state.monacoStickyTopBar = getStorageItem('monacoStickyTopBar', false);
+      state.showArrayLineNumbers = getStorageItem('showArrayLineNumbers', false);
       
       // Handle editorViewMode with migration from 'fold' to 'array'
       let savedViewMode = getStorageItem('editorViewMode', 'array');
@@ -155,6 +157,7 @@ export const selectBackgroundImage = (state) => state.settings.backgroundImage;
 export const selectShowPreviewBar = (state) => state.settings.showPreviewBar;
 export const selectShowMonacoLineNumbers = (state) => state.settings.showMonacoLineNumbers;
 export const selectMonacoStickyTopBar = (state) => state.settings.monacoStickyTopBar;
+export const selectShowArrayLineNumbers = (state) => state.settings.showArrayLineNumbers;
 export const selectEditorViewMode = (state) => state.settings.editorViewMode;
 export const selectAiService = (state) => state.settings.aiService;
 export const selectApiKeys = (state) => state.settings.apiKeys;

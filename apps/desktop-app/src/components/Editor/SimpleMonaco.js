@@ -17,6 +17,7 @@ import {
   selectIsAIEnabled,
 } from '../../store/settingsSlice';
 import { selectAiProposals, selectActiveChangeId } from '../../store/aiSlice';
+import { showAiContextMenu } from '../../store/aiUiSlice';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import DiffActionButtons from '../AI/DiffActionButtons';
 import DiffNavigation from '../AI/DiffNavigation';
@@ -204,9 +205,13 @@ const SimpleMonaco = forwardRef((props, ref) => {
     // Initial decoration once on mount
     updateDecorations();
 
-    // Click on glyph margin eye icon: toggle #ai-hide tag on that line
+    // Left-click on glyph margin eye icon: toggle #ai-hide on that line
     editor.onMouseDown((e) => {
       if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+
+      const domEvent = e.browserEvent || e.event?.browserEvent || e.event;
+      const button = domEvent && typeof domEvent.button === 'number' ? domEvent.button : 0;
+      if (button !== 0) return; // only handle left-click here
 
       const position = e.target.position;
       if (!position || !position.lineNumber) return;
@@ -215,7 +220,8 @@ const SimpleMonaco = forwardRef((props, ref) => {
       const model = editor.getModel();
       if (!model) return;
 
-      const lineContent = model.getLineContent(lineNumber);
+      const lineContent = model.getLineContent(lineNumber) || '';
+
       const hasHide = /\s#ai-hide\b/.test(lineContent);
       let newLine = lineContent;
 
@@ -241,6 +247,38 @@ const SimpleMonaco = forwardRef((props, ref) => {
 
       // Refresh decorations once for the updated content
       updateDecorations();
+    });
+
+    // Right-click (context menu) on glyph margin eye icon: open shared AI context menu
+    editor.onContextMenu((e) => {
+      if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+
+      const domEvent = e.browserEvent || e.event?.browserEvent || e.event;
+      if (domEvent) {
+        domEvent.preventDefault();
+      }
+
+      const position = e.target.position;
+      if (!position || !position.lineNumber) return;
+
+      const lineNumber = position.lineNumber;
+      const model = editor.getModel();
+      if (!model) return;
+
+      const lineContent = model.getLineContent(lineNumber) || '';
+
+      let level = 0;
+      const trimmed = lineContent.trim().toLowerCase();
+      if (/^#chapter\b/.test(trimmed)) level = 1;
+      else if (/^#section\b/.test(trimmed)) level = 2;
+
+      if (level === 0 || !domEvent) return; // only chapter/section get menu
+
+      dispatch(showAiContextMenu({
+        x: domEvent.clientX,
+        y: domEvent.clientY,
+        level,
+      }));
     });
   };
 

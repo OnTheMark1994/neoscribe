@@ -9,7 +9,7 @@ it seems to not persist the login aitj info sometimes
 
 Editor
 the right click menu does not show on the +- editor view line so we can not turn off ai view on the line
-Pressing enter on a section that is closed (and creating a new line in it) should open it. We might need to open the line in other situations too like if the change navigator goes to a prposed change that is in a closed section or chapter.  
+ or chapter.  
 when clicking on an empty array line the focus is thre because typing works but no carrat shows
 
 save as just saves it does not open the save as dialogue (desktop)
@@ -27,7 +27,7 @@ background color
 AI
 says all tokens have been used on first message 
 even when they are showing and not used
-
+navigator goes to a prposed change that is in a closed section
 
 Monaco
 talkes a very long time to load

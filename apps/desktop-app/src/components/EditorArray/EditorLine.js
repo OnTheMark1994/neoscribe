@@ -1,4 +1,6 @@
 import React, { useRef, useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { showAiContextMenu } from '../../store/aiUiSlice';
 import { getLines, getTextFromLines, updateLinesFromText, updateLineText, splitLine, mergeLine, addChapterAt, removeChapterAt, addSectionAt, removeSectionAt, openLine } from '../../utils/editorEngine';
 
 /**
@@ -19,9 +21,11 @@ function EditorLine({
   onContentChange,
   onRenderEditor,
   currentChangeId,
-  onShowAIContextMenu,
-  isAIEnabled
+  isAIEnabled,
+  developerMode,
+  showArrayLineNumbers,
 }) {
+  const dispatch = useDispatch();
   const contentRef = useRef(null);
 
   // Determine CSS classes based on proposed change type
@@ -206,8 +210,6 @@ function EditorLine({
         if (selectedText.length === currentText.length && lineIndex >= 0) {
           e.preventDefault();
           updateLineText(lineIndex, '');
-          const currentText2 = getTextFromLines();
-          updateLinesFromText(currentText2);
           onRenderEditor();
           onContentChange();
 
@@ -318,9 +320,14 @@ function EditorLine({
   };
 
   const handleFoldContextMenu = (e) => {
-    if (!onShowAIContextMenu) return;
+    if (line.level !== 1 && line.level !== 2) return;
     e.preventDefault();
-    onShowAIContextMenu(e.clientX, e.clientY, lineIndex);
+
+    dispatch(showAiContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      level: line.level || 0,
+    }));
   };
 
   /**
@@ -394,18 +401,22 @@ function EditorLine({
   const hasFoldButton = line.level === 1 || line.level === 2;
   const aiClass = isAIEnabled ? (line.sendToAI === 'all' ? 'ai-full' : (line.sendToAI === 'title' ? 'ai-partial' : 'ai-none')) : '';
 
-  // Render array view (with index gutter and ID box)
+  // Render array view (with optional index gutter and ID box)
   if (isArrayView) {
     return (
       <div className="array-line-container" data-level={line.level}>
-        <div className="array-index-gutter">{lineIndex}:</div>
+        {showArrayLineNumbers && (
+          <div className="array-index-gutter">{lineIndex}:</div>
+        )}
         <div 
           className={`${editorLineClasses} ${depthClass}`} 
           data-idx={lineIndex} 
           data-level={line.level}
           data-change-id={line.proposedChangeId || ''}
         >
-          <div className="array-id-box">{line.id}:</div>
+          {developerMode && (
+            <div className="array-id-box">{line.id}:</div>
+          )}
           
           {hasFoldButton ? (
             <button 

@@ -2,8 +2,11 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectIsAIEnabled } from './store/settingsSlice';
 import { selectViewType, setContent } from './store/editorSlice';
+import { hideAiContextMenu } from './store/aiUiSlice';
+import { getLines } from './utils/editorEngine';
 import SimpleMonaco from './components/Editor/SimpleMonaco';
 import EditorArray from './components/EditorArray/EditorArray';
+import AiContextMenu from './components/EditorArray/AiContextMenu';
 import AISidebar from './components/AI/AISidebar';
 import WebMenuBar from './components/UI/WebMenuBar';
 import AppInitializer from './components/Data/AppInitializer';
@@ -80,6 +83,9 @@ function App() {
     // First, sync the currently active editor into editorEngine
     syncCurrentEditorToEngine(viewMode, editorRef.current, dispatch);
 
+    // Also ensure any open AI context menu is closed when switching views
+    dispatch(hideAiContextMenu());
+
     // Then switch the local view mode, which controls which editor is shown
     setViewMode(viewType);
 
@@ -105,6 +111,7 @@ function App() {
           )}
         </div>
       </div>
+      <AiContextMenu />
       
       {isAIEnabled && <AISidebar monacoRef={editorRef} />}
       <StatusBar />

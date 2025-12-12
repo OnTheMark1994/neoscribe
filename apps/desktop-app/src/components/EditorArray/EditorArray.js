@@ -9,11 +9,13 @@ import {
   selectSaveTrigger,
   setIsModified 
 } from '../../store/editorSlice';
-import { selectIsAIEnabled } from '../../store/settingsSlice';
+import { selectIsAIEnabled, selectDeveloperMode, selectShowArrayLineNumbers } from '../../store/settingsSlice';
 import { showStatus } from '../../store/statusSlice';
+
 import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines, recomputeVisibleLines, getVisibleLinesCached } from '../../utils/editorEngine';
 import { saveFile } from '../../utils/fileOps';
 import EditorLine from './EditorLine';
+
 import DiffActionButtons from './AI/DiffActionButtons';
 import DiffNavigation from './AI/DiffNavigation';
 import './EditorArray.css';
@@ -35,6 +37,8 @@ const EditorArray = forwardRef((props, ref) => {
   const content = useSelector(selectContent);
   const currentFilePath = useSelector(selectCurrentFilePath);
   const isAIEnabled = useSelector(selectIsAIEnabled);
+  const developerMode = useSelector(selectDeveloperMode);
+  const showArrayLineNumbers = useSelector(selectShowArrayLineNumbers);
   const foldAllTrigger = useSelector(selectFoldAllTrigger);
   const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
   const saveTrigger = useSelector(selectSaveTrigger);
@@ -474,6 +478,8 @@ const EditorArray = forwardRef((props, ref) => {
               onRenderEditor={handleRenderEditor}
               currentChangeId={currentChangeId}
               isAIEnabled={isAIEnabled}
+              developerMode={developerMode}
+              showArrayLineNumbers={showArrayLineNumbers}
             />
             {line.proposedChangeType && (
               <DiffActionButtons

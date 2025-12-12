@@ -71,9 +71,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onToggleAITool: (callback) => ipcRenderer.on('toggle-ai-enabled', callback),
   onAIBulkAction: (callback) => ipcRenderer.on('ai-bulk-action', callback),
   openAIDebugWindow: (debugIndex) => ipcRenderer.invoke('open-ai-debug-window', debugIndex),
-  // Native AI context menu
-  showAIContextMenu: (payload) => ipcRenderer.invoke('show-ai-context-menu', payload),
-  onAIContextChoice: (callback) => ipcRenderer.on('ai-context-choice', (event, data) => callback && callback(data)),
   
   // User management
   getAnonId: () => ipcRenderer.invoke('get-anon-id'),

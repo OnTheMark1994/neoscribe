@@ -16,6 +16,7 @@ Short, opinionated guide to recurring problems in this codebase.
 - **9. State Duplication (Not DRY)** – Multiple sources of truth with no clear purpose.
 - **10. Missing Justification in Components** – Extra components with no reason.
 - **11. Parents/Menus Calling Child Functions** – Menus reaching down into component internals.
+- **12. Inline Styles in React Components** – Styling logic baked into JS instead of feature CSS.
 
 Each section below keeps a **very short summary**, with optional extra details collapsed.
 
@@ -49,6 +50,333 @@ dispatch(action());
 ```
 
 Pattern: child knows *what* should happen → child dispatches action directly.
+
+### 1a. Prop-Drilling Redux Values Into Components
+
+**Summary**: Don’t pass Redux-derived flags/coords/labels through multiple parents just so a component can render; let the component read Redux directly.
+
+**Wrong**
+
+```jsx
+// App.js
+const aiMenu = useSelector(selectAiContextMenu);
+
+{aiMenu.visible && aiMenu.source === 'monaco' && (
+  <AiContextMenu
+    visible={aiMenu.visible}
+    x={aiMenu.x}
+    y={aiMenu.y}
+    level={aiMenu.level}
+  />
+)}
+```
+
+**Right**
+
+```jsx
+// App.js
+<AiContextMenu />
+
+// AiContextMenu.js
+const aiMenu = useSelector(selectAiContextMenu);
+if (!aiMenu.visible) return null;
+```
+
+Rule: if a component’s behavior is entirely driven by Redux, it should **connect to Redux itself** instead of receiving those values via props from intermediates.
+
+### 1c. Parent Editor Defining Child-Only Redux Functions
+
+**Summary**: Don’t define Redux-dispatching helpers in a parent (e.g. `EditorArray`) when they’re only ever used by a single child (e.g. `EditorLine`). This is Boomerang State in disguise and clutters the parent.
+
+**Wrong**
+
+```jsx
+// EditorArray.js
+const handleShowAIContextMenu = (clientX, clientY, lineIdx) => {
+  const lines = getLines();
+  const line = lines && typeof lineIdx === 'number' ? lines[lineIdx] : null;
+  const level = line && typeof line.level === 'number' ? line.level : 0;
+  const lineKey = line && (line.id || lineIdx);
+
+  dispatch(showAiContextMenu({
+    x: clientX,
+    y: clientY,
+    level,
+    source: 'array',
+    lineKey,
+  }));
+};
+
+<EditorLine
+  ...
+  onShowAIContextMenu={handleShowAIContextMenu}
+/>;
+```
+
+Here:
+
+- `EditorArray` knows **too much** about per-line AI behavior.
+- The function only exists to be immediately called by `EditorLine`.
+- The parent file gets longer and harder to scan for its real responsibilities (folding, save, find, etc.).
+
+**Right**
+
+```jsx
+// EditorLine.js – child both computes AND dispatches
+import { useDispatch } from 'react-redux';
+import { showAiContextMenu } from '../../store/aiUiSlice';
+
+function EditorLine({ line, lineIndex, ... }) {
+  const dispatch = useDispatch();
+
+  const handleFoldContextMenu = (e) => {
+    if (line.level !== 1 && line.level !== 2) return; // Only headers
+    e.preventDefault();
+
+    const lines = getLines();
+    const fullLine = lines && lines[lineIndex];
+    const level = fullLine?.level ?? line.level ?? 0;
+    const lineKey = fullLine?.id ?? lineIndex;
+
+    dispatch(showAiContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      level,
+      source: 'array',
+      lineKey,
+    }));
+  };
+}
+```
+
+Rule: **the component that owns the interaction should own the dispatch**. Parent editors (`EditorArray`, `App`) stay short and focused; line components handle their own per-line Redux work.
+
+Corollary: Redux actions should encapsulate their own calculation logic. Callers should dispatch **intents**, not do all the math inline. Example: when switching views, `App` should simply dispatch `hideAiContextMenu()` ("close any open AI menus") instead of manually poking at menu state fields; the reducer owns how that happens.
+
+#### Extended Example: AI Context Menu Refactor
+
+- **Old way (what went wrong)**
+  - **Duplicated menu logic in both editors**
+    - `EditorArray` defined `handleShowAIContextMenu` and passed it down.
+    - `SimpleMonaco` had its own separate coordinate + level logic.
+    - Two places to update whenever menu behavior changed.
+  - **Incorrect positioning math in each editor**
+    - Array view measured from the editor container sometimes, sometimes from the window.
+    - Monaco used its own `getBoundingClientRect` offsets.
+    - Result: menu opened ~100px off in some cases and behaved differently per view.
+  - **Inline CSS and layout in JS**
+    - Menu styles lived as inline style objects inside components.
+    - Harder to scan and tweak; no single CSS owner for the menu.
+  - **Prop-drilled Redux state and actions**
+    - `App` + `EditorArray` pulled Redux state and passed flags/coords down as props.
+    - Parents contained AI-menu-specific code that only the child actually used.
+  - **Redux actions in the wrong place**
+    - Parents did the line/level lookups and built payloads.
+    - Call sites knew menu internals instead of just expressing "open menu here".
+  - **Bloated Redux state with unused fields**
+    - Early versions carried extra fields like `source` / `lineKey` that were never read.
+    - These made the slice harder to scan without adding any real behavior.
+
+  **Old code (simplified)**
+
+  ```jsx
+  // App.js – parent defines child-only helper and passes it down
+  const showAIContextMenu = (x, y, lineIdx) => {
+    const lines = getLines();
+    const line = lines[lineIdx];
+
+    if (window.electronAPI && window.electronAPI.showAIContextMenu && line) {
+      window.electronAPI.showAIContextMenu({
+        lineIdx,
+        sendToAI: line.sendToAI,
+        level: line.level,
+        isOpen: line.open,
+      });
+    }
+    // In web mode or without Electron bridge, do nothing for now
+  };
+
+  <EditorArray ref={editorRef} onShowAIContextMenu={showAIContextMenu} />;
+
+  // EditorArray.js – parent computes and renders menu
+  const [aiMenuVisible, setAiMenuVisible] = useState(false);
+  const [aiMenuX, setAiMenuX] = useState(0);
+  const [aiMenuY, setAiMenuY] = useState(0);
+  const [aiMenuLevel, setAiMenuLevel] = useState(0);
+
+  const handleShowAIContextMenu = (clientX, clientY, lineIdx) => {
+    const lines = getLines();
+    const line = lines && typeof lineIdx === 'number' ? lines[lineIdx] : null;
+    const level = line && typeof line.level === 'number' ? line.level : 0;
+
+    setAiMenuX(clientX);
+    setAiMenuY(clientY);
+    setAiMenuLevel(level);
+    setAiMenuVisible(true);
+  };
+
+  return (
+    <>
+      {aiMenuVisible && (
+        <AiContextMenu
+          visible={aiMenuVisible}
+          x={aiMenuX}
+          y={aiMenuY}
+          level={aiMenuLevel}
+          onClose={() => setAiMenuVisible(false)}
+        />
+      )}
+
+      <div className="editor-display">
+        {visibleLines.map(({ line, index }) => (
+          <EditorLine
+            key={line.id || index}
+            line={line}
+            lineIndex={index}
+            onShowAIContextMenu={handleShowAIContextMenu}
+          />
+        ))}
+      </div>
+    </>
+  );
+
+  // AiContextMenu.js – inline style, props-driven
+  function AiContextMenu({ visible, x, y, level, onClose }) {
+    if (!visible) return null;
+
+    return (
+      <div
+        className="ai-context-menu-root"
+        style={{ left: x, top: y }}
+        onClick={onClose}
+      >
+        ...
+      </div>
+    );
+  }
+  ```
+
+    - Closing the menu is a simple `hideAiContextMenu()` intent.
+    - View switching just dispatches `hideAiContextMenu()`; reducer owns the details.
+  - **Children just dispatch**
+    - `EditorLine` dispatches `showAiContextMenu({ x, y, level, source: 'array', lineKey })` on right-click of the fold button.
+    - `SimpleMonaco` dispatches similar payloads on glyph right-click.
+    - No parent helper function; each file only contains logic that truly belongs to it.
+  - **Centralized CSS instead of inline styles**
+    - All menu styling lives in `AiContextMenu.css`.
+    - Components use class names; inline styles are only for dynamic `left`/`top`.
+  - **Fewer bugs, less code to update**
+    - Fixing menu alignment or hover behavior now touches one CSS file + one component.
+    - No duplicated positioning math between Array and Monaco.
+    - App-level code stays short, and editors are easier to read and reason about.
+    - Redux state only tracks what is actually used (`visible`, `x`, `y`, `level`), avoiding clutter from unused fields.
+
+  **Impact on code size and complexity**
+
+  - Roughly **40–60 lines** of duplicated menu/render logic were removed from `EditorArray` and `SimpleMonaco`.
+  - The new setup centralizes menu UI into one component + one slice, so:
+    - There is a **single place** to change behavior or styling.
+    - Editors no longer carry menu-specific state/props, making them **easier to scan**.
+    - The Redux slice is smaller and only models what the UI actually needs, reducing mental load and chances of bugs.
+
+  **New code (simplified)**
+
+  ```jsx
+  // App.js – single global render, no props
+  import AiContextMenu from './components/EditorArray/AiContextMenu';
+
+  function App() {
+    ...
+    return (
+      <>
+        {viewMode === 'array' ? (
+          <EditorArray ref={editorRef} />
+        ) : (
+          <SimpleMonaco ref={editorRef} />
+        )}
+
+        <AiContextMenu />
+      </>
+    );
+  }
+
+  // EditorLine.js – child dispatches intent
+  import { useDispatch } from 'react-redux';
+  import { showAiContextMenu } from '../../store/aiUiSlice';
+
+  function EditorLine({ line, lineIndex, ... }) {
+    const dispatch = useDispatch();
+
+    const handleFoldContextMenu = (e) => {
+      if (line.level !== 1 && line.level !== 2) return;
+      e.preventDefault();
+
+      dispatch(showAiContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        level: line.level,
+        source: 'array',
+        lineKey: line.id || lineIndex,
+      }));
+    };
+  }
+
+  // SimpleMonaco.js – similar dispatch on glyph right-click
+  editor.onContextMenu((e) => {
+    if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+    const domEvent = e.browserEvent || e.event?.browserEvent || e.event;
+    const position = e.target.position;
+    const lineNumber = position?.lineNumber;
+    const lineContent = model.getLineContent(lineNumber) || '';
+
+    const trimmed = lineContent.trim().toLowerCase();
+    let level = 0;
+    if (/^#chapter\b/.test(trimmed)) level = 1;
+    else if (/^#section\b/.test(trimmed)) level = 2;
+    if (!level) return;
+
+    dispatch(showAiContextMenu({
+      x: domEvent.clientX,
+      y: domEvent.clientY,
+      level,
+      source: 'monaco',
+      lineKey: lineNumber,
+    }));
+  });
+
+  // aiUiSlice.js – Redux owns the math
+  const initialState = {
+    visible: false,
+    x: 0,
+    y: 0,
+    level: 0,
+    source: null,
+    lineKey: null,
+  };
+
+  const aiUiSlice = createSlice({
+    name: 'aiUi',
+    initialState,
+    reducers: {
+      showAiContextMenu(state, action) {
+        const { x, y, level, source, lineKey } = action.payload || {};
+        state.visible = true;
+        state.x = x;
+        state.y = y;
+        state.level = level || 0;
+        state.source = source || null;
+        state.lineKey = lineKey ?? null;
+      },
+      hideAiContextMenu(state) {
+        state.visible = false;
+        state.source = null;
+        state.lineKey = null;
+      },
+    },
+  });
+
+  export const { showAiContextMenu, hideAiContextMenu } = aiUiSlice.actions;
+  ```
 
 </details>
 
@@ -390,6 +718,62 @@ if (result?.success) {
 ```
 
 Rule: parents/menus decide *what* happens; shared modules do *how*; components focus on UI.
+
+</details>
+
+---
+
+## 12. Inline Styles in React Components
+
+**Summary**: Avoid large inline style objects in components; use feature-scoped CSS instead.
+
+<details>
+<summary>Details & example</summary>
+
+**Wrong**
+
+```javascript
+// Component JS mixes behavior with big style objects
+function Menu() {
+  const style = {
+    position: 'fixed',
+    backgroundColor: '#111',
+    color: '#fff',
+    /* ... lots more ... */
+  };
+
+  return <div style={style}>...</div>;
+}
+```
+
+**Right**
+
+```css
+/* Menu.css – feature-scoped */
+.menu-root {
+  position: fixed;
+  background-color: #111;
+  color: #fff;
+}
+```
+
+```javascript
+import './Menu.css';
+
+function Menu({ x, y }) {
+  return (
+    <div className="menu-root" style={{ left: x, top: y }}>
+      ...
+    </div>
+  );
+}
+```
+
+Rules for this codebase:
+
+- Keep **static styling in CSS** files grouped by feature (`EditorArray/AiContextMenu.css`).
+- Use inline style **only for dynamic layout** that depends on runtime values (e.g. `left`, `top`).
+- This keeps JS readable, makes theming easier, and prevents spaghetti styling.
 
 </details>
 

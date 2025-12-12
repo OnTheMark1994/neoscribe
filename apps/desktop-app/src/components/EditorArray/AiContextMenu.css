@@ -1,0 +1,55 @@
+.ai-context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.ai-context-menu-root {
+  position: fixed;
+  background-color: #111;
+  color: #fff;
+  border-radius: 4px;
+  padding: 4px 0 4px 4px; /* remove right padding to avoid hover gap toward submenu */
+  min-width: 180px;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+}
+
+.ai-context-menu-submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  display: none;
+  background-color: #111;
+  color: #fff;
+  border-radius: 4px;
+  padding: 4px;
+  min-width: 180px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  z-index: 1001;
+}
+
+.ai-context-menu-item {
+  padding: 4px 8px;
+  cursor: default;
+}
+
+.ai-context-menu-item--submenu {
+  padding: 4px 8px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-context-menu-item--submenu:hover .ai-context-menu-submenu {
+  display: block;
+}
+
+.ai-context-menu-radio-row {
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
