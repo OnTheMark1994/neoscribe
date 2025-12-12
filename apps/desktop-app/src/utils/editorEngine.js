@@ -1,5 +1,5 @@
 // Foldable Text Editor Engine
-// State: lines array where each entry is {text, open, level, startIdx, endIdx, id, sendToAI}
+// State: lines array where each entry is {text, open, level, id, sendToAI, hidden}
 
 let lines = [];
 let visibleLines = [];
@@ -27,8 +27,6 @@ export function parseText(text) {
     text: t, 
     open: true, 
     level: 0, 
-    startIdx: -1, 
-    endIdx: -1,
     sendToAI: 'all',
     id: generateLineId(),
     hidden: false
@@ -134,8 +132,6 @@ export function undo() {
         text: change.previous, 
         open: true, 
         level: 0, 
-        startIdx: -1, 
-        endIdx: -1, 
         id: generateLineId(),
         hidden: false
       });
@@ -170,8 +166,6 @@ export function redo() {
         text: change.current, 
         open: true, 
         level: 0, 
-        startIdx: -1, 
-        endIdx: -1, 
         id: generateLineId(),
         hidden: false
       });
@@ -229,8 +223,6 @@ export function splitLine(idx, offset) {
     text: afterCursor,
     open: true,
     level: 0,
-    startIdx: -1,
-    endIdx: -1,
     sendToAI: 'all',
     id: generateLineId(),
     hidden: false,
@@ -258,40 +250,10 @@ function applyHeaderMetadataFromText(line) {
   }
 }
 
-function computeHeaderRangeForward(idx, level) {
-  if (!lines || idx < 0 || idx >= lines.length) return { startIdx: idx, endIdx: lines.length - 1 };
-
-  let end = lines.length - 1;
-
-  for (let i = idx + 1; i < lines.length; i++) {
-    const t = (lines[i].text || '').trim();
-
-    if (t.match(/^#chapterend$/i) && level === 1) {
-      end = i;
-      break;
-    }
-    if (t.match(/^#sectionend$/i) && level === 2) {
-      end = i;
-      break;
-    }
-
-    const isHeader = t.match(/^#chapter(?:\s|$)/i) || t.match(/^#section(?:\s|$)/i);
-    if (isHeader) {
-      const nextLevel = t.match(/^#chapter(?:\s|$)/i) ? 1 : 2;
-      if (nextLevel >= level) {
-        end = i - 1;
-        break;
-      }
-    }
-  }
-
-  if (end < idx) end = idx;
-  return { startIdx: idx, endIdx: end };
-}
-
 export function addChapterAt(idx) {
   if (!lines || idx < 0 || idx >= lines.length) return;
   const line = lines[idx];
+
   line.level = 1;
   applyHeaderMetadataFromText(line);
   recomputeVisibleLines();
