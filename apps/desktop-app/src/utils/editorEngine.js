@@ -1,4 +1,16 @@
 // Foldable Text Editor Engine
+//
+// Invariants:
+// - After initial parse, `lines` is the single source of truth for the document.
+// - We do NOT reconstruct `lines` from a joined text string during normal editing
+//   operations (split, merge, header toggles). Those functions must mutate `lines`
+//   directly and then call `recomputeVisibleLines()`.
+// - Line `id` values are stable and only change when a line is actually inserted
+//   or deleted.
+// - All algorithms should do the minimum necessary work: prefer iterating only the
+//   affected subrange of `lines` (O(m) where m < n) instead of scanning the entire
+//   array when a local update is sufficient.
+//
 // State: lines array where each entry is {text, open, level, id, sendToAI, hidden}
 
 let lines = [];
@@ -207,13 +219,12 @@ export function updateLineText(idx, newText) {
 }
 
 // Split a line at the given offset, inserting a new line below.
-// Behaviour matches the existing EditorLine Enter handler, including a full
-// rebuild of the model from current text.
 export function splitLine(idx, offset) {
   if (!lines || idx < 0 || idx >= lines.length) return;
 
   const currentText = lines[idx].text || '';
   const safeOffset = Math.max(0, Math.min(offset, currentText.length));
+
   const beforeCursor = currentText.substring(0, safeOffset);
   const afterCursor = currentText.substring(safeOffset);
 
@@ -228,8 +239,7 @@ export function splitLine(idx, offset) {
     hidden: false,
   });
 
-  const text = getTextFromLines();
-  updateLinesFromText(text);
+  recomputeVisibleLines();
 }
 
 // === Localized header helpers (Step 4) ===
@@ -289,8 +299,6 @@ export function removeSectionAt(idx) {
 }
 
 // Merge line at idx into the previous line.
-// Behaviour matches the existing EditorLine Backspace-at-start handler,
-// including a full rebuild of the model from current text.
 export function mergeLine(idx) {
   if (!lines || idx <= 0 || idx >= lines.length) return;
 
@@ -301,8 +309,7 @@ export function mergeLine(idx) {
   lines[idx - 1].text = mergedText;
   lines.splice(idx, 1);
 
-  const text = getTextFromLines();
-  updateLinesFromText(text);
+  recomputeVisibleLines();
 }
 
 // Recompute and cache visible lines based on current lines and fold state
