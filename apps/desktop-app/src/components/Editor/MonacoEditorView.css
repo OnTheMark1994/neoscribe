@@ -33,7 +33,10 @@
   font-size: 1.08em;
 }
 
-/* AI eye icons in glyph margin */
+/* AI eye icons in glyph margin
+   WHAT: Use shared PNG glyphs from public/app-images
+   WHY PATH: Relative path so css-loader can resolve the files during build
+*/
 .ai-eye-icon {
   background: url("../../../public/app-images/scribefold-ai-eye.png") center center no-repeat !important;
   background-size: 14px 14px !important;
@@ -44,5 +47,4 @@
   background: url("../../../public/app-images/scribefold-ai-eye-grey.png") center center no-repeat !important;
   background-size: 14px 14px !important;
   cursor: pointer !important;
-  opacity: 0.7;
 }

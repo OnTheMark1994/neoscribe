@@ -7,13 +7,15 @@ import {
   selectFoldAllTrigger,
   selectUnfoldAllTrigger,
   selectSaveTrigger,
-  setIsModified 
+  selectSaveAsTrigger,
+  setIsModified,
+  setCurrentFilePath,
 } from '../../store/editorSlice';
 import { selectIsAIEnabled, selectDeveloperMode, selectShowArrayLineNumbers } from '../../store/settingsSlice';
 import { showStatus } from '../../store/statusSlice';
 
 import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines, recomputeVisibleLines, getVisibleLinesCached } from '../../utils/editorEngine';
-import { saveFile } from '../../utils/fileOps';
+import { saveFile, saveFileAs } from '../../utils/fileOps';
 import EditorLine from './EditorLine';
 
 import DiffActionButtons from './AI/DiffActionButtons';
@@ -42,6 +44,7 @@ const EditorArray = forwardRef((props, ref) => {
   const foldAllTrigger = useSelector(selectFoldAllTrigger);
   const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
   const saveTrigger = useSelector(selectSaveTrigger);
+  const saveAsTrigger = useSelector(selectSaveAsTrigger);
   
   // AI changes from aiChangesSlice (for array editor)
   const { allChangeIds, currentChangeIdIndex, processedChangesByLineID } = useSelector(state => state.aiChanges);
@@ -114,6 +117,12 @@ const EditorArray = forwardRef((props, ref) => {
     if (!saveTrigger) return;
     handleSave();
   }, [saveTrigger]);
+
+  // Respond to Save As trigger - ALWAYS opens save dialog
+  useEffect(() => {
+    if (!saveAsTrigger) return;
+    handleSaveAs();
+  }, [saveAsTrigger]);
 
   // Keyboard shortcuts (Find, Escape)
   useEffect(() => {
@@ -237,7 +246,26 @@ const EditorArray = forwardRef((props, ref) => {
     if (result.success) {
       dispatch(setIsModified(false));
       if (result.filePath) {
-        dispatch({ type: 'editor/setCurrentFilePath', payload: result.filePath });
+        dispatch(setCurrentFilePath(result.filePath));
+      }
+      dispatch(showStatus('File saved'));
+    } else if (result.error) {
+      dispatch(showStatus('Failed to save: ' + result.error));
+    }
+  };
+
+  /**
+   * Handle Save As - ALWAYS opens save dialog regardless of existing filePath
+   */
+  const handleSaveAs = async () => {
+    const textContent = getTextFromLines();
+
+    const result = await saveFileAs(textContent);
+    if (result.success) {
+      dispatch(setIsModified(false));
+      if (result.filePath) {
+        dispatch(setCurrentFilePath(result.filePath));
+        localStorage.setItem('lastOpenedFile', result.filePath);
       }
       dispatch(showStatus('File saved'));
     } else if (result.error) {

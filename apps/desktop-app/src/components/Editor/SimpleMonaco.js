@@ -7,7 +7,9 @@ import {
   selectFoldAllTrigger,
   selectUnfoldAllTrigger,
   selectSaveTrigger,
+  selectSaveAsTrigger,
   setIsModified,
+  setCurrentFilePath,
 } from '../../store/editorSlice';
 import { showStatus } from '../../store/statusSlice';
 import {
@@ -17,11 +19,11 @@ import {
   selectIsAIEnabled,
 } from '../../store/settingsSlice';
 import { selectAiProposals, selectActiveChangeId } from '../../store/aiSlice';
-import { showAiContextMenu } from '../../store/aiUiSlice';
+import { showAiContextMenu, selectAiDecorationsNonce } from '../../store/aiUiSlice';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import DiffActionButtons from '../AI/DiffActionButtons';
 import DiffNavigation from '../AI/DiffNavigation';
-import { saveFile } from '../../utils/fileOps';
+import { saveFile, saveFileAs } from '../../utils/fileOps';
 import './MonacoEditorView.css';
 
 /**
@@ -39,6 +41,8 @@ const SimpleMonaco = forwardRef((props, ref) => {
   const foldAllTrigger = useSelector(selectFoldAllTrigger);
   const unfoldAllTrigger = useSelector(selectUnfoldAllTrigger);
   const saveTrigger = useSelector(selectSaveTrigger);
+  const saveAsTrigger = useSelector(selectSaveAsTrigger);
+  const aiDecorationsNonce = useSelector(selectAiDecorationsNonce);
   const aiProposals = useSelector(selectAiProposals);
   const activeChangeId = useSelector(selectActiveChangeId);
 
@@ -115,6 +119,11 @@ const SimpleMonaco = forwardRef((props, ref) => {
   const handleMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    
+    // Expose refs globally for AiContextMenu to access when updating Monaco lines
+    // WHY: AiContextMenu needs to update line content but doesn't have direct access to editor
+    window.__monacoEditorRef = editorRef;
+    window.__monacoInstance = monaco;
 
     // Register custom scribefold language and folding provider (once)
     if (!window.__scribefoldLanguageRegistered) {
@@ -278,14 +287,17 @@ const SimpleMonaco = forwardRef((props, ref) => {
         x: domEvent.clientX,
         y: domEvent.clientY,
         level,
+        source: 'monaco',
+        lineKey: lineNumber,
       }));
     });
   };
 
-  // Re-apply decorations when AI setting changes or when we know content was replaced
+  // Re-apply decorations when AI setting changes, content changes, or the
+  // aiUiSlice decorations nonce is bumped (e.g., via AiContextMenu tag changes).
   useEffect(() => {
     updateDecorations();
-  }, [isAIEnabled, content]);
+  }, [isAIEnabled, content, aiDecorationsNonce]);
 
   // Cleanup folding provider on unmount
   useEffect(() => {
@@ -333,7 +345,7 @@ const SimpleMonaco = forwardRef((props, ref) => {
         dispatch(setIsModified(false));
         if (result.filePath) {
           // If saveAs returned a new path, update Redux
-          dispatch({ type: 'editor/setCurrentFilePath', payload: result.filePath });
+          dispatch(setCurrentFilePath(result.filePath));
         }
         dispatch(showStatus('File saved'));
       } else if (result.error) {
@@ -341,6 +353,29 @@ const SimpleMonaco = forwardRef((props, ref) => {
       }
     })();
   }, [saveTrigger, currentFilePath, dispatch]);
+
+  // Respond to Save As trigger (Electron): ALWAYS open save dialog regardless of current filePath
+  useEffect(() => {
+    if (!saveAsTrigger) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const text = editor.getValue();
+
+    (async () => {
+      const result = await saveFileAs(text);
+      if (result.success) {
+        dispatch(setIsModified(false));
+        if (result.filePath) {
+          dispatch(setCurrentFilePath(result.filePath));
+          localStorage.setItem('lastOpenedFile', result.filePath);
+        }
+        dispatch(showStatus('File saved'));
+      } else if (result.error) {
+        dispatch(showStatus('Failed to save file: ' + result.error));
+      }
+    })();
+  }, [saveAsTrigger, dispatch]);
 
 
   // Apply AI proposals to content to generate modified version

@@ -327,6 +327,8 @@ function EditorLine({
       x: e.clientX,
       y: e.clientY,
       level: line.level || 0,
+      source: 'array',
+      lineKey: lineIndex,
     }));
   };
 

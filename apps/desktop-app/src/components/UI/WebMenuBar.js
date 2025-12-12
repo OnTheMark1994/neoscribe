@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectIsAIEnabled, setIsAIEnabled, setBackgroundImage } from '../../store/settingsSlice';
-import { selectCurrentFilePath, selectIsModified, selectContent, selectViewType, setViewType, fileOpened, resetEditor, bumpFoldAllTrigger, bumpUnfoldAllTrigger, bumpSaveTrigger } from '../../store/editorSlice';
+import { selectCurrentFilePath, selectIsModified, selectContent, selectViewType, setViewType, fileOpened, resetEditor, bumpFoldAllTrigger, bumpUnfoldAllTrigger, bumpSaveTrigger, bumpSaveAsTrigger } from '../../store/editorSlice';
 import { openSettings, openDownloadModal } from '../../store/uiSlice';
 import { showStatus } from '../../store/statusSlice';
 import { isElectron, isWeb } from '../../utils/environment';
@@ -117,10 +117,10 @@ function WebMenuBar() {
         e.preventDefault();
         handleOpenFile();
       } else if (ctrl && shift && e.key === 'S') {
-        // Ctrl+Shift+S - Save As (Electron only) - handled via save flow in editor using saveTrigger
+        // Ctrl+Shift+S - Save As (Electron only) - ALWAYS opens save dialog
         e.preventDefault();
         if (IS_ELECTRON) {
-          dispatch(bumpSaveTrigger());
+          dispatch(bumpSaveAsTrigger());
         }
       } else if (ctrl && e.key === 's') {
         // Ctrl+S - Save (Electron) or open Download modal (Web)
@@ -371,7 +371,7 @@ function WebMenuBar() {
                   <button onClick={() => handleMenuClick(() => dispatch(bumpSaveTrigger()))}>
                     <span>Save</span><span className="shortcut">Ctrl+S</span>
                   </button>
-                  <button onClick={() => handleMenuClick(() => dispatch(bumpSaveTrigger()))}>
+                  <button onClick={() => handleMenuClick(() => dispatch(bumpSaveAsTrigger()))}>
                     <span>Save As</span><span className="shortcut">Ctrl+Shift+S</span>
                   </button>
                 </>

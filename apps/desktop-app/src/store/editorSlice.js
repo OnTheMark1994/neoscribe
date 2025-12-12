@@ -52,8 +52,8 @@ const initialState = {
   // VALUES: 'array' (EditorArray - line-based fold editor), 'monaco' (SimpleMonaco)
   // UPDATED BY: Settings or WebMenuBar toggle
   // READ BY: App.js to conditionally render editor component
-  // DEFAULT: 'array' for array view as requested
-  viewType: 'array',
+  // DEFAULT: 'monaco' so Monaco editor is the initial view
+  viewType: 'monaco',
   
   // WHAT: Legacy debug toggle for array view styling
   // TODO: Evaluate if still needed, possibly remove
@@ -64,6 +64,7 @@ const initialState = {
   foldAllTrigger: 0,
   unfoldAllTrigger: 0,
   saveTrigger: 0,
+  saveAsTrigger: 0, // Always opens save dialog, ignores existing filePath
 };
 
 const editorSlice = createSlice({
@@ -141,6 +142,9 @@ const editorSlice = createSlice({
     bumpSaveTrigger(state) {
       state.saveTrigger += 1;
     },
+    bumpSaveAsTrigger(state) {
+      state.saveAsTrigger += 1;
+    },
     
     // WHAT: Combined action for file open/new operations
     // WHY: Atomically updates filePath, content, and isModified in one dispatch
@@ -164,6 +168,7 @@ export const {
   bumpFoldAllTrigger,
   bumpUnfoldAllTrigger,
   bumpSaveTrigger,
+  bumpSaveAsTrigger,
   setContent,
   fileOpened,
 } = editorSlice.actions;
@@ -194,5 +199,6 @@ export const selectContent = (state) => state.editor.content;
 export const selectFoldAllTrigger = (state) => state.editor.foldAllTrigger;
 export const selectUnfoldAllTrigger = (state) => state.editor.unfoldAllTrigger;
 export const selectSaveTrigger = (state) => state.editor.saveTrigger;
+export const selectSaveAsTrigger = (state) => state.editor.saveAsTrigger;
 
 export default editorSlice.reducer;
