@@ -12,6 +12,7 @@ const initialState = {
   source: null, // 'array' or 'monaco' - which view opened the menu
   lineKey: null, // lineIndex (array) or lineNumber (monaco) - identifies the line
   decorationsNonce: 0, // bump this to request a decorations refresh in Monaco
+  arrayDecorationsNonce: 0, // bump this to request an array editor refresh
 };
 
 const aiUiSlice = createSlice({
@@ -38,12 +39,16 @@ const aiUiSlice = createSlice({
     bumpAiDecorationsNonce(state) {
       state.decorationsNonce += 1;
     },
+    bumpArrayDecorationsNonce(state) {
+      state.arrayDecorationsNonce += 1;
+    },
   },
 });
 
-export const { showAiContextMenu, hideAiContextMenu, bumpAiDecorationsNonce } = aiUiSlice.actions;
+export const { showAiContextMenu, hideAiContextMenu, bumpAiDecorationsNonce, bumpArrayDecorationsNonce } = aiUiSlice.actions;
 
 export const selectAiContextMenu = (state) => state.aiUi || initialState;
 export const selectAiDecorationsNonce = (state) => (state.aiUi || initialState).decorationsNonce;
+export const selectArrayDecorationsNonce = (state) => (state.aiUi || initialState).arrayDecorationsNonce;
 
 export default aiUiSlice.reducer;

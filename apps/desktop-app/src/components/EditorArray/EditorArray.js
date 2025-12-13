@@ -12,8 +12,9 @@ import {
 
 import { selectIsAIEnabled, selectDeveloperMode, selectShowArrayLineNumbers } from '../../store/settingsSlice';
 import { showStatus } from '../../store/statusSlice';
+import { selectArrayDecorationsNonce } from '../../store/aiUiSlice';
 
-import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines, recomputeVisibleLines, getVisibleLinesCached } from '../../utils/editorEngine';
+import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines, recomputeVisibleLines, getVisibleLinesCached, openLine, closeLine } from '../../utils/editorEngine';
 
 import EditorLine from './EditorLine';
 
@@ -37,6 +38,7 @@ const EditorArray = forwardRef((props, ref) => {
   // Redux selectors
   const content = useSelector(selectContent);
   const currentFilePath = useSelector(selectCurrentFilePath);
+  const arrayDecorationsNonce = useSelector(selectArrayDecorationsNonce);
 
   const isAIEnabled = useSelector(selectIsAIEnabled);
   const developerMode = useSelector(selectDeveloperMode);
@@ -156,17 +158,24 @@ const EditorArray = forwardRef((props, ref) => {
     recomputeFindMatches(findQuery);
   }, [renderTrigger]);
 
+  useEffect(() => {
+    setRenderTrigger(prev => prev + 1);
+  }, [arrayDecorationsNonce]);
+
   /**
    * Fold all collapsible sections
    */
   const foldAll = () => {
     const lines = getLines();
 
-    lines.forEach(line => {
-      if (line.level !== 0) {
+    lines.forEach((line, idx) => {
+      if (line.level === 1 || line.level === 2) {
+        closeLine(idx);
+      } else if (line.level !== 0) {
         line.open = false;
       }
     });
+
     recomputeVisibleLines();
     setRenderTrigger(prev => prev + 1);
     dispatch(setIsModified(true));
@@ -178,11 +187,14 @@ const EditorArray = forwardRef((props, ref) => {
   const unfoldAll = () => {
     const lines = getLines();
 
-    lines.forEach(line => {
-      if (line.level !== 0) {
+    lines.forEach((line, idx) => {
+      if (line.level === 1 || line.level === 2) {
+        openLine(idx);
+      } else if (line.level !== 0) {
         line.open = true;
       }
     });
+
     recomputeVisibleLines();
     setRenderTrigger(prev => prev + 1);
     dispatch(setIsModified(true));
@@ -193,9 +205,18 @@ const EditorArray = forwardRef((props, ref) => {
    */
   const toggleFold = (idx) => {
     const lines = getLines();
+    const line = lines[idx];
 
-    lines[idx].open = !lines[idx].open;
-    recomputeVisibleLines();
+    if (line.level === 1 || line.level === 2) {
+      if (line.open === false) {
+        openLine(idx);
+      } else {
+        closeLine(idx);
+      }
+    } else {
+      line.open = !line.open;
+      recomputeVisibleLines();
+    }
     setRenderTrigger(prev => prev + 1);
     dispatch(setIsModified(true));
   };

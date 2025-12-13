@@ -16,6 +16,97 @@
 let lines = [];
 let visibleLines = [];
 
+// Remove AI and fold tags from a raw line of text, returning the cleaned text.
+// Tags are persisted only on save via getTextFromLines; in-memory line.text is kept
+// free of these markers so the UI can work with clean content.
+function stripAiAndFoldTags(rawText) {
+  if (!rawText) return '';
+  return rawText
+    // AI visibility / mode tags
+    .replace(/\s*#ai-hide\b/gi, '')
+    .replace(/\s*#ai-summary\b/gi, '')
+    .replace(/\s*#ai-title\b/gi, '')
+    // Legacy variants without dash
+    .replace(/\s*#aihide\b/gi, '')
+    .replace(/\s*#aisummary\b/gi, '')
+    .replace(/\s*#aititle\b/gi, '')
+    // Fold state tag
+    .replace(/\s*#folded\b/gi, '');
+}
+
+// === Tag helpers for trailing `#tags` suffix ===
+// Format: "visible content #tags#ai-hide#folded" (tags must be at end of line)
+
+export function parseTagsFromText(text) {
+  const raw = text || '';
+  const trimmed = raw.trimEnd();
+
+  const match = trimmed.match(/^(.*?)(\s+#tags(#[^\s#]+)*)\s*$/i);
+  if (!match) {
+    return { content: raw, tags: [] };
+  }
+
+  const content = match[1] || '';
+  const tagsPart = match[2] || '';
+  const hashTags = tagsPart.match(/#[^\s#]+/g) || [];
+
+  const tags = hashTags
+    .map(t => t.slice(1))
+    .filter(t => t.toLowerCase() !== 'tags');
+
+  return { content, tags };
+}
+
+export function buildTextWithTags(content, tags) {
+  const base = (content || '').replace(/\s+$/g, '');
+  if (!tags || tags.length === 0) {
+    return base;
+  }
+
+  const seen = new Set();
+  const normalized = [];
+  for (const t of tags) {
+    if (!t) continue;
+    const key = t.toLowerCase();
+    if (key === 'tags') continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(t);
+  }
+
+  if (normalized.length === 0) {
+    return base;
+  }
+
+  return `${base} #tags${normalized.map(t => `#${t}`).join('')}`;
+}
+
+export function addTagToText(text, tag) {
+  const cleanTag = (tag || '').replace(/^#+/, '');
+  if (!cleanTag) return text || '';
+
+  const { content, tags } = parseTagsFromText(text);
+  if (tags.map(t => t.toLowerCase()).includes(cleanTag.toLowerCase())) {
+    return buildTextWithTags(content, tags);
+  }
+
+  return buildTextWithTags(content, [...tags, cleanTag]);
+}
+
+export function removeTagFromText(text, tag) {
+  const cleanTag = (tag || '').replace(/^#+/, '');
+  if (!cleanTag) return text || '';
+
+  const { content, tags } = parseTagsFromText(text);
+  const filtered = tags.filter(t => t.toLowerCase() !== cleanTag.toLowerCase());
+  return buildTextWithTags(content, filtered);
+}
+
+export function stripTagsFromTextForDisplay(text) {
+  const { content } = parseTagsFromText(text);
+  return content;
+}
+
 // Generate unique ID for a line
 export function generateLineId() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -34,43 +125,30 @@ let historyEnabled = true;
 
 // Parse text into lines array
 export function parseText(text) {
-  const raw = text.split('\n');
-  lines = raw.map(t => ({ 
-    text: t, 
-    open: true, 
-    level: 0, 
-    sendToAI: 'all',
-    id: generateLineId(),
-    hidden: false
-  }));
+  const raw = (text || '').split('\n');
 
-  for (let i = 0; i < lines.length; i++) {
-    const lineText = (lines[i].text || '').trim();
+  lines = raw.map(t => {
+    const full = t || '';
+    const { content, tags } = parseTagsFromText(full);
+
+    // Derive AI mode + fold state from tags only
+    const sendToAI = getAiModeFromTagsAndText(tags, full);
+    const hasFolded = tags.map(x => x.toLowerCase()).includes('folded');
+
     let level = 0;
-    let isHeader = false;
+    const trimmed = (content || '').trim();
+    if (/^#chapter(?:\s|$)/i.test(trimmed)) level = 1;
+    else if (/^#section(?:\s|$)/i.test(trimmed)) level = 2;
 
-    if (lineText.match(/^#chapter(?:\s|$)/i)) { 
-      level = 1; 
-      isHeader = true;
-    } else if (lineText.match(/^#section(?:\s|$)/i)) { 
-      level = 2; 
-      isHeader = true;
-    }
-
-    lines[i].level = level;
-    lines[i].hidden = false;
-
-    if (isHeader) {
-      // Determine AI sharing mode from tags on the header line
-      if (lineText.match(/#ai-hide\b/i) || lineText.match(/#aihide\b/i)) {
-        lines[i].sendToAI = 'none';
-      } else if (lineText.match(/#ai-summary\b/i) || lineText.match(/#aisummary\b/i)) {
-        lines[i].sendToAI = 'summary';
-      } else if (lineText.match(/#ai-title\b/i) || lineText.match(/#aititle\b/i)) {
-        lines[i].sendToAI = 'title';
-      }
-    }
-  }
+    return {
+      text: content,        // clean text, no #tags suffix
+      open: !hasFolded,     // closed if folded tag present
+      level,
+      sendToAI,
+      id: generateLineId(),
+      hidden: false,
+    };
+  });
 
   recomputeVisibleLines();
   return lines;
@@ -84,12 +162,28 @@ export function isLineHidden(lineIdx) {
 
 // Get all lines as text
 export function getTextFromLines() {
-  return lines.map(l => l.text).join('\n');
+  return lines.map(l => {
+    const t = l.text || '';
+    const tags = [];
+
+    // AI sharing tags from sendToAI mode
+    if (l.sendToAI === 'none') tags.push('ai-hide');
+    else if (l.sendToAI === 'summary') tags.push('ai-summary');
+    else if (l.sendToAI === 'title') tags.push('ai-title');
+
+    // Fold state tag for headers: closed headers get folded
+    if (l.level !== 0 && l.open === false) {
+      tags.push('folded');
+    }
+
+    return buildTextWithTags(t, tags);
+  }).join('\n');
 }
 
 // Update lines from text
 export function updateLinesFromText(text) {
   const oldOpenStates = {};
+
   
   // Preserve open state for header lines based on their text content
   lines.forEach((l) => {
@@ -244,20 +338,65 @@ export function splitLine(idx, offset) {
 
 // === Localized header helpers (Step 4) ===
 
-function applyHeaderMetadataFromText(line) {
-  const text = (line.text || '').trim();
+function getAiModeFromTagsAndText(tags, fullText) {
+  const lowerTags = (tags || []).map(t => t.toLowerCase());
 
-  // Reset to defaults first (open state is kept separate from tags)
-  line.sendToAI = 'all';
-
-  // AI sharing tags
-  if (text.match(/#ai-hide\b/i) || text.match(/#aihide\b/i)) {
-    line.sendToAI = 'none';
-  } else if (text.match(/#ai-summary\b/i) || text.match(/#aisummary\b/i)) {
-    line.sendToAI = 'summary';
-  } else if (text.match(/#ai-title\b/i) || text.match(/#aititle\b/i)) {
-    line.sendToAI = 'title';
+  if (lowerTags.includes('ai-hide') || lowerTags.includes('aihide')) {
+    return 'none';
   }
+  if (lowerTags.includes('ai-summary') || lowerTags.includes('aisummary')) {
+    return 'summary';
+  }
+  if (lowerTags.includes('ai-title') || lowerTags.includes('aititle')) {
+    return 'title';
+  }
+
+  const text = (fullText || '').trim();
+  if (text.match(/#ai-hide\b/i) || text.match(/#aihide\b/i)) {
+    return 'none';
+  }
+  if (text.match(/#ai-summary\b/i) || text.match(/#aisummary\b/i)) {
+    return 'summary';
+  }
+  if (text.match(/#ai-title\b/i) || text.match(/#aititle\b/i)) {
+    return 'title';
+  }
+
+  return 'all';
+}
+
+export function getAiModeFromText(text) {
+  const { tags } = parseTagsFromText(text || '');
+  return getAiModeFromTagsAndText(tags, text || '');
+}
+
+export function applyAiModeToText(text, mode) {
+  const targetMode = mode || 'all';
+  const { content, tags } = parseTagsFromText(text || '');
+  const lower = tags.map(t => t.toLowerCase());
+  const withoutAiTags = tags.filter(t => {
+    const lt = t.toLowerCase();
+    return lt !== 'ai-hide' && lt !== 'aihide' && lt !== 'ai-summary' && lt !== 'aisummary' && lt !== 'ai-title' && lt !== 'aititle';
+  });
+
+  if (targetMode === 'all') {
+    return buildTextWithTags(content, withoutAiTags);
+  }
+
+  let aiTag = null;
+  if (targetMode === 'none') aiTag = 'ai-hide';
+  else if (targetMode === 'summary') aiTag = 'ai-summary';
+  else if (targetMode === 'title') aiTag = 'ai-title';
+
+  const nextTags = aiTag ? [...withoutAiTags, aiTag] : withoutAiTags;
+  return buildTextWithTags(content, nextTags);
+}
+
+function applyHeaderMetadataFromText(line) {
+  const raw = line.text || '';
+  const { tags } = parseTagsFromText(raw);
+
+  line.sendToAI = getAiModeFromTagsAndText(tags, raw);
 }
 
 export function addChapterAt(idx) {

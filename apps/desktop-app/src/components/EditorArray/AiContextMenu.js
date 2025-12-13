@@ -1,8 +1,8 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectAiContextMenu, hideAiContextMenu, bumpAiDecorationsNonce } from '../../store/aiUiSlice';
+import { selectAiContextMenu, hideAiContextMenu, bumpAiDecorationsNonce, bumpArrayDecorationsNonce } from '../../store/aiUiSlice';
 import { selectViewType, setContent } from '../../store/editorSlice';
-import { getLines, updateLineText, recomputeVisibleLines, getTextFromLines } from '../../utils/editorEngine';
+import { getLines, updateLineText, recomputeVisibleLines, getTextFromLines, getAiModeFromText, applyAiModeToText } from '../../utils/editorEngine';
 import './AiContextMenu.css';
 
 /**
@@ -49,70 +49,29 @@ function AiContextMenu() {
       }
     }
 
-    // Determine mode from tags
-    if (/#ai-hide\b/i.test(lineText)) return 'none';
-    if (/#ai-title\b/i.test(lineText)) return 'title';
-    if (/#ai-summary\b/i.test(lineText)) return 'summary';
-    return 'all';
+    // Determine mode from trailing #tags suffix
+    return getAiModeFromText(lineText);
   };
 
   const currentMode = getCurrentMode();
-
-  /**
-   * Remove all AI tags from a line
-   */
-  const removeAiTags = (text) => {
-    return text
-      .replace(/\s*#ai-hide\b/gi, '')
-      .replace(/\s*#ai-title\b/gi, '')
-      .replace(/\s*#ai-summary\b/gi, '')
-      .replace(/\s*#aihide\b/gi, '')
-      .replace(/\s*#aititle\b/gi, '')
-      .replace(/\s*#aisummary\b/gi, '');
-  };
-
-  /**
-   * Add the appropriate AI tag to the line
-   */
-  const addAiTag = (text, mode) => {
-    const cleaned = removeAiTags(text).trimEnd();
-    if (mode === 'all') return cleaned; // No tag needed for 'share all'
-    
-    const tagMap = {
-      'none': '#ai-hide',
-      'title': '#ai-title',
-      'summary': '#ai-summary',
-    };
-    
-    const tag = tagMap[mode];
-    if (!tag) return cleaned;
-    
-    return cleaned + ' ' + tag;
-  };
 
   /**
    * Handle selecting an AI mode option
    */
   const handleSelectMode = (mode) => {
     if (source === 'array') {
-      // Update editorEngine directly
+      // ARRAY VIEW: update in-memory metadata only; tags are added on save by editorEngine
       const lines = getLines();
       if (lines && typeof lineKey === 'number' && lines[lineKey]) {
-        const oldText = lines[lineKey].text || '';
-        const newText = addAiTag(oldText, mode);
-        
-        // Update line text and sendToAI property
-        updateLineText(lineKey, newText);
+        // Keep line.text clean; just update sendToAI so getTextFromLines()
+        // can encode the correct #tags suffix when we persist content.
         lines[lineKey].sendToAI = mode;
         
-        // Recompute visible lines to reflect changes
+        // Recompute visible lines in case any AI-dependent UI wants to react
         recomputeVisibleLines();
-        
-        // Update Redux content to keep it in sync
-        const fullText = getTextFromLines();
-        dispatch(setContent(fullText));
-        // Let Monaco know AI tags changed so it can refresh glyph decorations
-        dispatch(bumpAiDecorationsNonce());
+
+        // Signal array editor to refresh AI indicators without touching content text
+        dispatch(bumpArrayDecorationsNonce());
       }
     } else if (source === 'monaco') {
       // Update Monaco model directly
@@ -123,8 +82,8 @@ function AiContextMenu() {
         const model = editor.getModel();
         if (model) {
           const lineContent = model.getLineContent(lineKey) || '';
-          const newText = addAiTag(lineContent, mode);
-          
+          const newText = applyAiModeToText(lineContent, mode);
+
           // Use pushEditOperations for undo support
           model.pushEditOperations(
             [],

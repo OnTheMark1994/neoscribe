@@ -851,3 +851,19 @@ useEffect(() => {
 ```
 
 Rule: **Never poll. Use events, Redux, or React state.**
+
+### Reusing Monaco-Specific State for Array View
+
+- We previously reused the Monaco `decorationsNonce` from `aiUiSlice` to force the array editor to refresh AI indicators.
+- This couples two unrelated concerns and makes it impossible to reason about which view is driving which refresh.
+- Fix: `aiUiSlice` now exposes a dedicated `arrayDecorationsNonce` and `bumpArrayDecorationsNonce`, which `EditorArray` listens to, while Monaco continues to use `decorationsNonce`.
+
+Guideline: **Never reuse a view-specific flag as a global trigger for a different view.** Add a clearly named field for each distinct responsibility.
+
+### Full recomputeVisibleLines() for Single-Line Changes
+
+- In `EditorArray`, changing AI mode for a single header currently calls `recomputeVisibleLines()` and bumps a render trigger.
+- `recomputeVisibleLines()` walks the entire `lines` array and rebuilds `visibleLines` (O(n)), which is overkill when only one header’s `sendToAI` changed and its `open` state did not.
+- This was acceptable as a first implementation but becomes wasteful at ~10,000+ lines.
+
+Future fix: introduce **localized updates** that only touch the affected header/descendants (or just the metadata used by the eye icon) instead of re-scanning the entire structure for every AI mode toggle.

@@ -671,6 +671,8 @@ async function applyTokenChange({
     const currentUsed = Number(user.tokens_used) || 0;
     const currentUsedAllTime = Number(user.tokens_used_all_time) || 0;
 
+    const prevAvailable = currentMonthly + currentAdded;
+
     // Calculate new values
     let newMonthly, newAdded;
     let actualDeltaMonthly = 0;
@@ -693,6 +695,8 @@ async function applyTokenChange({
       newAdded = Math.max(0, currentAdded + deltaAdded);
       actualDeltaAdded = newAdded - currentAdded;
     }
+
+    const newAvailable = newMonthly + newAdded;
 
     // Usage counters
     let newUsed = currentUsed;
@@ -731,7 +735,25 @@ async function applyTokenChange({
       return { success: false, error: updateError.message };
     }
 
-    console.log(`[applyTokenChange] userId=${userId} monthly: ${currentMonthly}->${newMonthly} (delta ${actualDeltaMonthly}), added: ${currentAdded}->${newAdded} (delta ${actualDeltaAdded}), note: ${note || '(none)'}`);
+    console.log(`[applyTokenChange] userId=${userId} monthly: ${currentMonthly}->${newMonthly} (delta ${actualDeltaMonthly}), added: ${currentAdded}->${newAdded} (delta ${actualDeltaAdded}), prevAvailable=${prevAvailable}, newAvailable=${newAvailable}, note: ${note || '(none)'}`);
+
+    if (prevAvailable > 0 && newAvailable === 0) {
+      console.warn('[applyTokenChange][TOKEN_ZERO] Available tokens dropped to 0 for userId=', userId, {
+        prevAvailable,
+        newAvailable,
+        currentMonthly,
+        currentAdded,
+        newMonthly,
+        newAdded,
+        deltaMonthly,
+        deltaAdded,
+        setMonthlyAbsolute,
+        setAddedAbsolute,
+        incrementUsageCounters,
+        resetTokensUsed,
+        note,
+      });
+    }
 
     // Best-effort log to token_log with separate columns
     if (actualDeltaMonthly !== 0 || actualDeltaAdded !== 0) {
@@ -2257,34 +2279,36 @@ app.post('/api/user/add-tokens', async (req, res) => {
     }
 
     const user = users[0];
-    const currentAdded = Number(user.tokens_added) || 0;
-    const newTokensAdded = currentAdded + Number(tokensToAdd);
+    const addAmount = Number(tokensToAdd);
 
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ tokens_added: newTokensAdded })
-      .eq('id', user.id);
+    // Use unified token change helper so all mutations flow through one place
+    const result = await applyTokenChange({
+      userId: user.id,
+      deltaAdded: addAmount,
+      note: 'Manual add-tokens endpoint',
+    });
 
-    if (updateError) {
-      console.error('[/api/user/add-tokens] Failed to update tokens_added:', updateError);
+    if (!result.success) {
+      console.error('[/api/user/add-tokens] Failed to apply token change:', result.error);
       return res.status(500).json({
         error: 'Failed to add tokens',
-        details: updateError.message
+        details: result.error,
       });
     }
 
-    // Calculate available tokens using new model
-    const tokensMonthly = Number(user.tokens_monthly) || 0;
-    const availableTokens = tokensMonthly + newTokensAdded;
+    const updated = result.user || user;
+    const tokensMonthly = Number(updated.tokens_monthly) || 0;
+    const tokensAdded = Number(updated.tokens_added) || 0;
+    const availableTokens = tokensMonthly + tokensAdded;
 
     return res.json({
       availableTokens,
       tokens_monthly: tokensMonthly,
       tokensMonthly: tokensMonthly,
-      tokens_used: user.tokens_used || 0,
-      tokens_added: newTokensAdded,
-      tokens_used_all_time: user.tokens_used_all_time || 0,
-      tier_id: user.tier_id || null
+      tokens_used: updated.tokens_used || 0,
+      tokens_added: tokensAdded,
+      tokens_used_all_time: updated.tokens_used_all_time || 0,
+      tier_id: updated.tier_id || null,
     });
   } catch (error) {
     console.error('Error in /api/user/add-tokens:', error);

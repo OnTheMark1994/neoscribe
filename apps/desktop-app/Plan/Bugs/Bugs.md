@@ -32,6 +32,18 @@ we can do these ones later: (just leave them here)
 font color (with colro selector), size
 background color
 
+In the AIContextMenu
+it calls for ai show or hide 
+recomputeVisibleLines
+which cycles through every line, maybe 10,000 lines just to change one visibleLines line to sync with the lines array
+
+on load with many (over 10k) lines it is super slow
+but monaco opens it right away
+we need to optamize
+or switch to monaco
+but the ai suggestions do not work
+and the section and chanpter headers sometimes do not work 
+
 Auth
 when in browser web mode
 the login is not persisting when computer closes and opens
