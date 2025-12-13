@@ -51,6 +51,14 @@ function EditorLine({
     container.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [isCurrentChange, lineIndex, line.proposedChangeId]);
 
+  // Fosus on the first line on load (this will run every time though, not what we want)
+  // useEffect(()=>{
+  //   if(lineIndex === 0){
+  //     if(contentRef.current)
+  //       contentRef.current.focus()
+  //   }
+  // },[lineIndex])
+
     // Detect changes in header/section markers and trigger localized helpers
     const classifyHeader = (text) => {
       const trimmed = (text || '').trim();
@@ -338,7 +346,7 @@ function EditorLine({
   const getEffectiveSendToAI = () => {
     const ownMode = line.sendToAI || 'all';
 
-    // Only sections can be overridden by a parent chapter
+    // Only sections are visually affected by a parent chapter's AI mode
     if (line.level !== 2) {
       return ownMode;
     }
@@ -346,15 +354,17 @@ function EditorLine({
     const lines = getLines();
     let parentChapterMode = null;
 
+    // Walk upward to find the nearest chapter header; no need for start/end
     for (let j = lineIndex - 1; j >= 0; j--) {
       const candidate = lines[j];
-      if (candidate.level === 1 && candidate.startIdx !== -1 && candidate.endIdx >= lineIndex) {
+      if (candidate.level === 1) {
         parentChapterMode = candidate.sendToAI || 'all';
         break;
       }
     }
 
-    // If parent chapter is limited/hidden, this section is effectively hidden
+    // If parent chapter is hidden or title-only/summary, treat this section
+    // as effectively hidden for eye-color purposes.
     if (parentChapterMode && parentChapterMode !== 'all') {
       return 'none';
     }

@@ -36,7 +36,12 @@ function AiContextMenu() {
     if (source === 'array') {
       const lines = getLines();
       if (lines && typeof lineKey === 'number' && lines[lineKey]) {
-        lineText = lines[lineKey].text || '';
+        const line = lines[lineKey];
+        // Prefer the in-memory sendToAI flag; fall back to text tags only if missing.
+        if (line.sendToAI) {
+          return line.sendToAI;
+        }
+        lineText = line.text || '';
       }
     } else if (source === 'monaco') {
       // Access Monaco editor via global ref set by SimpleMonaco
@@ -49,7 +54,8 @@ function AiContextMenu() {
       }
     }
 
-    // Determine mode from trailing #tags suffix
+    // Determine mode from trailing #tags suffix when using Monaco or when
+    // array metadata is unavailable.
     return getAiModeFromText(lineText);
   };
 

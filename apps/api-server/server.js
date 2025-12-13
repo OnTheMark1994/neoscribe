@@ -352,6 +352,148 @@ function countMessagesTokens(messages) {
 }
 
 /**
+ * Resolve canonical user for a given auth_id.
+ * If multiple rows exist (legacy/edge), prefer the one with the highest available tokens
+ * so we never accidentally treat a zero-balance row as the main account.
+ *
+ * @param {string} authId
+ * @returns {Promise<Object|null>} - Canonical user row or null if none
+ */
+async function findCanonicalUserByAuthId(authId) {
+  if (!supabase || !authId) return null;
+
+  try {
+    const { data: authUsers, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', authId);
+
+    if (error) {
+      console.error('[findCanonicalUserByAuthId] Error querying by auth_id:', error);
+      return null;
+    }
+
+    if (!authUsers || authUsers.length === 0) {
+      return null;
+    }
+
+    if (authUsers.length === 1) {
+      return authUsers[0];
+    }
+
+    console.warn('[findCanonicalUserByAuthId] Multiple user rows found for auth_id, choosing by highest tokens. Count =', authUsers.length);
+
+    let best = authUsers[0];
+    let bestTokens = (Number(best.tokens_monthly) || 0) + (Number(best.tokens_added) || 0);
+
+    for (let i = 1; i < authUsers.length; i++) {
+      const u = authUsers[i];
+      const total = (Number(u.tokens_monthly) || 0) + (Number(u.tokens_added) || 0);
+      if (total > bestTokens) {
+        best = u;
+        bestTokens = total;
+      }
+    }
+
+    return best;
+  } catch (err) {
+    console.error('[findCanonicalUserByAuthId] Exception:', err);
+    return null;
+  }
+}
+
+/**
+ * Safely link an auth_id to a specific user row, without ever creating duplicates.
+ * - If any row already has this auth_id, return that canonical row and DO NOT modify tokens.
+ * - Otherwise, set auth_id (and optional extra fields) on the provided row.
+ *
+ * @param {Object} row - Existing user row to potentially update
+ * @param {string} authId
+ * @param {Object} [extraFields] - Optional additional fields to update on the row
+ * @returns {Promise<Object|null>} - Updated row (or existing canonical row) or null on error
+ */
+async function safelyAttachAuthIdToUserRow(row, authId, extraFields = {}) {
+  if (!supabase || !row || !authId) return row || null;
+
+  // If this row already has this auth_id, just return it
+  if (row.auth_id === authId) {
+    return row;
+  }
+
+  // Check if some OTHER row already owns this auth_id
+  const existingAuthUser = await findCanonicalUserByAuthId(authId);
+  if (existingAuthUser) {
+    console.warn('[safelyAttachAuthIdToUserRow] auth_id already present on another row. Using existing auth row and NOT overwriting auth_id on current row.', {
+      targetRowId: row.id,
+      existingAuthRowId: existingAuthUser.id,
+    });
+    return existingAuthUser;
+  }
+
+  try {
+    const updatePayload = {
+      auth_id: authId,
+      ...extraFields,
+    };
+
+    const { data: updated, error } = await supabase
+      .from('users')
+      .update(updatePayload)
+      .eq('id', row.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[safelyAttachAuthIdToUserRow] Failed to update row:', error);
+      return row;
+    }
+
+    return updated || row;
+  } catch (err) {
+    console.error('[safelyAttachAuthIdToUserRow] Exception:', err);
+    return row;
+  }
+}
+
+/**
+ * Safely create a new user row that includes an auth_id.
+ * - If any row already has this auth_id, return that canonical row and DO NOT insert.
+ * - Otherwise, insert the provided row.
+ *
+ * @param {Object} insertData - Data for new row (must include auth_id)
+ * @returns {Promise<Object|null>} - Inserted row or existing canonical auth row
+ */
+async function safelyCreateUserWithAuthId(insertData) {
+  if (!supabase || !insertData || !insertData.auth_id) return null;
+
+  const existingAuthUser = await findCanonicalUserByAuthId(insertData.auth_id);
+  if (existingAuthUser) {
+    console.warn('[safelyCreateUserWithAuthId] auth_id already exists. Returning existing auth row and NOT inserting a new one.', {
+      existingAuthRowId: existingAuthUser.id,
+    });
+    return existingAuthUser;
+  }
+
+  try {
+    const { data: inserted, error } = await supabase
+      .from('users')
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[safelyCreateUserWithAuthId] Failed to insert user row:', error);
+      return null;
+    }
+
+    return inserted;
+  } catch (err) {
+    console.error('[safelyCreateUserWithAuthId] Exception:', err);
+    return null;
+  }
+}
+
+/**
  * Get or create user in database
  * @param {string} anonId - Anonymous ID
  * @param {string} authId - Authenticated user ID (optional)
@@ -362,32 +504,21 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
   if (!supabase) return null;
 
   try {
-    // First try to find user by auth_id if provided
+    // First try to find canonical user by auth_id if provided
     if (authId) {
-      // NOTE: We assume auth_id is effectively unique (at most one row per auth user).
-      // If this ever returns multiple rows, we may need to revisit user schema/merging.
-      const { data: authUsers, error: authError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', authId);
+      const authUser = await findCanonicalUserByAuthId(authId);
 
-      if (authError) {
-        console.error('❌ Error querying users by auth_id:', authError);
-      } else if (authUsers && authUsers.length > 0) {
-        // If multiple rows exist for this auth_id, pick the first deterministically
-        if (authUsers.length > 1) {
-          console.warn('⚠ Multiple user rows found for auth_id, using first row. Count =', authUsers.length);
-        }
-
-        const authUser = authUsers[0];
-        // console.log('  → Found existing user by auth_id');
-
-        // Update anon_id if needed
-        if (anonId && authUser.anon_id !== anonId) {
-          await supabase
-            .from('users')
-            .update({ anon_id: anonId })
-            .eq('id', authUser.id);
+      if (authUser) {
+        // Update anon_id if needed (but never touch auth_id or tokens)
+        if (anonId && authUser.anon_id !== anonId && !authUser.anon_id) {
+          try {
+            await supabase
+              .from('users')
+              .update({ anon_id: anonId })
+              .eq('id', authUser.id);
+          } catch (e) {
+            console.error('[getOrCreateUser] Failed to update anon_id on auth user:', e);
+          }
         }
 
         return authUser;
@@ -412,21 +543,11 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
       const anonUser = anonUsers[0];
       // console.log('  → Found existing user by anon_id');
       
-      // If auth_id provided, link it to existing anon account when not already linked
+      // If auth_id provided, link it to existing anon account when not already linked.
+      // Use safe helper so we never create duplicate auth_id rows or overwrite an existing auth row.
       if (authId && !anonUser.auth_id) {
-        // console.log('  → Linking auth_id to anonymous account');
-        const { data: updated } = await supabase
-          .from('users')
-          .update({ 
-            auth_id: authId
-            // Keep tokens_monthly, tokens_added and tokens_used as-is
-            // Monthly allowance is set via Stripe webhook when subscription is created
-          })
-          .eq('id', anonUser.id)
-          .select()
-          .single();
-        
-        return updated || anonUser;
+        const resolved = await safelyAttachAuthIdToUserRow(anonUser, authId);
+        return resolved || anonUser;
       }
       
       // User exists, no further update needed here
@@ -440,18 +561,41 @@ async function getOrCreateUser(anonId, authId, ipAddress) {
     // New users: anon gets 0 monthly + NEW_ANON_TOKENS bonus, auth gets 0 monthly + NEW_AUTH_TOKENS (will be set on upgrade)
     const isNewAnon = !authId;
     const initialTokensAdded = isNewAnon ? NEW_ANON_TOKENS : NEW_AUTH_TOKENS;
-    const { data: newUser, error: createError } = await supabase
-      .from('users')
-      .insert({
+
+    let newUser = null;
+    let createError = null;
+
+    if (authId) {
+      // Creating a row that has an auth_id: make sure we never duplicate that auth_id.
+      newUser = await safelyCreateUserWithAuthId({
         anon_id: anonId,
-        auth_id: authId || null,
-        tokens_monthly: 0,           // No monthly allowance initially (set via Stripe webhook)
-        tokens_used: 0,              // No tokens used yet
-        tokens_added: initialTokensAdded,  // Bonus for anon vs auth defined by constants
-        tokens_used_all_time: 0      // No lifetime usage yet
-      })
-      .select()
-      .single();
+        auth_id: authId,
+        tokens_monthly: 0,
+        tokens_used: 0,
+        tokens_added: initialTokensAdded,
+        tokens_used_all_time: 0,
+      });
+
+      if (!newUser) {
+        createError = { message: 'Failed to create or resolve user with auth_id' };
+      }
+    } else {
+      const result = await supabase
+        .from('users')
+        .insert({
+          anon_id: anonId,
+          auth_id: null,
+          tokens_monthly: 0,           // No monthly allowance initially (set via Stripe webhook)
+          tokens_used: 0,              // No tokens used yet
+          tokens_added: initialTokensAdded,  // Bonus for anon vs auth defined by constants
+          tokens_used_all_time: 0      // No lifetime usage yet
+        })
+        .select()
+        .single();
+
+      newUser = result.data;
+      createError = result.error;
+    }
 
     if (createError) {
       console.error('❌ Error creating user:', createError);
@@ -1180,25 +1324,20 @@ app.post('/api/users/login', async (req, res) => {
 
     if (!existingUsers || existingUsers.length === 0) {
       // No existing anon row: create a user row with no bonus tokens
-      const { data: inserted, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          anon_id: anonId,
-          auth_id: authId,
-          tokens_monthly: 0,
-          tokens_used: 0,
-          tokens_added: 0,
-          tokens_used_all_time: 0
-        })
-        .select()
-        .single();
+      const inserted = await safelyCreateUserWithAuthId({
+        anon_id: anonId,
+        auth_id: authId,
+        tokens_monthly: 0,
+        tokens_used: 0,
+        tokens_added: 0,
+        tokens_used_all_time: 0
+      });
 
-      if (insertError) {
-        console.error('❌ Failed to insert user row on login:', insertError);
+      if (!inserted) {
+        console.error('❌ Failed to insert or resolve user row on login');
         return res.status(500).json({
           success: false,
-          error: 'Failed to create user record on login',
-          details: insertError.message
+          error: 'Failed to create user record on login'
         });
       }
 
@@ -1208,47 +1347,35 @@ app.post('/api/users/login', async (req, res) => {
       // Single anon row without auth_id: link auth_id, no token changes
       const row = existingUsers[0];
 
-      const { data: updated, error: updateError } = await supabase
-        .from('users')
-        .update({
-          auth_id: authId
-        })
-        .eq('id', row.id)
-        .select()
-        .single();
+      const updated = await safelyAttachAuthIdToUserRow(row, authId);
 
-      if (updateError) {
-        console.error('❌ Failed to update user row on login:', updateError);
+      if (!updated) {
+        console.error('❌ Failed to safely attach auth_id on login');
         return res.status(500).json({
           success: false,
-          error: 'Failed to update user record on login',
-          details: updateError.message
+          error: 'Failed to update user record on login'
         });
       }
 
       userRow = updated;
       message = 'Login successful!';
     } else {
-      // Multiple rows or at least one already has auth_id, create a new row with no bonus tokens
-      const { data: repeatUser, error: repeatError } = await supabase
-        .from('users')
-        .insert({
-          anon_id: anonId,
-          auth_id: authId,
-          tokens_monthly: 0,
-          tokens_used: 0,
-          tokens_added: 0,
-          tokens_used_all_time: 0
-        })
-        .select()
-        .single();
+      // Multiple rows or at least one already has auth_id
+      // Prefer the existing canonical auth row instead of creating a duplicate
+      const repeatUser = await safelyCreateUserWithAuthId({
+        anon_id: anonId,
+        auth_id: authId,
+        tokens_monthly: 0,
+        tokens_used: 0,
+        tokens_added: 0,
+        tokens_used_all_time: 0
+      });
 
-      if (repeatError) {
-        console.error('❌ Failed to insert repeat user row on login:', repeatError);
+      if (!repeatUser) {
+        console.error('❌ Failed to insert or resolve repeat user row on login');
         return res.status(500).json({
           success: false,
-          error: 'Failed to create repeat user record on login',
-          details: repeatError.message
+          error: 'Failed to create repeat user record on login'
         });
       }
 
@@ -1375,28 +1502,23 @@ app.post('/api/users/create-account', async (req, res) => {
     if (!deviceAlreadyUsedForAuth && (!existingUsers || existingUsers.length === 0)) {
       // First auth account for this anon/device: create new user row with 0 tokens (granted on email confirm)
       console.log('[create-account] Creating new user row (no existing anon row, device not yet used for auth)');
-      const { data: inserted, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          anon_id: anonId,
-          auth_id: authId,
-          email,
-          password,
-          device_id: deviceId || null,
-          tokens_monthly: 0,
-          tokens_used: 0,
-          tokens_added: 0,  // NO bonus yet - granted on email confirmation
-          tokens_used_all_time: 0
-        })
-        .select()
-        .single();
+      const inserted = await safelyCreateUserWithAuthId({
+        anon_id: anonId,
+        auth_id: authId,
+        email,
+        password,
+        device_id: deviceId || null,
+        tokens_monthly: 0,
+        tokens_used: 0,
+        tokens_added: 0,  // NO bonus yet - granted on email confirmation
+        tokens_used_all_time: 0
+      });
 
-      if (insertError) {
-        console.error('❌ Failed to insert new user row:', insertError);
+      if (!inserted) {
+        console.error('❌ Failed to insert or resolve new user row on create-account');
         return res.status(500).json({
           success: false,
-          error: 'Failed to create user record',
-          details: insertError.message
+          error: 'Failed to create user record'
         });
       }
 
@@ -1409,29 +1531,22 @@ app.post('/api/users/create-account', async (req, res) => {
       console.log('[create-account] Reusing existing unconfirmed user row for new auth/email');
       const row = primaryUnconfirmedUser;
 
-      const updateData = {
-        auth_id: authId,
+      const extraFields = {
         email,
         password,
       };
       // Only set device_id if not already set and we have one
       if (deviceId && !row.device_id) {
-        updateData.device_id = deviceId;
+        extraFields.device_id = deviceId;
       }
 
-      const { data: updated, error: updateError } = await supabase
-        .from('users')
-        .update(updateData)
-        .eq('id', row.id)
-        .select()
-        .single();
+      const updated = await safelyAttachAuthIdToUserRow(row, authId, extraFields);
 
-      if (updateError) {
-        console.error('❌ Failed to update existing user row:', updateError);
+      if (!updated) {
+        console.error('❌ Failed to safely update existing unconfirmed user row');
         return res.status(500).json({
           success: false,
-          error: 'Failed to update user record',
-          details: updateError.message
+          error: 'Failed to update user record'
         });
       }
 
@@ -1442,29 +1557,22 @@ app.post('/api/users/create-account', async (req, res) => {
       console.log('[create-account] Linking auth_id to existing anon row (device not yet used for auth)');
       const row = existingUsers[0];
 
-      const updateData = {
-        auth_id: authId,
+      const extraFields = {
         email,
         password,
       };
       // Only set device_id if not already set and we have one
       if (deviceId && !row.device_id) {
-        updateData.device_id = deviceId;
+        extraFields.device_id = deviceId;
       }
 
-      const { data: updated, error: updateError } = await supabase
-        .from('users')
-        .update(updateData)
-        .eq('id', row.id)
-        .select()
-        .single();
+      const updated = await safelyAttachAuthIdToUserRow(row, authId, extraFields);
 
-      if (updateError) {
-        console.error('❌ Failed to update existing user row:', updateError);
+      if (!updated) {
+        console.error('❌ Failed to safely link auth_id to existing anon row');
         return res.status(500).json({
           success: false,
-          error: 'Failed to update user record',
-          details: updateError.message
+          error: 'Failed to update user record'
         });
       }
 
@@ -1479,28 +1587,23 @@ app.post('/api/users/create-account', async (req, res) => {
         'existingUsers.length =', existingUsers ? existingUsers.length : 0,
         'firstRowAuthId =', existingUsers && existingUsers[0] ? (existingUsers[0].auth_id || '(none)') : '(n/a)');
 
-      const { data: newUser, error: newUserError } = await supabase
-        .from('users')
-        .insert({
-          anon_id: anonId,
-          auth_id: authId,
-          email,
-          password,
-          device_id: deviceId || null,
-          tokens_monthly: 0,
-          tokens_used: 0,
-          tokens_added: 0,
-          tokens_used_all_time: 0
-        })
-        .select()
-        .single();
+      const newUser = await safelyCreateUserWithAuthId({
+        anon_id: anonId,
+        auth_id: authId,
+        email,
+        password,
+        device_id: deviceId || null,
+        tokens_monthly: 0,
+        tokens_used: 0,
+        tokens_added: 0,
+        tokens_used_all_time: 0
+      });
 
-      if (newUserError) {
-        console.error('❌ Failed to insert new user row:', newUserError);
+      if (!newUser) {
+        console.error('❌ Failed to insert or resolve new user row');
         return res.status(500).json({
           success: false,
-          error: 'Failed to create user record',
-          details: newUserError.message
+          error: 'Failed to create user record'
         });
       }
 

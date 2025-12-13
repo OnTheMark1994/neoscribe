@@ -14,7 +14,7 @@ import { selectIsAIEnabled, selectDeveloperMode, selectShowArrayLineNumbers } fr
 import { showStatus } from '../../store/statusSlice';
 import { selectArrayDecorationsNonce } from '../../store/aiUiSlice';
 
-import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines, recomputeVisibleLines, getVisibleLinesCached, openLine, closeLine } from '../../utils/editorEngine';
+import { parseText, getTextFromLines, updateLinesFromText, getLines, setLines, recomputeVisibleLines, getVisibleLinesCached, openLine, closeLine, openAncestorsForLine } from '../../utils/editorEngine';
 
 import EditorLine from './EditorLine';
 
@@ -161,6 +161,23 @@ const EditorArray = forwardRef((props, ref) => {
   useEffect(() => {
     setRenderTrigger(prev => prev + 1);
   }, [arrayDecorationsNonce]);
+
+  // Ensure the chapter/section containing the current AI change is open
+  useEffect(() => {
+    if (!allChangeIds || allChangeIds.length === 0) return;
+
+    const targetId = allChangeIds[currentChangeIdIndex];
+    if (!targetId) return;
+
+    const lines = getLines();
+    if (!lines || lines.length === 0) return;
+
+    const targetIdx = lines.findIndex(l => l.proposedChangeId === targetId);
+    if (targetIdx === -1) return;
+
+    openAncestorsForLine(targetIdx);
+    setRenderTrigger(prev => prev + 1);
+  }, [allChangeIds, currentChangeIdIndex]);
 
   /**
    * Fold all collapsible sections

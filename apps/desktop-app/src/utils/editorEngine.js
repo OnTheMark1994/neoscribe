@@ -530,3 +530,33 @@ export function closeLine(idx){
   line.open = false;
   recomputeVisibleLines();
 }
+
+// Open ancestor headers (chapter/section) for the given line index so that
+// the line becomes visible when navigating to it.
+export function openAncestorsForLine(idx) {
+  if (!lines || idx < 0 || idx >= lines.length) return;
+
+  let chapterIdx = null;
+  let sectionIdx = null;
+
+  for (let j = idx - 1; j >= 0; j--) {
+    const candidate = lines[j];
+    if (!candidate) continue;
+
+    if (candidate.level === 2 && sectionIdx === null) {
+      sectionIdx = j;
+    } else if (candidate.level === 1) {
+      chapterIdx = j;
+      break;
+    }
+  }
+
+  if (chapterIdx !== null) {
+    lines[chapterIdx].open = true;
+  }
+  if (sectionIdx !== null) {
+    lines[sectionIdx].open = true;
+  }
+
+  recomputeVisibleLines();
+}

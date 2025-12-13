@@ -10,7 +10,7 @@ import { setAIChanges } from '../../store/aiChangesSlice';
 import { selectViewType } from '../../store/editorSlice';
 import { isWeb } from '../../utils/environment';
 import { openSettings } from '../../store/uiSlice';
-import { selectAnonId, selectAuthId, selectAvailableTokens, setAvailableTokens as setReduxAvailableTokens } from '../../store/userSlice';
+import { selectAnonId, selectAuthId, selectDeviceId, selectAvailableTokens, setAvailableTokens as setReduxAvailableTokens } from '../../store/userSlice';
 import { selectDeveloperMode } from '../../store/settingsSlice';
 import { WEB_PORTAL_BASE_URL } from '../../utils/constants';
 
@@ -29,6 +29,7 @@ function AISidebar({ onAIResponse, monacoRef }) {
   // Read from Redux instead of props
   const anonId = useSelector(selectAnonId);
   const authId = useSelector(selectAuthId);
+  const deviceId = useSelector(selectDeviceId);
   const developerMode = useSelector(selectDeveloperMode);
   const reduxAvailableTokens = useSelector(selectAvailableTokens);
   const viewType = useSelector(selectViewType); // 'array' or 'monaco'
@@ -49,6 +50,12 @@ function AISidebar({ onAIResponse, monacoRef }) {
     // Update token count when component mounts
     updateTokenCount();
   }, []);
+
+  // When auth state changes (e.g., user logs in), auto-refresh token info
+  useEffect(() => {
+    if (!anonId || !authId) return;
+    updateTokenCount();
+  }, [anonId, authId, deviceId]);
 
   // Sync availableTokens from Redux when it changes
   useEffect(() => {
@@ -81,8 +88,8 @@ function AISidebar({ onAIResponse, monacoRef }) {
     // Also refresh available tokens from backend when the refresh button is clicked
     try {
       if (anonId) {
-        console.log('[AI] Refresh button calling fetchUserTokens with anonId/authId:', anonId, authId);
-        const data = await fetchUserTokens(anonId, authId);
+        console.log('[AI] Refresh button calling fetchUserTokens with ids:', { anonId, authId, deviceId });
+        const data = await fetchUserTokens(anonId, authId, deviceId);
         if (data) {
           let effectiveAvailable;
           if (typeof data.availableTokens === 'number') {
@@ -356,7 +363,7 @@ function AISidebar({ onAIResponse, monacoRef }) {
       let response;
       
       if (aiService === 'deepseek-server') {
-        response = await callDeepSeekServerAPI(userPrompt, lines, anonId, authId);
+        response = await callDeepSeekServerAPI(userPrompt, lines, anonId, authId, deviceId);
         console.log('[AI] Received response:', response);
       } else if (aiService === 'deepseek') {
         throw new Error('DeepSeek Direct API not yet implemented. Please use DeepSeek (Custom Server) in settings.');
@@ -447,7 +454,7 @@ function AISidebar({ onAIResponse, monacoRef }) {
       // Refresh available tokens after a successful AI response
       try {
         if (anonId) {
-          const tokenData = await fetchUserTokens(anonId, authId);
+          const tokenData = await fetchUserTokens(anonId, authId, deviceId);
           if (tokenData) {
             if (typeof tokenData.availableTokens === 'number') {
               setAvailableTokens(tokenData.availableTokens);
@@ -512,7 +519,8 @@ function AISidebar({ onAIResponse, monacoRef }) {
       if (window.electronAPI?.openExternal) {
         await window.electronAPI.openExternal(url);
       } else {
-        throw new Error('Electron API not available - cannot open externally');
+        // Web fallback: open in a new tab
+        window.open(url, '_blank', 'noopener,noreferrer');
       }
     } catch (error) {
       console.error('Failed to open URL externally:', error);
@@ -597,8 +605,14 @@ function AISidebar({ onAIResponse, monacoRef }) {
             Estimated used / prompt
           </div>
           <div className="token-row-line-right">
+            {tokenCount > 10000 && (
+              <div className="token-alert-inline" title="Large Token Usage!">
+                <span className="token-alert-triangle">▼</span>
+                <span className="token-alert-text">Large Token Usage!</span>
+              </div>
+            )}
             <div className="token-counter token-row-token-count">
-              <span id="tokenCount">~{tokenCount}</span>
+              <span id="tokenCount">~{tokenCount.toLocaleString()}</span>
             </div>
             <button
               id="tokenInfoBtn"

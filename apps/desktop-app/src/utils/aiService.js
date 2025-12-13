@@ -2,6 +2,16 @@
 // Handles all AI-related functionality including API calls and change processing
 import { WEB_PORTAL_BASE_URL, API_BASE_URL } from './constants';
 
+// Build a normalized identity payload for backend calls.
+// We explicitly track anonId, authId, and deviceId instead of a generic userId.
+export function buildUserIdentity(anonId, authId = null, deviceId = null) {
+  return {
+    anonId: anonId || null,
+    authId: authId || null,
+    deviceId: deviceId || null,
+  };
+}
+
 export function buildWebPortalAutoLoginUrl(email, password) {
   const safeEmail = email || '';
   const safePassword = password || '';
@@ -81,106 +91,89 @@ export function getPromptPreface() {
 //
 export function getBookContent(lines) {
   const contentArray = [];
-  
+
   // Debug logging (can be removed in production)
   const debug = false;
   const log = (msg) => { if (debug) console.log('[AI-SHARE]', msg); };
-  
+
+  let currentChapterMode = 'all';
+  let currentSectionMode = 'all';
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineMode = line.sendToAI || 'all';
-    
-    log(`--- Processing line ${i}: "${line.text.substring(0, 40)}..." level=${line.level} mode=${lineMode}`);
-    
-    // Find parent chapter (if any)
-    let parentChapter = null;
-    for (let j = i - 1; j >= 0; j--) {
-      const candidate = lines[j];
-      // A chapter contains this line if: startIdx <= i <= endIdx
-      if (candidate.level === 1 && candidate.startIdx !== -1 && candidate.startIdx <= i && candidate.endIdx >= i) {
-        parentChapter = candidate;
-        log(`  Found parent chapter at ${j}: "${candidate.text.substring(0, 30)}..." mode=${candidate.sendToAI || 'all'}`);
-        break;
-      }
-    }
-    
-    // Find parent section (if any) - only look within the current chapter or before any chapter
-    let parentSection = null;
-    const searchLimit = parentChapter ? parentChapter.startIdx : 0;
-    for (let j = i - 1; j >= searchLimit; j--) {
-      const candidate = lines[j];
-      // A section contains this line if: startIdx <= i <= endIdx
-      if (candidate.level === 2 && candidate.startIdx !== -1 && candidate.startIdx <= i && candidate.endIdx >= i) {
-        parentSection = candidate;
-        log(`  Found parent section at ${j}: "${candidate.text.substring(0, 30)}..." mode=${candidate.sendToAI || 'all'}`);
-        break;
-      }
-    }
-    
-    const parentChapterMode = parentChapter ? (parentChapter.sendToAI || 'all') : 'all';
-    const parentSectionMode = parentSection ? (parentSection.sendToAI || 'all') : 'all';
-    
-    // RULE 1: Check if hidden by parent chapter
-    if (parentChapter && parentChapterMode === 'none') {
-      log(`  SKIP: Parent chapter is hidden`);
-      continue;
-    }
-    
-    // RULE 2: Check if parent chapter is title-only (content inside should be hidden)
-    // But the chapter header ITSELF should still be included (handled below)
-    if (parentChapter && parentChapterMode === 'title' && line.level !== 1) {
-      // This line is content inside a title-only chapter, skip it
-      log(`  SKIP: Parent chapter is title-only, this is content inside`);
-      continue;
-    }
-    
-    // RULE 3: Check the line's own mode (for headers)
-    if (line.level === 1) {
-      // This is a chapter header
+    const level = line.level || 0;
+
+    log(`--- Processing line ${i}: "${(line.text || '').substring(0, 40)}..." level=${level} mode=${lineMode}`);
+
+    if (level === 1) {
+      // New chapter starts: reset section state under it
+      currentChapterMode = lineMode;
+      currentSectionMode = 'all';
+
       if (lineMode === 'none') {
-        log(`  SKIP: Chapter header itself is hidden`);
+        log('  SKIP: Chapter header itself is hidden (none)');
         continue;
       }
+
       // 'title' or 'all' - include the chapter header
       log(`  INCLUDE: Chapter header (mode=${lineMode})`);
       contentArray.push({ id: line.id, text: line.text });
       continue;
     }
-    
-    if (line.level === 2) {
-      // This is a section header
-      // First check if parent chapter allows it
-      if (parentChapter && parentChapterMode === 'title') {
-        log(`  SKIP: Section header, but parent chapter is title-only`);
+
+    if (level === 2) {
+      // Section header belongs to current chapter
+      if (currentChapterMode === 'none') {
+        log('  SKIP: Section header, but parent chapter is hidden (none)');
+        currentSectionMode = 'none';
         continue;
       }
-      // Check section's own mode
+
+      if (currentChapterMode === 'title') {
+        log('  SKIP: Section header, parent chapter is title-only');
+        currentSectionMode = 'none';
+        continue;
+      }
+
+      // Chapter allows content; apply section's own mode
+      currentSectionMode = lineMode;
+
       if (lineMode === 'none') {
-        log(`  SKIP: Section header itself is hidden`);
+        log('  SKIP: Section header itself is hidden (none)');
         continue;
       }
+
       // 'title' or 'all' - include the section header
       log(`  INCLUDE: Section header (mode=${lineMode})`);
       contentArray.push({ id: line.id, text: line.text });
       continue;
     }
-    
-    // RULE 4: This is a content line (level=0)
-    // Check if hidden by parent section
-    if (parentSection && parentSectionMode === 'none') {
-      log(`  SKIP: Parent section is hidden`);
+
+    // Content line (level 0 or other)
+    if (currentChapterMode === 'none') {
+      log('  SKIP: Content line, parent chapter is hidden (none)');
       continue;
     }
-    if (parentSection && parentSectionMode === 'title') {
-      log(`  SKIP: Parent section is title-only`);
+    if (currentChapterMode === 'title') {
+      log('  SKIP: Content line, parent chapter is title-only');
       continue;
     }
-    
+
+    if (currentSectionMode === 'none') {
+      log('  SKIP: Content line, parent section is hidden (none)');
+      continue;
+    }
+    if (currentSectionMode === 'title') {
+      log('  SKIP: Content line, parent section is title-only');
+      continue;
+    }
+
     // All checks passed, include the line
-    log(`  INCLUDE: Content line`);
+    log('  INCLUDE: Content line');
     contentArray.push({ id: line.id, text: line.text });
   }
-  
+
   log(`=== Final result: ${contentArray.length} lines sent to AI ===`);
   return contentArray;
 }
@@ -261,8 +254,8 @@ export async function fetchUserAccount(anonId, deviceId = null) {
   return data;
 }
 
-// Fetch current token usage/availability for a user by anonId
-export async function fetchUserTokens(anonId, authId = null) {
+// Fetch current token usage/availability for a user
+export async function fetchUserTokens(anonId, authId = null, deviceId = null) {
   if (!anonId) {
     throw new Error('anonId is required to fetch user tokens');
   }
@@ -270,10 +263,7 @@ export async function fetchUserTokens(anonId, authId = null) {
   const serverUrl = API_BASE_URL;
   const url = `${serverUrl}/api/user/tokens/`;
 
-  const body = {
-    userId: anonId,
-    authId: authId || null,
-  };
+  const body = buildUserIdentity(anonId, authId, deviceId);
 
   console.log('[USER] Fetching user tokens from:', url, 'with body:', body);
 
@@ -483,7 +473,7 @@ export function generateChangeId(lineID, type, index = 0) {
 }
 
 // Call DeepSeek Server API (custom server endpoint)
-export async function callDeepSeekServerAPI(userPrompt, lines, anonId, authId) {
+export async function callDeepSeekServerAPI(userPrompt, lines, anonId, authId, deviceId = null) {
   const bookContent = getBookContent(lines);
   const systemPrompt = getPromptPreface();
 
@@ -499,10 +489,11 @@ Request: ${userPrompt}`;
     { role: 'user', content: userMessage }
   ];
 
+  const identity = buildUserIdentity(anonId, authId, deviceId);
+
   const requestBody = {
-    messages: messages,
-    userId: anonId || 'anon_default',
-    authId: authId || null,
+    messages,
+    ...identity,
     temperature: 0.7,
     model: 'deepseek-chat'
   };

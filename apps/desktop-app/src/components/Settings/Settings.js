@@ -6,7 +6,8 @@ import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from '../UI/RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
 import { selectAnonId, selectAuthId, selectDeviceId, selectUserData, setAuthId as setReduxAuthId } from '../../store/userSlice';
-import { setBackgroundImage, selectShowPreviewBar, selectShowMonacoLineNumbers, selectMonacoStickyTopBar, setShowPreviewBar, setShowMonacoLineNumbers, setMonacoStickyTopBar } from '../../store/settingsSlice';
+import { setBackgroundImage, selectShowPreviewBar, selectShowMonacoLineNumbers, selectMonacoStickyTopBar, selectShowArrayLineNumbers, setShowPreviewBar, setShowMonacoLineNumbers, setMonacoStickyTopBar, updateSetting } from '../../store/settingsSlice';
+import { selectViewType, setViewType } from '../../store/editorSlice';
 import { setBackground } from '../../utils/backgroundHelper';
 
 /**
@@ -42,11 +43,8 @@ function Settings({ onClose, initialTab = 'general' }) {
   const showPreviewBar = useSelector(selectShowPreviewBar);
   const showMonacoLineNumbers = useSelector(selectShowMonacoLineNumbers);
   const monacoStickyTopBar = useSelector(selectMonacoStickyTopBar);
-  const [editorViewMode, setEditorViewMode] = useState(() => {
-    const saved = localStorage.getItem('editorViewMode');
-    if (saved === 'fold') return 'array'; // migrate old value
-    return saved || 'array';
-  });
+  const showArrayLineNumbers = useSelector(selectShowArrayLineNumbers);
+  const currentViewType = useSelector(selectViewType); // 'array' or 'monaco'
 
   useEffect(() => {
     // Load settings from localStorage
@@ -351,6 +349,12 @@ function Settings({ onClose, initialTab = 'general' }) {
           General
         </button>
         <button 
+          className={`tab ${activeTab === 'display' ? 'active' : ''}`}
+          onClick={() => setActiveTab('display')}
+        >
+          Display
+        </button>
+        <button 
           className={`tab ${activeTab === 'ai' ? 'active' : ''}`}
           onClick={() => setActiveTab('ai')}
         >
@@ -402,125 +406,34 @@ function Settings({ onClose, initialTab = 'general' }) {
               <label>Current View Mode</label>
               <div className="view-mode-selector">
                 <button
-                  className={`view-mode-btn ${editorViewMode === 'array' ? 'active' : ''}`}
+                  className={`view-mode-btn ${currentViewType === 'array' ? 'active' : ''}`}
                   onClick={() => {
-                    setEditorViewMode('array');
                     localStorage.setItem('editorViewMode', 'array');
                     // Notify Electron main window if available
                     if (window.electronAPI && window.electronAPI.settingsSaved) {
                       window.electronAPI.settingsSaved({ editorViewMode: 'array' });
                     }
+                    dispatch(setViewType('array'));
                   }}
                 >
                   Array
                 </button>
                 <button
-                  className={`view-mode-btn ${editorViewMode === 'monaco' ? 'active' : ''}`}
+                  className={`view-mode-btn ${currentViewType === 'monaco' ? 'active' : ''}`}
                   onClick={() => {
-                    setEditorViewMode('monaco');
                     localStorage.setItem('editorViewMode', 'monaco');
                     if (window.electronAPI && window.electronAPI.settingsSaved) {
                       window.electronAPI.settingsSaved({ editorViewMode: 'monaco' });
                     }
+                    dispatch(setViewType('monaco'));
                   }}
                 >
                   Monaco
                 </button>
-                <button
-                  className={`view-mode-btn ${editorViewMode === 'textarea' ? 'active' : ''}`}
-                  onClick={() => {
-                    setEditorViewMode('textarea');
-                    localStorage.setItem('editorViewMode', 'textarea');
-                    if (window.electronAPI && window.electronAPI.settingsSaved) {
-                      window.electronAPI.settingsSaved({ editorViewMode: 'textarea' });
-                    }
-                  }}
-                >
-                  Textarea
-                </button>
               </div>
               <p className="setting-hint">
-                {editorViewMode === 'array' && 'Array view: Line-by-line editing with folding support'}
-                {editorViewMode === 'monaco' && 'Monaco view: VS Code-style editor with syntax highlighting'}
-                {editorViewMode === 'textarea' && 'Textarea view: Simple plain text editing'}
-              </p>
-            </div>
-          </div>
-
-          <div className="setting-section">
-            <h2>Monaco Sticky Top Bar</h2>
-            <div className="setting-item">
-              <div className="toggle-container">
-                <label>Show Sticky Top Bar (Monaco)</label>
-                <div
-                  className={`toggle-switch ${monacoStickyTopBar ? 'active' : ''}`}
-                  onClick={() => {
-                    const next = !monacoStickyTopBar;
-                    dispatch(setMonacoStickyTopBar(next));
-                    if (window.electronAPI && window.electronAPI.settingsSaved) {
-                      window.electronAPI.settingsSaved({ monacoStickyTopBar: next });
-                    }
-                  }}
-                >
-                  <div className="toggle-slider"></div>
-                </div>
-              </div>
-              <p className="setting-hint">
-                {monacoStickyTopBar
-                  ? 'Monaco view pins the current chapter/section header at the top while scrolling.'
-                  : 'Monaco view scrolls normally without a sticky top bar.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="setting-section">
-            <h2>Monaco Line Indexes</h2>
-            <div className="setting-item">
-              <div className="toggle-container">
-                <label>Show Line Indexes (Monaco)</label>
-                <div
-                  className={`toggle-switch ${showMonacoLineNumbers ? 'active' : ''}`}
-                  onClick={() => {
-                    const next = !showMonacoLineNumbers;
-                    dispatch(setShowMonacoLineNumbers(next));
-                    if (window.electronAPI && window.electronAPI.settingsSaved) {
-                      window.electronAPI.settingsSaved({ showMonacoLineNumbers: next });
-                    }
-                  }}
-                >
-                  <div className="toggle-slider"></div>
-                </div>
-              </div>
-              <p className="setting-hint">
-                {showMonacoLineNumbers
-                  ? 'Monaco view shows line index numbers on the left.'
-                  : 'Monaco view hides line index numbers for a cleaner page look.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="setting-section">
-            <h2>Preview Bar</h2>
-            <div className="setting-item">
-              <div className="toggle-container">
-                <label>Show Right Preview Bar</label>
-                <div
-                  className={`toggle-switch ${showPreviewBar ? 'active' : ''}`}
-                  onClick={() => {
-                    const next = !showPreviewBar;
-                    dispatch(setShowPreviewBar(next));
-                    if (window.electronAPI && window.electronAPI.settingsSaved) {
-                      window.electronAPI.settingsSaved({ showPreviewBar: next });
-                    }
-                  }}
-                >
-                  <div className="toggle-slider"></div>
-                </div>
-              </div>
-              <p className="setting-hint">
-                {showPreviewBar
-                  ? 'Preview bar is visible on the right side.'
-                  : 'Preview bar is hidden. AI tools still work but without the live preview panel.'}
+                {currentViewType === 'array' && 'Array view: Line-by-line editing with folding support'}
+                {currentViewType === 'monaco' && 'Monaco view: VS Code-style editor with syntax highlighting'}
               </p>
             </div>
           </div>
@@ -538,6 +451,115 @@ function Settings({ onClose, initialTab = 'general' }) {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Display Tab */}
+      {activeTab === 'display' && (
+        <div className="tab-content active">
+          <div className="setting-section">
+            <h2>Array View</h2>
+            <details open>
+              <summary>Array Display Options</summary>
+              <div className="setting-item" style={{ marginTop: '10px' }}>
+                <div className="toggle-container">
+                  <label>Show Line Indexes (Array)</label>
+                  <div
+                    className={`toggle-switch ${showArrayLineNumbers ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = !showArrayLineNumbers;
+                      dispatch(updateSetting({ key: 'showArrayLineNumbers', value: next }));
+                      if (window.electronAPI && window.electronAPI.settingsSaved) {
+                        window.electronAPI.settingsSaved({ showArrayLineNumbers: next });
+                      }
+                    }}
+                  >
+                    <div className="toggle-slider"></div>
+                  </div>
+                </div>
+                <p className="setting-hint">
+                  {showArrayLineNumbers
+                    ? 'Array view shows line index numbers and IDs in the left gutter.'
+                    : 'Array view hides line index numbers and IDs for a cleaner page look.'}
+                </p>
+              </div>
+            </details>
+          </div>
+
+          <div className="setting-section">
+            <h2>Monaco View</h2>
+            <details open>
+              <summary>Monaco Display Options</summary>
+              <div className="setting-item" style={{ marginTop: '10px' }}>
+                <div className="toggle-container">
+                  <label>Show Sticky Top Bar (Monaco)</label>
+                  <div
+                    className={`toggle-switch ${monacoStickyTopBar ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = !monacoStickyTopBar;
+                      dispatch(setMonacoStickyTopBar(next));
+                      if (window.electronAPI && window.electronAPI.settingsSaved) {
+                        window.electronAPI.settingsSaved({ monacoStickyTopBar: next });
+                      }
+                    }}
+                  >
+                    <div className="toggle-slider"></div>
+                  </div>
+                </div>
+                <p className="setting-hint">
+                  {monacoStickyTopBar
+                    ? 'Monaco view pins the current chapter/section header at the top while scrolling.'
+                    : 'Monaco view scrolls normally without a sticky top bar.'}
+                </p>
+              </div>
+
+              <div className="setting-item">
+                <div className="toggle-container">
+                  <label>Show Line Indexes (Monaco)</label>
+                  <div
+                    className={`toggle-switch ${showMonacoLineNumbers ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = !showMonacoLineNumbers;
+                      dispatch(setShowMonacoLineNumbers(next));
+                      if (window.electronAPI && window.electronAPI.settingsSaved) {
+                        window.electronAPI.settingsSaved({ showMonacoLineNumbers: next });
+                      }
+                    }}
+                  >
+                    <div className="toggle-slider"></div>
+                  </div>
+                </div>
+                <p className="setting-hint">
+                  {showMonacoLineNumbers
+                    ? 'Monaco view shows line index numbers on the left.'
+                    : 'Monaco view hides line index numbers for a cleaner page look.'}
+                </p>
+              </div>
+
+              <div className="setting-item">
+                <div className="toggle-container">
+                  <label>Show Right Preview Bar</label>
+                  <div
+                    className={`toggle-switch ${showPreviewBar ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = !showPreviewBar;
+                      dispatch(setShowPreviewBar(next));
+                      if (window.electronAPI && window.electronAPI.settingsSaved) {
+                        window.electronAPI.settingsSaved({ showPreviewBar: next });
+                      }
+                    }}
+                  >
+                    <div className="toggle-slider"></div>
+                  </div>
+                </div>
+                <p className="setting-hint">
+                  {showPreviewBar
+                    ? 'Preview bar is visible on the right side.'
+                    : 'Preview bar is hidden. AI tools still work but without the live preview panel.'}
+                </p>
+              </div>
+            </details>
           </div>
         </div>
       )}
@@ -689,6 +711,9 @@ function Settings({ onClose, initialTab = 'general' }) {
                   const newAuthId = result.authUser.id;
                   setAuthId(newAuthId);
 
+                  // Keep Redux authId in sync so other components (like AISidebar) see the change
+                  dispatch(setReduxAuthId(newAuthId));
+
                   // Notify main window so primary App instance can update authId immediately
                   if (window.electronAPI && window.electronAPI.settingsSaved) {
                     window.electronAPI.settingsSaved({ authId: newAuthId });
@@ -711,6 +736,9 @@ function Settings({ onClose, initialTab = 'general' }) {
                 if (window.electronAPI && window.electronAPI.settingsSaved) {
                   window.electronAPI.settingsSaved({ authId: null });
                 }
+
+                // Also clear Redux authId so web/electron UI stays in sync
+                dispatch(setReduxAuthId(null));
               }}
               initialEmail={accountEmail}
               initialPassword={accountPassword}

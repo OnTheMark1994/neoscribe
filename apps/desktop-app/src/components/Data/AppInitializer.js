@@ -227,7 +227,7 @@ function AppInitializer() {
 
         console.log('[INIT] User account data loaded:', {
           anonId,
-          userId: data?.id,
+          backendUserPrimaryId: data?.id,
           authId: data?.auth_id || data?.authId || null,
         });
 
