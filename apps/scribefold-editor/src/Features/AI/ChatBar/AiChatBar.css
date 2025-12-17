@@ -1,0 +1,28 @@
+/* AiChatBar - shell styles (inner content will be added later) */
+
+.aiChatBar {
+  width: 400px;
+  height: 100vh;
+  background-color: rgba(20, 20, 20, 0.8);
+  backdrop-filter: blur(14px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+}
+
+.aiChatBarHeader {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.aiChatBarTitle {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+}

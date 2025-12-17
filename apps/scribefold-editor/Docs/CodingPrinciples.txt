@@ -1,0 +1,19 @@
+
+Coding Principles:
+    simple as possible (min lines and low complexity components)
+    efficient soutions (min big O)
+    organized (logical consistent compomponent and file heirarchy structures)
+    max reuse of code
+    detailed meaningful comments for detail
+    Follow conventions and patterns in the other files maintaing consistency and organization   
+    docs: 
+        keep file structure, database_tables etc updated as changes are made 
+        Note in each component with detailed overview and description of data flow
+
+Details:
+    Avoid unnecessary prop drilling (no boomerang state, no redux state as props, etc)
+    Put code into its own components for organization
+    see common-isues.md and commin-issuesexample.md examples 
+    use .css files to define classes, only use inline css when using variables like backgroundImage or position from redux
+        create files when necessary
+        try to reuse css when it makes sense

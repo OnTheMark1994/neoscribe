@@ -1,30 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import './Settings.css';
 import { createUserAccount, loginUserAccount, buildWebPortalAutoLoginUrl } from '../../utils/aiService';
+import { selectAuthUser, selectDeviceId, setAuthUser } from '../../store/userSlice';
 
 function AccountAuthSection({
   anonId,
-  authId,
-  deviceId,
   onAccountUpdated,
-  onAuthCleared,
-  initialEmail,
-  initialPassword,
   subscriptionType,
   nextBillingDate,
 }) {
-  const [authEmail, setAuthEmail] = useState('');
+  const dispatch = useDispatch();
+  const authUser = useSelector(selectAuthUser);
+  const deviceId = useSelector(selectDeviceId);
+
+  const emailInputRef = useRef(null);
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState('create'); // 'create' or 'login'
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    const emailValue = emailInputRef.current?.value?.trim() || '';
+    const passwordValue = authPassword.trim();
+
     if (!anonId) {
       setStatus('Anonymous ID not ready yet.');
       return;
     }
-    if (!authEmail || !authPassword) {
+    if (!emailValue || !passwordValue) {
       setStatus('Email and password are required.');
       return;
     }
@@ -37,14 +41,14 @@ function AccountAuthSection({
       if (authMode === 'create') {
         result = await createUserAccount(anonId, {
           name: null,
-          email: authEmail,
-          password: authPassword,
+          email: emailValue,
+          password: passwordValue,
           deviceId: deviceId || null  // Pass deviceId for abuse prevention
         });
       } else {
         result = await loginUserAccount(anonId, {
-          email: authEmail,
-          password: authPassword
+          email: emailValue,
+          password: passwordValue,
         });
       }
 
@@ -56,16 +60,9 @@ function AccountAuthSection({
 
       setStatus(message);
 
-      if (result && result.authUser && result.authUser.email) {
-        setAuthEmail(result.authUser.email);
-        try {
-          localStorage.setItem('userEmail', result.authUser.email);
-          if (authPassword) {
-            localStorage.setItem('userPassword', authPassword);
-          }
-        } catch (e) {
-          // ignore storage failures
-        }
+      if (result && result.authUser) {
+        // Update Redux authUser so the rest of the app has a single source of truth
+        dispatch(setAuthUser(result.authUser));
       }
 
       if (onAccountUpdated) {
@@ -79,22 +76,13 @@ function AccountAuthSection({
   };
 
   const handleLogout = () => {
-    // Clear local auth state and any saved credentials
-    setAuthEmail('');
+    // Clear local auth state and reset UI
     setAuthPassword('');
     setStatus('');
     setAuthMode('login');
 
-    try {
-      localStorage.removeItem('userEmail');
-      localStorage.removeItem('userPassword');
-    } catch (e) {
-      // ignore storage errors
-    }
-
-    if (onAuthCleared) {
-      onAuthCleared();
-    }
+    // Clear Redux authUser so UI and API calls stop treating user as authenticated
+    dispatch(setAuthUser(null));
   };
 
   const handleViewWebpage = () => {
@@ -102,7 +90,7 @@ function AccountAuthSection({
     openExternalLink('https://scribefold-ai-monorepo.onrender.com');
   };
 
-  const isSignedIn = !!authId;
+  const isSignedIn = !!authUser;
   const isFreePlan = !subscriptionType || String(subscriptionType).toLowerCase() === 'free';
 
   const openExternalLink = async (url) => {
@@ -117,31 +105,14 @@ function AccountAuthSection({
     }
   };
 
-  // On mount or when authId appears, try to restore email from localStorage if we don't have one yet
   useEffect(() => {
-    if (authId && !authEmail) {
-      try {
-        const savedEmail = localStorage.getItem('userEmail');
-        if (savedEmail) {
-          setAuthEmail(savedEmail);
-        }
-      } catch (e) {
-        // ignore
+    // When authUser changes, ensure the email input (when visible) defaults to the authUser email
+    if (authUser && authUser.email && emailInputRef.current) {
+      if (!emailInputRef.current.value) {
+        emailInputRef.current.value = authUser.email;
       }
     }
-  }, [authId, authEmail]);
-
-  useEffect(() => {
-    if (!authEmail && initialEmail) {
-      setAuthEmail(initialEmail);
-    }
-  }, [initialEmail, authEmail]);
-
-  useEffect(() => {
-    if (!authPassword && initialPassword) {
-      setAuthPassword(initialPassword);
-    }
-  }, [initialPassword, authPassword]);
+  }, [authUser]);
 
   return (
     <>
@@ -181,44 +152,25 @@ function AccountAuthSection({
         <>
           <div className="stat-item">
             <span className="stat-label">Signed in as</span>
-            <span
-              className="stat-value"
-              style={{ display: 'block', marginTop: '4px' }}
-            >
-              {authEmail || 'Authenticated user'}
+            <span className="stat-value auth-signed-in-email">
+              {authUser?.email || 'Authenticated user'}
             </span>
           </div>
 
           {status && (
-            <div
-              style={{
-                textAlign: 'center',
-                marginTop: '10px',
-                marginBottom: '10px',
-                color: '#4CAF50',
-              }}
-            >
+            <div className="auth-status-message">
               {status}
             </div>
           )}
 
-          <div style={{ marginTop: '20px', marginBottom: '20px' }}>
+          <div className="account-portal-container">
             <button 
-              onClick={() => openExternalLink(buildWebPortalAutoLoginUrl(authEmail, authPassword))}
-              className="settings-account-portal-btn"
-              style={{ 
-                padding: '10px 15px',
-                backgroundColor: '#4a6da7',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                width: '100%'
-              }}
+              onClick={() => openExternalLink(buildWebPortalAutoLoginUrl(authUser?.email || '', authPassword || ''))}
+              className="settings-account-portal-btn account-portal-button"
             >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span>Account Portal</span>
-                <span style={{ fontSize: '12px', color: '#d0d7eb', marginTop: '2px' }}>(Auto Login)</span>
+              <div className="account-portal-content">
+                <span className="account-portal-label">Account Portal</span>
+                <span className="account-portal-subtitle">(Auto Login)</span>
               </div>
             </button>
           </div>
@@ -245,7 +197,7 @@ function AccountAuthSection({
         </>
       ) : (
         <>
-          <div className="auth-info-message" style={{ marginTop: '12px' }}>
+          <div className="auth-info-message auth-info-message-extra-margin">
             Email must be confirmed to receive bonus tokens.
           </div>
 
@@ -254,8 +206,7 @@ function AccountAuthSection({
             <input
               type="email"
               className="auth-input"
-              value={authEmail}
-              onChange={(e) => setAuthEmail(e.target.value)}
+              ref={emailInputRef}
               placeholder="you@example.com"
             />
           </div>

@@ -10,7 +10,7 @@ import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
   isSettingsOpen: false,
-  settingsTab: null,              // 'general' | 'ai' | 'account' | null
+  settingsTab: null,              // 'general' | 'display' | 'ai' | 'account' | null
   showUnsavedDialog: false,       // Unsaved changes modal
   showDownloadModal: false,       // Web download modal
   isLoadingVisible: true,         // Loading screen visible (true on app start)
@@ -21,7 +21,9 @@ const uiSlice = createSlice({
   initialState,
   reducers: {
     openSettings(state, action) {
-      const tab = action.payload && action.payload.tab ? action.payload.tab : 'general';
+      const rawTab = action && action.payload ? action.payload.tab : null;
+      const validTabs = ['general', 'display', 'ai', 'account'];
+      const tab = validTabs.includes(rawTab) ? rawTab : null;
       state.isSettingsOpen = true;
       state.settingsTab = tab;
     },

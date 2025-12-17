@@ -1,0 +1,134 @@
+Overal plan and timeline for the development of the application.
+
+Then and Now
+
+    Previously
+        did not create a plan
+        did not lay out file structure, data flows, user stories etc before
+        did not set timelines
+
+        so always pushing as fast as I can
+        cutting cornders and moving on to next thing as soon as current on at minimum viable 
+        unsustainably spending time on it until burning out
+
+        put everything else on pause to fosuc on it entirely 
+        and it was so long all at once it could not be completed before other thigns piled up and needed to stop
+        if didn't complete the entire thing it was a failure
+
+        trying to do the whole thing at once in one big bite
+        can't eat an entire steak in one bite
+        but you can break it into many piecs and finish it fine
+
+    Better:
+        create a plan for phases
+        create a timeline for each phase
+        do not progress past that so it stays sustainable
+            when you are done with the weeks work you do other things that need to be done and to balance life so you can carry on
+        if you spend the number of weeks on it you predict you will have the finished product at the time you expect
+
+
+
+        Each phase has a part that is complete
+        typing out the user interactions stream of consciousness
+        while doing that typing out the components with their displays and state interactions
+        and in the 3rd window have the file structure 
+        create files based on files strucutre
+        put psudocode notes at the top of each
+        fill them in (ai can do this becaues its by your plan and you can do in small increments looking it over for spaghetti)
+
+Phases: 
+
+    ScribeFold AI Development Plan
+    Starting 2026-1-1
+    10 weeks of work
+    2 weeks of vacation time used as needed
+    12 weeks total (3 months)
+    +1 month of prototype time (already done)
+    so 4 months total on the development 
+    then 4 months post development to make use of it  
+    So 8 months total for the end result
+
+    1 week
+    UI
+
+    1 week 
+    menus and settings
+
+    1 week
+    monaco basic
+
+    1 week 
+    ai chat area 
+    (just going into redux)
+
+    1 week 
+    connecting monaco and the ai response
+
+    1 week
+    array editor (optional/conditional)
+
+    1 week
+    user id and user row creation
+        start on web, start on desktop, create account, login, log out, log in on new device, etc  
+    token flow 
+        initial tokens
+        subscription tokens
+        token use
+
+    1 week
+    referrals feature
+
+    1 week
+    general use and bug resolution
+    
+    1 week
+    prompt preface and story type sliders
+
+    phase 1:
+        Prototype
+        (1 month) 2025-11-14 to 2025-12-14 (done)
+        Tasks:
+            creata a basic prototype 
+            vibe coding, manualy, expreiments, docs etc
+            this is meant to be a general layout and fact finding expreiments
+            so we know what features we want and what tools are best
+            it gives the understanding necessary to create the plan
+
+    phase 2:
+        Planning 
+        (2 weeks) 2025-12-4 to 2025-12-31
+        Tasks: 
+            Define UI 
+                Basic visual structure of the app 
+                maybe make the files and have a comment at the top describing each one
+                then can add the desription of the state and flows in the file 
+            Usage stories
+                What the user will do and what will happen
+            Folder and file structure
+            Data structures / database / api endpoints
+            This is hard to do on its own without building anything 
+
+    phase 3: 
+        UI (2 weeks) 2026-1-1 to 2026-1-14
+        Tasks:
+            Create basic UI and file structure
+                Can tell ai to create folders and files as per instruction 
+                    in phases
+                    making it look the same as the last version but in new files
+                    keep very simple and watch carefully
+            Wire up basic menu ui redux state
+                Ex: Settigns slice then settings menu showing when it should, showing correct tabs and tab UI etc
+
+    phase 3:
+        implement data flows (2 weeks) 2026-1-14 to 2026-1-30
+        create, load, display data as per the plan 
+        creating or updating the api endpoints to recieve and give correct data
+
+    Phase 4:
+        testing, bug resolutions, updating plan (2 weeks) 2026-2-1 to 2026-2-30
+        test the applicaiton, resolve bugs
+
+Notes:
+    As we go thorugh creating the plan 
+    update the plan, file structure, database, data flows etc
+

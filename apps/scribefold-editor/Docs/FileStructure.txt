@@ -1,0 +1,53 @@
+File Structure.
+Created during planning.
+
+App.js                          // Starting point for the application
+App.css                         // High level non-specific css classes like the background, page, etc
+Global
+    TopBar.js                   // The top bar that shows file optoins (like open, save, etc), View options, etc. Like a normal window top bar of an application
+    AppInitializer.js           // Handles getting user auth id from supabase, loading user data from tables into redux global store, and other setup 
+    ReduxStore.js                  // Combines the slices for use in the application
+    ReduxSlices
+        SettingsSlice.js        // Global state for showing settgins window, selecting tab, loading and updating settings, holsing settingsObject with all settigns values 
+        UserSlice.js            // Stores data related to user auth object, user data object, and other user related variables
+        EditorSlice.js          // Related to editor content, proposedChanges array, and other editor specific global state
+Features
+    Editors
+        Editor.js               // Choose which editor to display
+        EditorArray
+            EditorEngine.js     // Stores the lines in a global variable to avoid using react overhead
+            EditorArray.js      // The editor array base component, put in the page, displays array of lines
+            EditorArrayLine.js  // Each line is displayed in one of these
+            SearchBox.js        // For ctrl+f shows in top right
+            ProposedChangeBox (missing, maybe not needd tho)  // A line that shows a proposed change from the ai in array view mode
+        EditorMonaco
+            EditorMonaco.js         // Monaco editor for alternate display (better in many ways if can make the ai propsed changes show, did not work in prototype though)
+    AI
+        ChatBar
+            AiChatBar.js        // The side bar that allows the user to interact with the ai writing tool
+            Message.js          // The messages from the user or the ai assistant will show in these
+            InputArea.js        // Where the user will type and sent messages 
+            TokenDisplay.js     // Shows number of tokens the prompt will use, that the user has, etc 
+            MessageDetail.js    // Shows all message data (for developer use)
+        Components
+            ChangeNavigator.js     // Allows user to scroll up or down scroling to proposed changes, accept or recect all with 2 buttons
+            AcceptRejectButtons.js // UI for the accept and reject buttons on the proposed changes (used in editor array within proposed change line and editor monaco inserted between lines with a viewarea)
+    Settings
+        Settings.js             // Settings window that shows when opened, has several tabs
+        Settings.css            // Styles for settings page (that only occur here)
+        Tabs
+            SettingsGeneral.js  // General settings (displays when the settings tab is in general(default))
+            SettingsDisplay.js  // Display settings  
+            SettingsAccount.js  // Create account, log in, account stats like used tokens, remaining tokens, email, password reset, etc
+            SettingsAI.js       // Related to how the ai behaves 
+            SettingsDeveloper.js// Settings tab that only show if developer mode is active
+    Util
+        Window.js               // A window wrapper with a topbar with a title and close bar, custom styles can be sent into it, whatever it is wrapped arond is displayed as a window
+        RefreshButton.js        // A refresh button that calls a refresh function and shows when loading is occuring
+        FoldableSection.js      // Foldable section, 100% width, opens or closes to show content on top right button press
+    Windows
+        HelpWindow.js             // Shows information about the application for user learning
+        RightClickWindow.js       // The window that shows when the user right clicks on the +- or up down buttons or eye glyph to show related options
+        SaveBeforeClosingWindow.js// A window that shows to ask the user to save or disgard 
+        Windows.js                // Contains all conditional windows in this file
+
