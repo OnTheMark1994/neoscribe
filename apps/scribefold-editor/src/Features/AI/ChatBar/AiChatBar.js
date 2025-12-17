@@ -57,7 +57,7 @@ export default function AiChatBar() {
         />
         {/* Title is centered across the full header width (not relative to the icon). */}
         <div className="aiChatBarHeaderTitleBox">
-          <div className="aiChatBarTitle">AI Chat</div>
+          <div className="aiChatBarTitle">AI Writer</div>
         </div>
       </div>
 

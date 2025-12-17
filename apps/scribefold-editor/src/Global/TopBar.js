@@ -53,6 +53,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleFullscreenActive } from './ReduxSlices/MenuSlice';
+import { setAiModeActive } from './ReduxSlices/AiSlice';
+import { openHelpWindow, openSettingsWindow } from './ReduxSlices/WindowSlice';
 import './TopBar.css';
 
 // Detect whether we are running in the browser (no Electron preload API).
@@ -72,8 +74,11 @@ export default function TopBar() {
   const filepath = useSelector(state => state.editorSlice.filepath);
   const modified = useSelector(state => state.editorSlice.modified);
 
-  // Fullscreen state controls whether the top bar is visually hidden. (set from key press listener in that component)
+  // Fullscreen state controls whether the top bar is visually hidden.
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
+
+  // Controls whether the AI chat sidebar is visible.
+  const aiModeActive = useSelector(state => state.aiSlice.aiModeActive);
 
   // Derive file name from path (handles both / and \ path separators).
   const fileName = filepath ? filepath.split(/[/\\]/).pop() : 'Untitled';
@@ -125,7 +130,14 @@ export default function TopBar() {
                 <button onClick={closeMenu}><span>Save</span><span className="shortcut">Ctrl+S</span></button>
                 <button onClick={closeMenu}><span>Save As</span><span className="shortcut">Ctrl+Shift+S</span></button>
                 <div className="topBarDivider" />
-                <button onClick={closeMenu}><span>Settings</span><span className="shortcut">Ctrl+,</span></button>
+                <button
+                  onClick={() => {
+                    closeMenu();
+                    dispatch(openSettingsWindow());
+                  }}
+                >
+                  <span>Settings</span><span className="shortcut">Ctrl+,</span>
+                </button>
               </div>
             )}
           </div>
@@ -171,7 +183,14 @@ export default function TopBar() {
                   <span className="shortcut">F11</span>
                 </button>
                 <div className="topBarDivider" />
-                <button onClick={closeMenu}><span>View Settings</span></button>
+                <button
+                  onClick={() => {
+                    closeMenu();
+                    dispatch(openSettingsWindow('Display'));
+                  }}
+                >
+                  <span>Display Settings</span>
+                </button>
               </div>
             )}
           </div>
@@ -187,10 +206,31 @@ export default function TopBar() {
             {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'ai' && (
               <div className="topBarDropdown">
-                <button onClick={closeMenu}><span>Show AI Chat</span></button>
-                <button onClick={closeMenu}><span>AI Settings</span></button>
+                <button
+                  onClick={() => {
+                    closeMenu();
+                    dispatch(setAiModeActive());
+                  }}
+                >
+                  <span>{aiModeActive ? 'Hide AI Chat' : 'Show AI Chat'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    closeMenu();
+                    dispatch(openSettingsWindow('AI'));
+                  }}
+                >
+                  <span>AI Settings</span>
+                </button>
                 <div className="topBarDivider" />
-                <button onClick={closeMenu}><span>Token Usage FAQ</span></button>
+                <button
+                  onClick={() => {
+                    closeMenu();
+                    dispatch(openHelpWindow('ai-help'));
+                  }}
+                >
+                  <span>Token Usage FAQ</span>
+                </button>
               </div>
             )}
           </div>
@@ -198,17 +238,14 @@ export default function TopBar() {
           <div className="topBarMenuItem">
             <button
               className={`topBarMenuButton ${activeMenu === 'help' ? 'active' : ''}`}
-              // Toggle the Help dropdown.
-              onClick={() => setActiveMenu(activeMenu === 'help' ? null : 'help')}
+              // Help opens immediately (no dropdown).
+              onClick={() => {
+                closeMenu();
+                dispatch(openHelpWindow());
+              }}
             >
               Help
             </button>
-            {/* Dropdown content only mounts while this menu is active. */}
-            {activeMenu === 'help' && (
-              <div className="topBarDropdown">
-                <button onClick={closeMenu}><span>Help</span></button>
-              </div>
-            )}
           </div>
         </div>
 

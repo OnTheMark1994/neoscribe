@@ -16,6 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Window from '../Util/Window';
 import SettingsGeneral from './Tabs/SettingsGeneral';
+import SettingsDisplay from './Tabs/SettingsDisplay';
 import SettingsAI from './Tabs/SettingsAI';
 import { closeSettingsWindow } from '../../Global/ReduxSlices/WindowSlice';
 
@@ -35,16 +36,21 @@ export default function SettingsWindow() {
   }, [initialTab])
 
   // The data that deterines which tabs are available and how they display
-  const tabs = [
-    {
+  const tabs = {
+    General: {
       title: "General",
       component: (<SettingsGeneral></SettingsGeneral>)
     },
-    {
+    Display: {
+      title: "Display",
+      component: (<SettingsDisplay></SettingsDisplay>)
+    },
+    AI: {
       title: "AI",
       component: (<SettingsAI></SettingsAI>)
     }
-  ]
+  }
+  
 
   return (
     // Conditional display window
@@ -60,7 +66,7 @@ export default function SettingsWindow() {
 
       {/* Tabs */}
       <div className="settingsTab">
-          {tabs.map(tabJSON => (
+          {Object.entries(tabs).map(tabJSON => (
             <div 
               className={"settingsTab "+((tab === tabJSON.title)? "settingsTabSelected":"")}
               onClick={()=>setTab(tabJSON.title)}
@@ -70,12 +76,8 @@ export default function SettingsWindow() {
           ))}
       </div>
 
-      {/* Section displat with the actual settings in it */}
-      {tabs.map(tabJSON => (
-        <div className="settingsTabContainer">
-          {tab === tabJSON.title ? tabJSON.component : null}
-        </div>
-      ))}
+      {/* Section display with the actual settings in it */}
+      {tabs[tab]?.component}
 
     </Window>
   );

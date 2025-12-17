@@ -4,7 +4,7 @@
 */
 
 .aiChatTokenRow {
-  padding: 0 20px;
+  padding: 5px 20px;
   box-sizing: border-box;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-top: 4px;
+  margin-bottom: 5px;
 }
 
 .aiChatTokenLineLeft {
@@ -35,7 +35,7 @@
 }
 
 .aiChatTokenLabel {
-  font-size: 11px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.65);
 }
 

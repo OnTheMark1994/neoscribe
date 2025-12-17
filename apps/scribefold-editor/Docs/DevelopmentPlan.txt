@@ -55,7 +55,7 @@ Phases:
             page (done)
             ai side bar (done)
         topbar (done)
-        ai chat area layout
+        ai chat area layout (done)
 
     1 week 
     settings and windows
