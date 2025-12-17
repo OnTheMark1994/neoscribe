@@ -3,6 +3,7 @@
  
   */
 import React from 'react';
+import './Window.css';
 
 export default function Window({ title, open, onClose, children }) {
 
@@ -13,8 +14,13 @@ export default function Window({ title, open, onClose, children }) {
       <div className="windowContainer">
         <div className="windowTopBar">
           <div className="windowTitle">{title}</div>
-          <button className="windowCloseButton" onClick={onClose} type="button">
-            X
+          <button
+            className="windowCloseButton"
+            onClick={onClose}
+            type="button"
+            aria-label="Close"
+          >
+            ×
           </button>
         </div>
         <div className="windowContent">

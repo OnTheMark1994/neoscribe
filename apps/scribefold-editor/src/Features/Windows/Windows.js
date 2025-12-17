@@ -3,6 +3,7 @@ import SettingsWindow from '../Settings/SettingsWindow';
 import RightClickWindow from './RightClickWindow';
 import SaveBeforeClosingWindow from './SaveBeforeClosingWindow';
 import HelpWindow from './HelpWindow';
+import AiChatMessageDetail from '../AI/ChatBar/AiChatMessageDetail';
 /*
     Contains conditional windows
 
@@ -18,6 +19,7 @@ export default function Windows() {
       <RightClickWindow/>
       <SaveBeforeClosingWindow/>
       <HelpWindow/>
+      <AiChatMessageDetail/>
     </>
   );
 }

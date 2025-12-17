@@ -55,22 +55,35 @@ import { useDispatch, useSelector } from 'react-redux';
 import { toggleFullscreenActive } from './ReduxSlices/MenuSlice';
 import './TopBar.css';
 
+// Detect whether we are running in the browser (no Electron preload API).
 const IS_WEB = !window?.electronAPI;
 
 export default function TopBar() {
+  // Redux dispatch for menu actions.
   const dispatch = useDispatch();
+
+  // Used to detect clicks outside of the menu dropdown area.
   const menuRef = useRef(null);
+
+  // Tracks which top-level menu (tobar option) is currently open (file/edit/view/ai/help).
   const [activeMenu, setActiveMenu] = useState(null);
 
+  // Editor/file state for displaying the current filename.
   const filepath = useSelector(state => state.editorSlice.filepath);
   const modified = useSelector(state => state.editorSlice.modified);
+
+  // Fullscreen state controls whether the top bar is visually hidden. (set from key press listener in that component)
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
 
+  // Derive file name from path (handles both / and \ path separators).
   const fileName = filepath ? filepath.split(/[/\\]/).pop() : 'Untitled';
+
+  // Add a trailing * to indicate unsaved changes.
   const displayName = `${fileName}${modified ? '*' : ''}`;
 
   useEffect(() => {
     const handleClickOutside = (e) => {
+      // Close dropdown menus when user clicks outside of the top bar.
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setActiveMenu(null);
       }
@@ -79,8 +92,10 @@ export default function TopBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Helper used by many menu items to close the active dropdown.
   const closeMenu = () => setActiveMenu(null);
 
+  // If fullscreen mode is active, the CSS class hides the bar (hover container still exists).
   const barClasses = `topBar ${fullscreenActive ? 'topBarHidden' : ''}`;
 
   return (
@@ -96,10 +111,12 @@ export default function TopBar() {
           <div className="topBarMenuItem">
             <button
               className={`topBarMenuButton ${activeMenu === 'file' ? 'active' : ''}`}
+              // Toggle the File dropdown.
               onClick={() => setActiveMenu(activeMenu === 'file' ? null : 'file')}
             >
               File
             </button>
+            {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'file' && (
               <div className="topBarDropdown">
                 <button onClick={closeMenu}><span>New</span><span className="shortcut">Ctrl+N</span></button>
@@ -116,10 +133,12 @@ export default function TopBar() {
           <div className="topBarMenuItem">
             <button
               className={`topBarMenuButton ${activeMenu === 'edit' ? 'active' : ''}`}
+              // Toggle the Edit dropdown.
               onClick={() => setActiveMenu(activeMenu === 'edit' ? null : 'edit')}
             >
               Edit
             </button>
+            {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'edit' && (
               <div className="topBarDropdown">
                 <button onClick={closeMenu} disabled><span>Undo</span><span className="shortcut">Ctrl+Z</span></button>
@@ -131,15 +150,20 @@ export default function TopBar() {
           <div className="topBarMenuItem">
             <button
               className={`topBarMenuButton ${activeMenu === 'view' ? 'active' : ''}`}
+              // Toggle the View dropdown.
               onClick={() => setActiveMenu(activeMenu === 'view' ? null : 'view')}
             >
               View
             </button>
+            {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'view' && (
               <div className="topBarDropdown">
+                {/* Fullscreen toggle is the only View action wired up currently. */}
                 <button
                   onClick={() => {
+                    // Close the menu first so the UI feels responsive.
                     closeMenu();
+                    // Tells redux to toggle the fullscreenActive flag.
                     dispatch(toggleFullscreenActive());
                   }}
                 >
@@ -155,10 +179,12 @@ export default function TopBar() {
           <div className="topBarMenuItem">
             <button
               className={`topBarMenuButton ${activeMenu === 'ai' ? 'active' : ''}`}
+              // Toggle the AI dropdown.
               onClick={() => setActiveMenu(activeMenu === 'ai' ? null : 'ai')}
             >
               AI
             </button>
+            {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'ai' && (
               <div className="topBarDropdown">
                 <button onClick={closeMenu}><span>Show AI Chat</span></button>
@@ -172,10 +198,12 @@ export default function TopBar() {
           <div className="topBarMenuItem">
             <button
               className={`topBarMenuButton ${activeMenu === 'help' ? 'active' : ''}`}
+              // Toggle the Help dropdown.
               onClick={() => setActiveMenu(activeMenu === 'help' ? null : 'help')}
             >
               Help
             </button>
+            {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'help' && (
               <div className="topBarDropdown">
                 <button onClick={closeMenu}><span>Help</span></button>
@@ -185,11 +213,13 @@ export default function TopBar() {
         </div>
 
         <div className="topBarCenter">
+          {/* Current filename (+* when modified) */}
           <span className="topBarFilename">{displayName}</span>
         </div>
 
         <div className="topBarRight">
           {IS_WEB && (
+            // In the web build we show a "Desktop App" link (Electron apps don't need it).
             <a
               href="#"
               className="topBarDesktopLink"

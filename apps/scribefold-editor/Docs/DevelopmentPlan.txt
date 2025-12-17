@@ -50,9 +50,22 @@ Phases:
 
     1 week
     UI
+        main area ui (done)
+            background (done)
+            page (done)
+            ai side bar (done)
+        topbar (done)
+        ai chat area layout
 
     1 week 
-    menus and settings
+    settings and windows
+        f11 mode (done)
+        ai mode on / off
+        windows slice
+            just showing windows
+            settings window
+        
+
 
     1 week
     monaco basic

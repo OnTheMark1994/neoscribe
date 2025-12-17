@@ -1,56 +1,91 @@
 /*
-  This component shows to the left of the window when the mode is active
+  AiChatBar
 
-  It shows a bar on the left that is height 100% and width of a set amount like 300px
+  This is the main left-side AI chat sidebar for the editor.
 
-  there is a top section with a title and icon
-  a row showing token info like how many tokens the user has, a refresh button, 
-  how many each call will take, and an info button showing the help menu going right too the correct section with the dispatched action
-  
-  there is a messages area with all of the messages from the user and ai assistant
+  High level UI:
+    - Header (icon + centered title)
+    - Token row (available tokens + estimate + refresh/help)
+    - Scrollable message list (user + assistant)
+    - Input area (prompt textarea + settings + send)
 
-  and there is an input area with a send button at the bottom
- 
-  the message chain, proposed changes array, and all other related state are in the aiSlice
+  State:
+    - `aiSlice.aiModeActive` determines whether the sidebar is visible.
+    - `aiSlice.messages` stores the full chat history (and optional debug data).
 
-  the refresh button connects to a function in the initializer
-    the button shows its "refreshing" or not state (changes css display) based on the redux loading user data value
-    it calls an action that triggers the user data reload when pressed
-    this makes all refresh buttons in sync all over the app
-    the refresh button component is used for this 
-
-  Uses custom chat api that takes params
-    model to use (if left blank uses default one, just use default for now we will add this functionality later)
-    all ids (auth, device, anon)
-    messages so far
-    the api generates a new message and sends it back, 
-    sends proposed changes in the text which is parsed and put in redux aiSlice, 
-    changes the users tokens by connecting to the database from the server 
-    sends new token values so we can update user data withouth needing to refresh user data in a seperate call
-      (can call userSlice action specifically for this)
-    
-    so on response
-      new message shows in the messages area
-      then the proposed changes will show in the editor
-      new token value shows in the chat area (and the settings if the user goes there) becasue user data is updated
-      all data is saved into the messages array in aislice so a developer can open thenm for inspection
-
- */
+  Note:
+    - This file is intentionally kept as a thin layout component. Most logic is pushed into
+      small subcomponents (token row, message renderer, input area).
+*/
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
+import AiChatInputArea from './AiChatInputArea';
+import AiChatMessage from './AiChatMessage';
+import AiChatTokenDisplay from './AiChatTokenDisplay';
 import './AiChatBar.css';
 export default function AiChatBar() {
 
-  // Get redux state that determines if it shows
+  // Determines whether we render the chat bar at all.
   const showChatBar = useSelector(state => state.aiSlice.aiModeActive)
 
-  // Return if show state is false (if ai mode is off)
+  // The full chat history (user + assistant + placeholder thinking messages).
+  const messages = useSelector(state => state.aiSlice.messages)
+
+  // Used to scroll to the bottom when new messages are appended.
+  const messageEndRef = useRef(null);
+
+  // Defensive: ensure we always map an array even if something put a non-array in state.
+  const safeMessages = useMemo(() => (Array.isArray(messages) ? messages : []), [messages]);
+
+  useEffect(() => {
+    if (!messageEndRef.current) return;
+    // Keep the chat scrolled to the newest message.
+    messageEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  }, [safeMessages.length]);
+
+  // If AI mode is off, do not mount anything.
   if(!showChatBar) return null
 
   return (
-    <div className="aiChatBar">
+    <div className="aiChatBar resizable-x">
       <div className="aiChatBarHeader">
-        <div className="aiChatBarTitle">AI Chat</div>
+        {/* Brand icon (title is centered independently via CSS absolute positioning) */}
+        <img
+          src="/icon-images/scribefold-ai-icon-png.png"
+          alt=""
+          className="aiChatBarHeaderIcon"
+        />
+        {/* Title is centered across the full header width (not relative to the icon). */}
+        <div className="aiChatBarHeaderTitleBox">
+          <div className="aiChatBarTitle">AI Chat</div>
+        </div>
       </div>
+
+      {/* Token / usage row (reads userSlice + dispatches refresh/help actions). */}
+      <AiChatTokenDisplay/>
+
+      <div className="aiChatMessages">
+        {safeMessages.length === 0 ? (
+          // Empty state shown before any messages are sent.
+          <div className="aiChatEmptyState">
+            <div className="aiChatEmptyTitle">Ask anything</div>
+            <div className="aiChatEmptySubtitle">Your messages will appear here.</div>
+          </div>
+        ) : (
+          // Render the conversation in order.
+          safeMessages.map((message, idx) => (
+            <AiChatMessage
+              key={message?.id ?? message?.createdAt ?? idx}
+              message={message}
+            />
+          ))
+        )}
+        {/* Scroll anchor so we can always scroll to latest message. */}
+        <div ref={messageEndRef} />
+      </div>
+
+      {/* Prompt input + send + settings entry point. */}
+      <AiChatInputArea/>
     </div>
   );
 }

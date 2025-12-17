@@ -50,3 +50,9 @@
   flex-direction: column;
   backdrop-filter: blur(10px);
 }
+.resizable-x {
+  resize: horizontal;  /* ← That's it! */
+  overflow: auto;      /* Required for resize to work */
+  min-width: 100px;    /* Prevent shrinking too small */
+  max-width: 100%;     /* Optional constraint */
+}

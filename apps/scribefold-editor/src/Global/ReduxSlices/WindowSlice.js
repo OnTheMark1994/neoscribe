@@ -50,13 +50,9 @@ const windowSlice = createSlice({
       state.showSaveBeforeClosingWindow = typeof next === 'boolean' ? next : !state.showSaveBeforeClosingWindow;
     },
 
-    openMessageDetailWindow(state, action) {
-      state.showMessageDetailWindow = true;
+    setMessageDetailDisplayData(state, action) {
       state.messageDetailData = action.payload ?? null;
-    },
-    closeMessageDetailWindow(state) {
-      state.showMessageDetailWindow = false;
-      state.messageDetailData = null;
+      state.showMessageDetailWindow = Boolean(state.messageDetailData);
     },
 
     setShowHelpWindow(state, action) {
@@ -95,8 +91,7 @@ export const {
   openSettingsWindow,
   closeSettingsWindow,
   setShowSaveBeforeClosingWindow,
-  openMessageDetailWindow,
-  closeMessageDetailWindow,
+  setMessageDetailDisplayData,
   setShowHelpWindow,
   setHelpWindowInitialSection,
   openHelpWindow,

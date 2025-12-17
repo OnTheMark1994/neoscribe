@@ -3,7 +3,9 @@ Coding Principles:
     simple as possible (min lines and low complexity components)
     efficient soutions (min big O)
     organized (logical consistent compomponent and file heirarchy structures)
+        so do not put window.js styles in app.css. make window.css for styles specific to it
     max reuse of code
+        so it there is a reload comonent do not make new jsx, reuse the existing component
     detailed meaningful comments for detail
     Follow conventions and patterns in the other files maintaing consistency and organization   
     docs: 

@@ -16,6 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Window from '../Util/Window';
 import SettingsGeneral from './Tabs/SettingsGeneral';
+import SettingsAI from './Tabs/SettingsAI';
 import { closeSettingsWindow } from '../../Global/ReduxSlices/WindowSlice';
 
 export default function SettingsWindow() {
@@ -38,6 +39,10 @@ export default function SettingsWindow() {
     {
       title: "General",
       component: (<SettingsGeneral></SettingsGeneral>)
+    },
+    {
+      title: "AI",
+      component: (<SettingsAI></SettingsAI>)
     }
   ]
 
