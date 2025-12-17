@@ -19,8 +19,9 @@
  import { createSlice } from '@reduxjs/toolkit';
 
  const defaultSettingsObject = {
-   backgroundImageUri: '/theme-images/spacedreams.jpg',      // The image that shows as the background of the entire application 
- };
+    backgroundImageUri: '/theme-images/spacedreams.jpg',      // The image that shows as the background of the entire application 
+    devMode: false, 
+  };
 
  const initialState = {
    settingsObject: defaultSettingsObject,
