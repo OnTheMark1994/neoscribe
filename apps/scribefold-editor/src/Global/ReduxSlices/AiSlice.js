@@ -17,6 +17,9 @@ const aiSlice = createSlice({
     },
     // Add a message to the messages array (todo: we may need to add some data when the message sends and add to that when the resopnse is recieved)
     addMessage(state, action) {
+      // We treat "thinking" messages as temporary placeholders.
+      // Any time a real message is added (user or assistant), remove all placeholders first.
+      state.messages = state.messages.filter(m => !m?.thinking);
       state.messages.push(action.payload);
     },
     // Clear the array of messages
