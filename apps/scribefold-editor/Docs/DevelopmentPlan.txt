@@ -67,21 +67,41 @@ Phases:
             help button shows help window (done)
         settings ui
             tabs
-                components for each 
+                tabs UI (done) 
+                tabs change what shows (done)
+                components for each (done)
+                UI for each component (done)
+                components change settingsObject (done) 
                 they display based on the selected tab (done)
-                tab component UIs
-                functionality for each 
-        
-
+                tab component UIs (done)
+			
     1 week
     monaco basic
+        embed editor (done)
+        basic ui display (done) 
+        view reflects settings (done)
 
-    at this point will have basic that focus has
-    but without the tabs
+    monaco additional
+        chapter and section folding
+        glyphs for ai-hide options
+            they change when clicked
+        index values
+            test by having a function that pulls it and logs with the indexs'
+                modify and pull again to see if they persist 
+
+    file IO
+        load file
+        save file
+        save as
+        reopen file on close/reopen
+        works in desktop and browser 
+            may be different top menu options in browser
+            may need the explanation window to download file instead of save on browser
 
     1 week 
     ai chat area 
         sends to api
+            after gathering from the editor ref
             just getting a response, no user token updates now
         gets response, prases it, puts it into redux
             just logs it for now
@@ -164,3 +184,34 @@ Notes:
     As we go thorugh creating the plan 
     update the plan, file structure, database, data flows etc
 
+
+
+
+
+
+
+Monaco prompt:
+please tell me how to install monaco into a react electron web app. 
+I also want to modify it in these ways:
+sticky top bar on/off based on settings
+same with the preview scrollbar
+and line numbers in the gutters
+custom language for folding on #section and #chapter tags with the section being inside of a chapter so if the parent chapter is folded the sections in it are hidden
+
+I want to add ids to the lines
+so I can pull the data from the editor
+send it to an endpoint
+get a response and then use the ids to add the content to the correct lines even if their number or order changes
+and then have those two versions show as a dif in the monaco view
+and of course adding new ids as new lines are added
+and to stay very performant doing O(1) or low complexity operations
+
+I want to have a custom glyph in the gutter that when clicked changes something correlated with that line so the glyph image changes (like a toggle)
+and I want that change to be visible in the function that pulls the data and sends it to the api described previously
+
+so it will be monaco
+1: with custom css styles (transparent background etc)
+2: conditional sticky top, gutter index values, and preview slider on the left (all based on a settingsObject json)
+3: ability to have unique ids on each line that persist as the same for at least the entire session (does't have to persist on refresh or program load unless its easy to do so)
+4: ability to have the data pulled from it for processing by an api with line numbers and a custom show or hide attribute that tells the function which lines to send to the api
+5: ability to show diff of the original content and the content created when the api responds

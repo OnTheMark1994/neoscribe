@@ -21,7 +21,7 @@
 
  const initialState = {
    authUser: null,            // From the supabase auth listener, contains .id (the authID)
-   userData: null,            // Loaded from users table (via our api) based on ids (auth, device, anon)
+   userData: {},              // Loaded from users table (via our api) based on ids (auth, device, anon)
    userDataLoading: false,    // Flag to show when user data is showing (used for display)
    reloadUserDataTrigger: 0,  // Triggers a user data reload when incremented (via useEffect in the initalizer comonent)
  };

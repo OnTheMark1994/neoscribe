@@ -18,6 +18,8 @@ import Window from '../Util/Window';
 import SettingsGeneral from './Tabs/SettingsGeneral';
 import SettingsDisplay from './Tabs/SettingsDisplay';
 import SettingsAI from './Tabs/SettingsAI';
+import SettingsAccount from './Tabs/SettingsAccount';
+import SettingsDeveloper from './Tabs/SettingsDeveloper';
 import { closeSettingsWindow } from '../../Global/ReduxSlices/WindowSlice';
 import "./SettingsWindow.css"
 
@@ -52,11 +54,11 @@ export default function SettingsWindow() {
     },
     Account: {
       title: "Account",
-      component: (<SettingsAI></SettingsAI>)
+      component: (<SettingsAccount></SettingsAccount>)
     },
     Developer: {
       title: "Developer",
-      component: (<SettingsAI></SettingsAI>)
+      component: (<SettingsDeveloper></SettingsDeveloper>)
     },
   }
   

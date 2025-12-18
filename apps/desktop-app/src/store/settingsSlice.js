@@ -32,7 +32,9 @@ const settingsSlice = createSlice({
     // Called when user changes any setting in the UI
     updateSetting(state, action) {
       const { settingName, value } = action.payload;
+      console.log("in updateSetting: ", settingsName, value)
       if (settingName) {
+
         // 1. Update Redux state immediately for UI responsiveness
         state.settingsObject[settingName] = value;
         

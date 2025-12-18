@@ -19,3 +19,14 @@ Details:
     use .css files to define classes, only use inline css when using variables like backgroundImage or position from redux
         create files when necessary
         try to reuse css when it makes sense
+
+
+more exaples:
+
+unnecessary complexity:
+dont do this:
+  const showMonacoLineNumbers = settingsObject?.showMonacoLineNumbers !== false;
+  const monacoStickyTopBar = settingsObject?.monacoStickyTopBar !== false;
+  const showPreviewBar = settingsObject?.showPreviewBar !== false;
+
+just use settingsObject?.monacoStickyTopBar where needed
