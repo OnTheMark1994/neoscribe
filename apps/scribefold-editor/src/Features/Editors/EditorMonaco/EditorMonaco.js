@@ -218,10 +218,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
         defaultValue={initialValue}
         onChange={(nextValue) => setValue(nextValue ?? '')}
         onMount={(editor) => {
-          // This is the critical wiring step:
-          // The Monaco <Editor/> component provides the actual editor instance here.
-          // We store it into the ref that was created in App.js so other components
-          // (like the AI chat Send button) can access Monaco content.
+          // This is sent up to App.js so we can send helper functions the ref (like when we call send in ai chat)
           if(monacoEditorRef){
             monacoEditorRef.current = editor
           }
@@ -262,6 +259,16 @@ export default function EditorMonaco({ monacoEditorRef }) {
         options={{
           // Line number gutter.
           lineNumbers: settingsObject?.showMonacoLineNumbers ? 'on' : 'off',
+
+          // Disable autocomplete / suggestion popups (word suggestions, etc).
+          // This is a writing editor, not a code editor.
+          quickSuggestions: false,
+          suggestOnTriggerCharacters: false,
+          wordBasedSuggestions: 'off',
+          parameterHints: { enabled: false },
+          acceptSuggestionOnEnter: 'off',
+          tabCompletion: 'off',
+          snippetSuggestions: 'none',
 
           // Sticky top bar / sticky scroll.
           stickyScroll: { enabled: Boolean(settingsObject?.monacoStickyTopBar) },
