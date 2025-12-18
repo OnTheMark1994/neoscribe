@@ -2,7 +2,7 @@
  
  
   */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import Editor from '@monaco-editor/react';
 import './EditorMonaco.css';
@@ -198,6 +198,12 @@ export default function EditorMonaco({ monacoEditorRef }) {
 
   // User preferences that should affect Monaco rendering.
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
+
+  const proposedChanges = useSelector(state => state.aiSlice.proposedChanges);
+
+  useEffect(() => {
+    console.log('[EditorMonaco] proposedChanges updated:', proposedChanges);
+  }, [proposedChanges]);
 
   const initialValue = useMemo(() => {
     return [

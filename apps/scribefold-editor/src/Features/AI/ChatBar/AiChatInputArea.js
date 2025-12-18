@@ -15,7 +15,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
-import { addMessage } from '../../../Global/ReduxSlices/AiSlice';
+import { addMessage, addProposedChanges } from '../../../Global/ReduxSlices/AiSlice';
 import { openSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import { getLinesArrayWithAssertedIds } from '../../Editors/EditorMonaco/MonacoFunctions';
 import './AiChatInputArea.css';
@@ -89,6 +89,7 @@ async function callChatApi(messages) {
   };
 }
 
+// Parses the text from the endpoint into a json that can be used by the application
 function tryParseAiJsonResponse(text) {
   const raw = String(text ?? '');
   const cleaned = raw
@@ -124,13 +125,19 @@ export default function AiChatInputArea({ monacoEditorRef }) {
     // Don't send empty messages.
     if (!content) return;
 
-    console.log('[AI Chat] Send:', content);
-
     // Create line array (ensures stable ids).
     const linesArray = getLinesArrayWithAssertedIds(monacoEditorRef)
 
-    // Log Monaco lines and ids.
-    console.log('[AI Chat] Monaco lines with ids:', linesArray)
+    // Compile the lines of the text into an array in the format that the api expects it
+    const documentLinesForAi = Array.isArray(linesArray)
+      ? linesArray.map(line => ({
+        id: line?.lineId,
+        text: String(line?.content ?? ''),
+      }))
+      : [];
+
+    // The prompt request and also the lines of text
+    const userMessageForAi = `Request: ${content} \n\n Document:\n${JSON.stringify(documentLinesForAi, null, 2)}`;
 
     // Append the user's message into the shared chat history.
     const userMessageId = `local_${Date.now()}`; // I don't think we need to be adding message ids but I'll leave it for now
@@ -163,17 +170,18 @@ export default function AiChatInputArea({ monacoEditorRef }) {
       // Put the new message into the messages array 
       const outgoingMessages = [
         ...previousChain,
-        { role: 'user', content },
+        { role: 'user', content: userMessageForAi },
       ];
-
-      console.log('[AI Chat] Outgoing message chain:', outgoingMessages);
 
       // This function calls the api and also comiles debug info 
       const { text: responseText, debugInfo } = await callChatApi(outgoingMessages);
-      console.log('[AI Chat] DeepSeek response:', responseText);
-
+      
       // Try to parse the resonse 
       const parsedResult = tryParseAiJsonResponse(responseText);
+
+      if(Array.isArray(parsedResult?.changes) && parsedResult.changes.length > 0){
+        dispatch(addProposedChanges(parsedResult.changes));
+      }
 
       // Fall back to the response text if the aprse failed 
       const assistantContent = parsedResult.message || responseText;
