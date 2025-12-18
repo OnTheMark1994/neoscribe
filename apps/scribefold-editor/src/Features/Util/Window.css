@@ -54,6 +54,7 @@
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
+  user-select: none;
 }
 
 .windowCloseButton:hover {
@@ -64,6 +65,27 @@
 .windowContent {
   padding: 16px 20px 20px 20px;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.windowContent::-webkit-scrollbar {
+  width: 10px;
+}
+
+.windowContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.windowContent::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.windowContent:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.22);
 }
 
 @media (max-width: 768px) {

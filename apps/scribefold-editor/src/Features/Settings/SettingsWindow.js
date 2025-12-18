@@ -19,6 +19,7 @@ import SettingsGeneral from './Tabs/SettingsGeneral';
 import SettingsDisplay from './Tabs/SettingsDisplay';
 import SettingsAI from './Tabs/SettingsAI';
 import { closeSettingsWindow } from '../../Global/ReduxSlices/WindowSlice';
+import "./SettingsWindow.css"
 
 export default function SettingsWindow() {
 
@@ -27,12 +28,12 @@ export default function SettingsWindow() {
   // Sets the initial tab (set to null in ation if string is not sent into open settings menu action call)
   const initialTab = useSelector(state => state.windowSlice.settingsInitialTab)
   // Determines what tab is selected, set primarily by tab onClick and default vaule can be set by settingsInitialTab that can be set by the button that opens the settings menu
-  const [tab, setTab] = useState(initialTab)
+  const [tab, setTab] = useState(initialTab ?? 'General')
 
   const dispatch = useDispatch()
 
   useEffect(() => {
-    setTab(initialTab)
+    setTab(initialTab ?? 'General')
   }, [initialTab])
 
   // The data that deterines which tabs are available and how they display
@@ -48,7 +49,15 @@ export default function SettingsWindow() {
     AI: {
       title: "AI",
       component: (<SettingsAI></SettingsAI>)
-    }
+    },
+    Account: {
+      title: "Account",
+      component: (<SettingsAI></SettingsAI>)
+    },
+    Developer: {
+      title: "Developer",
+      component: (<SettingsAI></SettingsAI>)
+    },
   }
   
 
@@ -58,26 +67,26 @@ export default function SettingsWindow() {
       title="Settings"
       onClose={() => dispatch(closeSettingsWindow())}
       open={showWindow}
+      className="settingsWindow"
     >
-      {/* Top Area */}
-      <div>
-        {/* top area (maybe says Settings and has an image of the main scroll eye icon) */}
-      </div>
-
-      {/* Tabs */}
-      <div className="settingsTab">
-          {Object.entries(tabs).map(tabJSON => (
-            <div 
-              className={"settingsTab "+((tab === tabJSON.title)? "settingsTabSelected":"")}
-              onClick={()=>setTab(tabJSON.title)}
+      <div className="settings-container">
+        <div className="tabs-container">
+          {Object.values(tabs).map(tabJSON => (
+            <button
+              key={tabJSON.title}
+              type="button"
+              className={`tab ${tab === tabJSON.title ? 'active' : ''}`}
+              onClick={() => setTab(tabJSON.title)}
             >
               {tabJSON.title}
-            </div>
+            </button>
           ))}
-      </div>
+        </div>
 
-      {/* Section display with the actual settings in it */}
-      {tabs[tab]?.component}
+        {/* Section display with the actual settings in it */}
+        {tabs[tab]?.component}
+
+      </div>
 
     </Window>
   );

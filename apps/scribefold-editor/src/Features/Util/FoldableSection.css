@@ -1,0 +1,66 @@
+.foldableSection {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.foldableSectionTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.foldableSectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.foldableSectionToggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #4CAF50;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  user-select: none;
+}
+
+.foldableSectionToggle:hover {
+  background: rgba(76, 175, 80, 0.18);
+  border-color: rgba(76, 175, 80, 0.45);
+  transform: scale(1.06);
+}
+
+.foldableSectionContent {
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.foldableSectionContent code {
+  font-family: Consolas, 'Monaco', monospace;
+}
+
+.foldableSectionContent pre {
+  margin: 10px 0 0 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  overflow: auto;
+}

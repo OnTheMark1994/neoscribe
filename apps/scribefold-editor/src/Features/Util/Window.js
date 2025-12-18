@@ -5,13 +5,13 @@
 import React from 'react';
 import './Window.css';
 
-export default function Window({ title, open, onClose, children }) {
+export default function Window({ title, open, onClose, children, className = '' }) {
 
   if (!open) return null;
 
   return (
     <div className="windowOverlay">
-      <div className="windowContainer">
+      <div className={`windowContainer ${className}`}>
         <div className="windowTopBar">
           <div className="windowTitle">{title}</div>
           <button

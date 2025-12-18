@@ -60,22 +60,41 @@ Phases:
     1 week 
     settings and windows
         f11 mode (done)
-        ai mode on / off
-        windows slice
-            just showing windows
-            settings window
+        ai mode on / off (done)
+        windows slice (done)
+            just showing windows (done)
+            settings window opens (done)
+            help button shows help window (done)
+        settings ui
+            tabs
+                components for each 
+                they display based on the selected tab (done)
+                tab component UIs
+                functionality for each 
         
-
 
     1 week
     monaco basic
 
+    at this point will have basic that focus has
+    but without the tabs
+
     1 week 
     ai chat area 
-    (just going into redux)
+        sends to api
+            just getting a response, no user token updates now
+        gets response, prases it, puts it into redux
+            just logs it for now
+
 
     1 week 
     connecting monaco and the ai response
+        diff view
+        accept reject buttons
+            insert them in best place
+            they actually work
+            jumping to selected one with bottom diff and jump
+                maybe need to add those components
 
     1 week
     array editor (optional/conditional)

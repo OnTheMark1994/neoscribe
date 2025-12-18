@@ -34,6 +34,7 @@
 
 */
 import React, { useEffect, useRef, useState } from 'react';
+import './FoldableSection.css';
 
 export default function FoldableSection({ title, defaultOpen = false, scrollTo = false, children }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
