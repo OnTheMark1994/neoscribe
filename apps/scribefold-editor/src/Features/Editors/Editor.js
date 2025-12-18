@@ -4,10 +4,10 @@ import EditorMonaco from './EditorMonaco/EditorMonaco';
  
  
   */
-export default function Editor() {
+export default function Editor({ monacoEditorRef }) {
   return (
     <div>
-      <EditorMonaco/>
+      <EditorMonaco monacoEditorRef={monacoEditorRef}/>
     </div>
   );
 }

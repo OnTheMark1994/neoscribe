@@ -16,15 +16,18 @@ import React, { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { addMessage } from '../../../Global/ReduxSlices/AiSlice';
 import { openSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
+import { logMonacoEditorLines } from '../../Editors/EditorMonaco/MonacoFunctions';
 import './AiChatInputArea.css';
 
-export default function AiChatInputArea() {
+export default function AiChatInputArea({ monacoEditorRef }) {
   // Redux dispatch for writing messages + opening windows.
   const dispatch = useDispatch();
 
   // Uncontrolled textarea ref (keeps this component simple; Redux does not store draft input).
   const inputRef = useRef(null);
 
+  // New behavior: Accept monacoEditorRef prop and call MonacoFunctions.logMonacoEditorLines on Send.
+  // This allows us to log the current Monaco editor content when the user sends a message.
   function send() {
     // Read/trim the textarea value.
     const content = String(inputRef.current?.value ?? '').trim();
@@ -32,6 +35,14 @@ export default function AiChatInputArea() {
     if (!content) return;
 
     console.log('[AI Chat] Send:', content);
+
+    // Debug / first-step integration:
+    // When the user presses Send, log the current Monaco editor content directly.
+    // This confirms:
+    //   - Send button click works
+    //   - The ref was passed from App -> EditorMonaco and is populated
+    //   - We can access Monaco model content from outside the editor component
+    logMonacoEditorLines(monacoEditorRef)
 
     // Append the user's message into the shared chat history.
     dispatch(addMessage({

@@ -23,7 +23,7 @@ import AiChatInputArea from './AiChatInputArea';
 import AiChatMessage from './AiChatMessage';
 import AiChatTokenDisplay from './AiChatTokenDisplay';
 import './AiChatBar.css';
-export default function AiChatBar() {
+export default function AiChatBar({ monacoEditorRef }) {
 
   // Determines whether we render the chat bar at all.
   const showChatBar = useSelector(state => state.aiSlice.aiModeActive)
@@ -85,7 +85,7 @@ export default function AiChatBar() {
       </div>
 
       {/* Prompt input + send + settings entry point. */}
-      <AiChatInputArea/>
+      <AiChatInputArea monacoEditorRef={monacoEditorRef}/>
     </div>
   );
 }

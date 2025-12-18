@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useSelector } from 'react-redux';
 import './App.css';
 import TopBar from './Global/TopBar';
@@ -38,6 +38,10 @@ import Windows from './Features/Windows/Windows';
 */
 export default function App() {
 
+  // This ref will hold the Monaco editor instance once EditorMonaco mounts.
+  // We keep it in App so both the editor and the AI chat "Send" button can access it.
+  const monacoEditorRef = useRef(null)
+
   // We are retreiving this so we can display the correct backgroundImageUri
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject)
 
@@ -68,7 +72,7 @@ export default function App() {
           <div className={"page"}>
           
             {/* The actual editor */}
-              <Editor/>
+              <Editor monacoEditorRef={monacoEditorRef}/>
           
           </div>
 
@@ -77,7 +81,7 @@ export default function App() {
       </div>
 
       {/* Right side: The AI chat bar that shows conditionally */}
-      <AiChatBar/>
+      <AiChatBar monacoEditorRef={monacoEditorRef}/>
 
       {/* All windows show from here (right click, settings, help etc) */}
       <Windows/>
