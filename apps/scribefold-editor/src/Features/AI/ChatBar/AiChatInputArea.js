@@ -16,7 +16,7 @@ import React, { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { addMessage } from '../../../Global/ReduxSlices/AiSlice';
 import { openSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
-import { logMonacoEditorLines } from '../../Editors/EditorMonaco/MonacoFunctions';
+import { getLinesArrayWithAssertedIds } from '../../Editors/EditorMonaco/MonacoFunctions';
 import './AiChatInputArea.css';
 
 export default function AiChatInputArea({ monacoEditorRef }) {
@@ -26,8 +26,8 @@ export default function AiChatInputArea({ monacoEditorRef }) {
   // Uncontrolled textarea ref (keeps this component simple; Redux does not store draft input).
   const inputRef = useRef(null);
 
-  // New behavior: Accept monacoEditorRef prop and call MonacoFunctions.logMonacoEditorLines on Send.
-  // This allows us to log the current Monaco editor content when the user sends a message.
+  // New behavior: Accept `monacoEditorRef` so Send can pull Monaco lines and assert per-line ids
+  // via helper functions in `MonacoFunctions.js`.
   function send() {
     // Read/trim the textarea value.
     const content = String(inputRef.current?.value ?? '').trim();
@@ -36,13 +36,21 @@ export default function AiChatInputArea({ monacoEditorRef }) {
 
     console.log('[AI Chat] Send:', content);
 
-    // Debug / first-step integration:
-    // When the user presses Send, log the current Monaco editor content directly.
-    // This confirms:
-    //   - Send button click works
-    //   - The ref was passed from App -> EditorMonaco and is populated
-    //   - We can access Monaco model content from outside the editor component
-    logMonacoEditorLines(monacoEditorRef)
+    // Next-step integration:
+    // Build an array of lines that includes a stable-per-session `lineId` per line.
+    //
+    // How this works:
+    //  - We read line ids from Monaco decorations.
+    //  - If a line is missing an id, we generate one and record the line number.
+    //  - We then assert those missing ids back into Monaco (as decorations).
+    //  - Finally we re-read so the returned array exactly matches Monaco state.
+    const linesArray = getLinesArrayWithAssertedIds(monacoEditorRef)
+
+    // Debug: print the full array so we can test persistence by:
+    //   1) press Send (logs lines + ids)
+    //   2) insert new lines in the middle in Monaco
+    //   3) press Send again (existing ids should persist, new lines get new ids)
+    console.log('[AI Chat] Monaco lines with ids:', linesArray)
 
     // Append the user's message into the shared chat history.
     dispatch(addMessage({
