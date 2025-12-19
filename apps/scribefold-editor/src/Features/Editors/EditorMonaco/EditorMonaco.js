@@ -3,7 +3,8 @@
  
   */
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { openRightClickWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import Editor from '@monaco-editor/react';
 import PerformanceTest from './PerformanceTest';
 import './EditorMonaco.css';
@@ -75,7 +76,7 @@ function getEditorContentWithMetadata(editorRef) {
 }
 
 export default function EditorMonaco({ monacoEditorRef }) {
-
+  const dispatch = useDispatch();
   // User preferences that should affect Monaco rendering.
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
 
@@ -164,58 +165,81 @@ export default function EditorMonaco({ monacoEditorRef }) {
           
           // Toggle aiShare metadata on click
           editor.onMouseDown((e) => {
-            console.log('[DEBUG] Mouse event received', {
-              targetType: e.target.type,
-              position: e.target.position,
-              lineNumber: e.target.position?.lineNumber
-            });
-            
-            if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
-              console.log('[DEBUG] Ignoring non-glyph click');
-              return;
+              if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+                console.log('[DEBUG] Ignoring non-glyph click');
+                return;
+              }
+
+            if(e.event.rightButton){
+                console.log('Right-click on eye icon:', {
+                  x: e.event.browserEvent.clientX,
+                  y: e.event.browserEvent.clientY,
+                  pageX: e.event.browserEvent.pageX,
+                  pageY: e.event.browserEvent.pageY,
+                });
+
+                const { clientX: x, clientY: y } = e.event.browserEvent;
+                  dispatch(openRightClickWindow({ 
+                    left: x, 
+                    top: y,
+                    type: 'eyeIcon'
+                  }));
+
+
             }
-            
-            const position = e.target.position;
-            if (!position || !position.lineNumber) {
-              console.log('[DEBUG] Missing position/lineNumber');
-              return;
+            // On left click toggle
+            else{
+              console.log('[DEBUG] Mouse event received', {
+                targetType: e.target.type,
+                position: e.target.position,
+                lineNumber: e.target.position?.lineNumber
+              });
+              
+  
+              
+              const position = e.target.position;
+              if (!position || !position.lineNumber) {
+                console.log('[DEBUG] Missing position/lineNumber');
+                return;
+              }
+              
+              const lineNumber = position.lineNumber;
+              const model = editor.getModel();
+              if (!model) {
+                console.log('[DEBUG] No editor model');
+                return;
+              }
+              
+              // Get existing decorations
+              const existingLineDecorations = model.getLineDecorations(lineNumber);
+              console.log('[DEBUG] Existing decorations', existingLineDecorations);
+              
+              const existingMetadata = getLineMetadataFromDecorations(existingLineDecorations) || {};
+              console.log('[DEBUG] Existing metadata', existingMetadata);
+              
+              // Toggle visibility state
+              const isHidden = existingMetadata.aiShare === 'hide';
+              const newMetadata = {
+                ...existingMetadata,
+                aiShare: isHidden ? undefined : 'hide'
+              };
+              
+              // Create new decoration
+              const newDecoration = createLineMetadataDecoration(lineNumber, newMetadata);
+              
+              // Clear all metadata decorations for this line first
+              const metaDecorations = existingLineDecorations
+                .filter(d => d.options.description?.startsWith('sf_meta:'));
+              const oldDecorationIds = metaDecorations.map(d => d.id);
+              
+              // Apply changes
+              editor.deltaDecorations(oldDecorationIds, [newDecoration]);
+              editor.layout();
+              updateDecorations();
+              
+              console.log('[DEBUG] Editor layout forced, decorations updated');
+
             }
-            
-            const lineNumber = position.lineNumber;
-            const model = editor.getModel();
-            if (!model) {
-              console.log('[DEBUG] No editor model');
-              return;
-            }
-            
-            // Get existing decorations
-            const existingLineDecorations = model.getLineDecorations(lineNumber);
-            console.log('[DEBUG] Existing decorations', existingLineDecorations);
-            
-            const existingMetadata = getLineMetadataFromDecorations(existingLineDecorations) || {};
-            console.log('[DEBUG] Existing metadata', existingMetadata);
-            
-            // Toggle visibility state
-            const isHidden = existingMetadata.aiShare === 'hide';
-            const newMetadata = {
-              ...existingMetadata,
-              aiShare: isHidden ? undefined : 'hide'
-            };
-            
-            // Create new decoration
-            const newDecoration = createLineMetadataDecoration(lineNumber, newMetadata);
-            
-            // Clear all metadata decorations for this line first
-            const metaDecorations = existingLineDecorations
-              .filter(d => d.options.description?.startsWith('sf_meta:'));
-            const oldDecorationIds = metaDecorations.map(d => d.id);
-            
-            // Apply changes
-            editor.deltaDecorations(oldDecorationIds, [newDecoration]);
-            editor.layout();
-            updateDecorations();
-            
-            console.log('[DEBUG] Editor layout forced, decorations updated');
           });
           
           // Initial decoration update

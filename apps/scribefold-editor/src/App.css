@@ -56,3 +56,13 @@
   min-width: 100px;    /* Prevent shrinking too small */
   max-width: 100%;     /* Optional constraint */
 }
+
+.rightClickWindow{
+  height: 200px;
+  width: 200px;
+  background-color: "grey";
+  position: absolute;
+  left:0;
+  top:0;
+  z-index: 10000000000000000000,
+}
