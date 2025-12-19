@@ -194,7 +194,7 @@ I want to implement a line id system in monaco, I want this to be triggerd when 
   */
 }
 
-export default function EditorMonaco({ monacoEditorRef }) {
+export default function EditorMonacoFoldOptamized({ monacoEditorRef }) {
 
   // User preferences that should affect Monaco rendering.
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
@@ -220,15 +220,12 @@ export default function EditorMonaco({ monacoEditorRef }) {
 
   return (
     <div className="editorMonacoContainer">
-      <div>
       {showPerformanceTest && (
         <PerformanceTest 
           editorRef={monacoEditorRef} 
           onClose={() => setShowPerformanceTest(false)}
         />
       )}
-
-      </div>
       <button 
         className="performance-test-toggle"
         onClick={() => setShowPerformanceTest(!showPerformanceTest)}
@@ -246,60 +243,49 @@ export default function EditorMonaco({ monacoEditorRef }) {
           
           const foldingProvider = monaco.languages.registerFoldingRangeProvider('markdown', {
             provideFoldingRanges: (model) => {
-              const lines = model.getLinesContent();
+              const lineCount = model.getLineCount();
               const ranges = [];
+              let currentChapter = null;
+              let currentSection = null;
               
-              // Track chapters and their sections
-              const chapters = [];
-              const sections = [];
-              
-              // First, identify all markers
-              for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                const lineNum = i + 1;
+              // Single pass O(n) algorithm
+              for (let lineNum = 1; lineNum <= lineCount; lineNum++) {
+                const line = model.getLineContent(lineNum).trim();
                 
                 if (line.startsWith('#chapter')) {
-                  chapters.push({ line: lineNum, index: i });
-                } else if (line.startsWith('#section')) {
-                  sections.push({ line: lineNum, index: i });
+                  // Close previous ranges
+                  if (currentSection) {
+                    ranges.push({ start: currentSection, end: lineNum - 1 });
+                    currentSection = null;
+                  }
+                  if (currentChapter) {
+                    ranges.push({ start: currentChapter, end: lineNum - 1 });
+                  }
+                  // Start new chapter
+                  currentChapter = lineNum;
+                } 
+                else if (line.startsWith('#section') && currentChapter) {
+                  // Close previous section
+                  if (currentSection) {
+                    ranges.push({ start: currentSection, end: lineNum - 1 });
+                  }
+                  // Start new section
+                  currentSection = lineNum;
                 }
               }
               
-              // Create chapter ranges
-              for (let i = 0; i < chapters.length; i++) {
-                const chapter = chapters[i];
-                const nextChapter = chapters[i + 1];
-                const endLine = nextChapter ? nextChapter.index : lines.length;
-                
-                ranges.push({
-                  start: chapter.line,
-                  end: endLine,
-                  kind: monaco.languages.FoldingRangeKind.Region
-                });
+              // Close any open ranges at end
+              if (currentSection) {
+                ranges.push({ start: currentSection, end: lineCount });
+              }
+              if (currentChapter) {
+                ranges.push({ start: currentChapter, end: lineCount });
               }
               
-              // Create section ranges (must be within a chapter)
-              for (let i = 0; i < sections.length; i++) {
-                const section = sections[i];
-                const nextSection = sections[i + 1];
-                const nextChapter = chapters.find(c => c.index > section.index);
-                
-                // Determine end of this section
-                let endLine = lines.length;
-                if (nextSection && nextSection.index < (nextChapter?.index || Infinity)) {
-                  endLine = nextSection.index;
-                } else if (nextChapter) {
-                  endLine = nextChapter.index;
-                }
-                
-                ranges.push({
-                  start: section.line,
-                  end: endLine,
-                  kind: monaco.languages.FoldingRangeKind.Region
-                });
-              }
-              
-              return ranges;
+              return ranges.map(range => ({
+                ...range,
+                kind: monaco.languages.FoldingRangeKind.Region
+              }));
             }
           });
           
