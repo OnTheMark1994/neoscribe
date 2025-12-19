@@ -87,6 +87,31 @@ export default function TopBar() {
   const displayName = `${fileName}${modified ? '*' : ''}`;
 
   useEffect(() => {
+    const handleKeyDown = (e) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (!ctrl) return;
+
+      const key = String(e.key || '').toLowerCase();
+      const shift = e.shiftKey;
+
+      if (key === 's') {
+        e.preventDefault();
+        if (shift) saveFileAs();
+        else saveFile();
+      } else if (key === 'o') {
+        e.preventDefault();
+        openFile();
+      } else if (key === 'n') {
+        e.preventDefault();
+        newFile();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (e) => {
       // Close dropdown menus when user clicks outside of the top bar.
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -99,6 +124,31 @@ export default function TopBar() {
 
   // Helper used by many menu items to close the active dropdown.
   const closeMenu = () => setActiveMenu(null);
+
+  // File operation functions
+  const newFile = () => {
+    console.log('New file action');
+    // TODO: Implement new file logic
+    closeMenu();
+  };
+
+  const openFile = () => {
+    console.log('Open file action');
+    // TODO: Implement open file logic
+    closeMenu();
+  };
+
+  const saveFile = () => {
+    console.log('Save file action');
+    // TODO: Implement save file logic
+    closeMenu();
+  };
+
+  const saveFileAs = () => {
+    console.log('Save As file action');
+    // TODO: Implement save as logic
+    closeMenu();
+  };
 
   // If fullscreen mode is active, the CSS class hides the bar (hover container still exists).
   const barClasses = `topBar ${fullscreenActive ? 'topBarHidden' : ''}`;
@@ -124,11 +174,23 @@ export default function TopBar() {
             {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'file' && (
               <div className="topBarDropdown">
-                <button onClick={closeMenu}><span>New</span><span className="shortcut">Ctrl+N</span></button>
-                <button onClick={closeMenu}><span>Open</span><span className="shortcut">Ctrl+O</span></button>
+                <button onClick={newFile}>
+                  <span>New</span><span className="shortcut">Ctrl+N</span>
+                </button>
+
+                <button onClick={openFile}>
+                  <span>Open</span><span className="shortcut">Ctrl+O</span>
+                </button>
+
                 <div className="topBarDivider" />
-                <button onClick={closeMenu}><span>Save</span><span className="shortcut">Ctrl+S</span></button>
-                <button onClick={closeMenu}><span>Save As</span><span className="shortcut">Ctrl+Shift+S</span></button>
+
+                <button onClick={saveFile}>
+                  <span>Save</span><span className="shortcut">Ctrl+S</span>
+                </button>
+
+                <button onClick={saveFileAs}>
+                  <span>Save As</span><span className="shortcut">Ctrl+Shift+S</span>
+                </button>
                 <div className="topBarDivider" />
                 <button
                   onClick={() => {
