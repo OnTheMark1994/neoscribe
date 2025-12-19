@@ -79,7 +79,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
   const dispatch = useDispatch();
   // User preferences that should affect Monaco rendering.
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
-
+  const aiModeActive = useSelector(state => state.aiSlice.aiModeActive)
   const proposedChanges = useSelector(state => state.aiSlice.proposedChanges);
 
   useEffect(() => {
@@ -123,7 +123,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
           if (monacoEditorRef) {
             monacoEditorRef.current = editor;
           }
-          
+
           // Ensure glyph margin is visible
           editor.updateOptions({
             glyphMargin: true,
@@ -132,7 +132,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
           
           const updateDecorations = () => {
             const model = editor.getModel();
-            if (!model) return;
+            if (!model || !aiModeActive) return;
             
             // Clear existing decorations first
             decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);
@@ -171,6 +171,8 @@ export default function EditorMonaco({ monacoEditorRef }) {
               }
 
             if(e.event.rightButton){
+                e.event.preventDefault(); // THIS prevents browser context menu
+                e.event.stopPropagation();
                 console.log('Right-click on eye icon:', {
                   x: e.event.browserEvent.clientX,
                   y: e.event.browserEvent.clientY,
@@ -241,7 +243,17 @@ export default function EditorMonaco({ monacoEditorRef }) {
 
             }
           });
+
+          // Preventing browser right click menu on glyph right click
+          window.addEventListener('contextmenu', (e) => {
+            // if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+            if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+              console.log('[DEBUG] Ignoring non-glyph click');
+              return;
+            }
+            e.preventDefault(); // THIS stops the browser menu
           
+          }, true);
           // Initial decoration update
           updateDecorations();
           

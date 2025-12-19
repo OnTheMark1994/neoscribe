@@ -5,7 +5,6 @@ import { closeRightClickWindow } from '../../Global/ReduxSlices/WindowSlice';
 
 export default function RightClickWindow() {
   const dispatch = useDispatch();
-  const windowRef = useRef(null);
   const ignoreNextClickRef = useRef(true);
   const elementRef = useRef() 
 
@@ -29,21 +28,19 @@ export default function RightClickWindow() {
 
 
     const handleClickOutside = (event) => {
-      console.log("handleClickOutside ignoreNextClickRef.current:", ignoreNextClickRef.current)
+      
       // Skip if we're ignoring this click (the one that opened the window)
-      if(ignoreNextClickRef.current){
-        ignoreNextClickRef.current = false
-        return
-      }
+      // if(ignoreNextClickRef.current){
+      //   ignoreNextClickRef.current = false
+      //   return
+      // }
 
       // dispatch(closeRightClickWindow());
-      if (windowRef.current && event.target !== windowRef.current){
+      if (elementRef.current && event.target !== elementRef.current){
         closeWindow()
       }else{
         console.log("not closing")
-
       }
-
     };
 
     // Also close on escape key
@@ -53,14 +50,23 @@ export default function RightClickWindow() {
       }
     };
 
-    // Use mousedown instead of click for better timing
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscapeKey);
+    // Prevents the browsers click menu showing over it on mouse up
+    const handleContextMenu = (event) => {
+      event.preventDefault()
+    }
 
+    // Mousedown to close the right click menu when clicking outside of it
+    document.addEventListener('mousedown', handleClickOutside);
+    // Close right click menu on escape
+    document.addEventListener('keydown', handleEscapeKey);
+    // Prevents the browsers click menu showing over it on mouse up
+    elementRef.current?.addEventListener('contextmenu', handleContextMenu);
+    
     // Cleanup
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscapeKey);
+      elementRef.current?.removeEventListener("contextmenu", handleContextMenu)
     };
   }, [showWindow, dispatch]);
 
@@ -69,7 +75,7 @@ export default function RightClickWindow() {
 
   return (
     <div 
-      ref={windowRef}
+      ref={elementRef}
       className="rightClickWindow" 
       style={{ left: `${left}px`, top: `${top}px` }}
       onClick={(e) => {
@@ -82,13 +88,13 @@ export default function RightClickWindow() {
           className="rightClickOption" 
           key={i}
           onClick={(e) => {
+            e.preventDefault()
             e.stopPropagation();
             // Call option's onClick if it exists
             if (option.onClick) option.onClick();
             // Close the window after action
             dispatch({ type: 'windowSlice/closeRightClickMenu' });
           }}
-          ref={elementRef}
         >
           {option.title}
         </div>
