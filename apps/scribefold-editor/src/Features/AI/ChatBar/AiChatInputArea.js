@@ -120,6 +120,7 @@ export default function AiChatInputArea({ monacoEditorRef }) {
   // New behavior: Accept `monacoEditorRef` so Send can pull Monaco lines and assert per-line ids
   // via helper functions in `MonacoFunctions.js`.
   async function send() {
+    console.log("send function")
     // Read/trim the textarea value.
     const content = String(inputRef.current?.value ?? '').trim();
     // Don't send empty messages.
@@ -127,12 +128,15 @@ export default function AiChatInputArea({ monacoEditorRef }) {
 
     // Create line array (ensures stable ids).
     const linesArray = getLinesArrayWithAssertedIds(monacoEditorRef)
+    console.log("linesArray: ", linesArray)
+
 
     // Compile the lines of the text into an array in the format that the api expects it
     const documentLinesForAi = Array.isArray(linesArray)
       ? linesArray.map(line => ({
         id: line?.lineId,
         text: String(line?.content ?? ''),
+        aiShare: line?.aiShare,
       }))
       : [];
 

@@ -231,3 +231,18 @@
 .performance-test-toggle:hover {
   background-color: #005a9e;
 }
+
+/* Monaco Glyph Margin - Eye Icons */
+.monaco-editor .glyph-margin {
+  background-size: 14px 14px;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+.monaco-editor .ai-eye-icon {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'%3E%3C/path%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3C/svg%3E") !important;
+}
+
+.monaco-editor .ai-hide-icon {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16'%3E%3Ccircle cx='12' cy='12' r='8' fill='%23cccccc' stroke='%23999999' stroke-width='1'/%3E%3Ccircle cx='12' cy='12' r='4' fill='%23999999'/%3E%3Cline x1='6' y1='6' x2='18' y2='18' stroke='%23666666' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+}

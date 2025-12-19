@@ -82,7 +82,7 @@ Phases:
         view reflects settings  (done)
 
     monaco additional
-        chapter and section folding
+        chapter and section folding (done)
         glyphs for ai-hide options
             glyphs show
             they change when clicked

@@ -57,7 +57,7 @@ export function logMonacoEditorLines(monacoEditorRef) {
   console.log('[MonacoFunctions] Monaco lines:', lines)
 }
 
-function createLineId(){
+export function createLineId(){
   // Prefer stable UUIDs when available (browser + modern runtimes).
   if(typeof crypto !== 'undefined' && crypto?.randomUUID){
     return crypto.randomUUID()
@@ -90,107 +90,101 @@ function getLineIdFromDecorations(lineDecorations){
   return null
 }
 
+export function getLineMetadataFromDecorations(lineDecorations) {
+  if (!Array.isArray(lineDecorations)) return null;
+  
+  for (const decoration of lineDecorations) {
+    const description = decoration?.options?.description;
+    if (typeof description !== 'string') continue;
+    
+    if (description.startsWith('sf_meta:')) {
+      try {
+        return JSON.parse(description.slice('sf_meta:'.length));
+      } catch (e) {
+        console.error('Failed to parse line metadata:', e);
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+export function createLineMetadataDecoration(lineNumber, metadata) {
+  return {
+    range: {
+      startLineNumber: lineNumber,
+      startColumn: 1,
+      endLineNumber: lineNumber,
+      endColumn: 1
+    },
+    options: {
+      description: `sf_meta:${JSON.stringify(metadata)}`,
+      className: 'sfLineMetadataDecoration'
+    }
+  };
+}
+
 export function createLinesArrayFromMonaco(monacoEditorRef){
-  // This function reads the editor text and decorations and produces:
-  // 1) `linesArray` = [{ lineNumber, content, lineId }]
-  // 2) `missingIdLineNumbers` = [<lineNumber>, ...] (1-based, Monaco line numbers)
-  //
-  // We intentionally do NOT mutate Monaco here. That is handled by `assertLineIdsIntoMonaco`.
+  const editor = monacoEditorRef?.current;
+  if(!editor) return { linesArray: [], missingIdLineNumbers: [] };
 
-  const editor = monacoEditorRef?.current
-  if(!editor){
-    return { linesArray: [], missingIdLineNumbers: [] }
-  }
+  const model = editor.getModel?.();
+  if(!model) return { linesArray: [], missingIdLineNumbers: [] };
 
-  const model = editor.getModel?.()
-  if(!model){
-    return { linesArray: [], missingIdLineNumbers: [] }
-  }
-
-  const lineCount = model.getLineCount()
-  const linesArray = []
-  const missingIdLineNumbers = []
+  const lineCount = model.getLineCount();
+  const linesArray = [];
+  const missingIdLineNumbers = [];
 
   for(let lineNumber = 1; lineNumber <= lineCount; lineNumber++){
-    // Read the user-visible content of this line.
-    const content = model.getLineContent(lineNumber)
-
-    // Read decorations that intersect this line.
-    // We use this as our "metadata store" for ids.
-    const lineDecorations = model.getLineDecorations(lineNumber)
-
-    // Pull existing id from decorations if present.
-    let lineId = getLineIdFromDecorations(lineDecorations)
-
-    // If missing, we still generate an id for the returned array, and record this
-    // line number for later decoration insertion.
-    if(!lineId){
-      lineId = createLineId()
-      missingIdLineNumbers.push(lineNumber)
+    const content = model.getLineContent(lineNumber);
+    const lineDecorations = model.getLineDecorations(lineNumber);
+    
+    // Get all metadata including aiShare
+    const metadata = getLineMetadataFromDecorations(lineDecorations) || {};
+    
+    // If missing lineId, generate one
+    if(!metadata.lineId) {
+      metadata.lineId = createLineId();
+      missingIdLineNumbers.push(lineNumber);
     }
 
     linesArray.push({
       lineNumber,
       content,
-      lineId,
-    })
+      ...metadata // Spread all metadata including aiShare
+    });
   }
 
-  return { linesArray, missingIdLineNumbers }
+  return { linesArray, missingIdLineNumbers };
 }
 
 export function assertLineIdsIntoMonaco(monacoEditorRef, linesArray, missingIdLineNumbers){
-  // This function mutates Monaco by inserting missing line-id decorations.
-  // It is O(k) where k is the count of missing ids (<= total line count).
-  //
-  // We do a single `deltaDecorations` call for performance.
+  const editor = monacoEditorRef?.current;
+  if(!editor) return;
 
-  const editor = monacoEditorRef?.current
-  if(!editor) return
+  const model = editor.getModel?.();
+  if(!model) return;
 
-  const model = editor.getModel?.()
-  if(!model) return
+  if(!Array.isArray(linesArray) || linesArray.length === 0) return;
+  if(!Array.isArray(missingIdLineNumbers) || missingIdLineNumbers.length === 0) return;
 
-  if(!Array.isArray(linesArray) || linesArray.length === 0) return
-  if(!Array.isArray(missingIdLineNumbers) || missingIdLineNumbers.length === 0) return
-
-  const newDecorations = []
+  const newDecorations = [];
 
   for(const lineNumber of missingIdLineNumbers){
-    // Find the corresponding line object.
-    // This is O(1) if `linesArray` is in 1:1 order with Monaco lines (it is).
-    const lineObj = linesArray[lineNumber - 1]
-    if(!lineObj) continue
+    const lineObj = linesArray[lineNumber - 1];
+    if(!lineObj) continue;
 
-    // Monaco accepts a plain IRange object here, we don't need `monaco.Range`.
-    // We anchor the decoration at column 1 so it stays attached to the line.
-    newDecorations.push({
-      range: {
-        startLineNumber: lineNumber,
-        startColumn: 1,
-        endLineNumber: lineNumber,
-        endColumn: 1,
-      },
-      options: {
-        // We store the id in `description` because it's a Monaco-supported field
-        // and survives subsequent reads of decorations.
-        //
-        // Prefix is used so we can easily identify our decorations.
-        description: `sf_lineId:${lineObj.lineId}`,
+    // Prepare metadata object
+    const metadata = {
+      lineId: lineObj.lineId,
+      aiShare: lineObj.aiShare
+    };
 
-        // A no-op class name (can be styled later if needed).
-        // Having a real Monaco option here also helps ensure this decoration
-        // isn't treated as an empty/no-op decoration.
-        className: 'sfLineIdDecoration',
-      },
-    })
+    newDecorations.push(createLineMetadataDecoration(lineNumber, metadata));
   }
 
-  if(newDecorations.length === 0) return
-
-  // We pass an empty array for old decorations because we are only adding.
-  // (We are not yet tracking decoration ids for updates/removals.)
-  editor.deltaDecorations([], newDecorations)
+  if(newDecorations.length === 0) return;
+  editor.deltaDecorations([], newDecorations);
 }
 
 export function getLinesArrayWithAssertedIds(monacoEditorRef){
