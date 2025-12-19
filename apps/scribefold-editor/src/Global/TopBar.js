@@ -42,7 +42,7 @@
   
   File name
     the file path is saved in the editor slice
-    the file name is shown at the top cener of the topbar
+    the file name is shown at the top ceter of the topbar
     if it is modified and requires save show a * at the end of the file name
 
   Download button
@@ -54,7 +54,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleFullscreenActive } from './ReduxSlices/MenuSlice';
 import { setAiModeActive } from './ReduxSlices/AiSlice';
-import { openHelpWindow, openSettingsWindow } from './ReduxSlices/WindowSlice';
+import { setShowHelpWindow, setShowSettingsWindow } from './ReduxSlices/WindowSlice';
 import './TopBar.css';
 
 // Detect whether we are running in the browser (no Electron preload API).
@@ -133,7 +133,7 @@ export default function TopBar() {
                 <button
                   onClick={() => {
                     closeMenu();
-                    dispatch(openSettingsWindow());
+                    dispatch(setShowSettingsWindow(true));
                   }}
                 >
                   <span>Settings</span><span className="shortcut">Ctrl+,</span>
@@ -186,7 +186,7 @@ export default function TopBar() {
                 <button
                   onClick={() => {
                     closeMenu();
-                    dispatch(openSettingsWindow('Display'));
+                    dispatch(setShowSettingsWindow('Display'));
                   }}
                 >
                   <span>Display Settings</span>
@@ -217,7 +217,7 @@ export default function TopBar() {
                 <button
                   onClick={() => {
                     closeMenu();
-                    dispatch(openSettingsWindow('AI'));
+                    dispatch(setShowSettingsWindow('AI'));
                   }}
                 >
                   <span>AI Settings</span>
@@ -226,7 +226,7 @@ export default function TopBar() {
                 <button
                   onClick={() => {
                     closeMenu();
-                    dispatch(openHelpWindow('ai-help'));
+                    dispatch(setShowHelpWindow('ai-help'));
                   }}
                 >
                   <span>Token Usage FAQ</span>
@@ -241,7 +241,7 @@ export default function TopBar() {
               // Help opens immediately (no dropdown).
               onClick={() => {
                 closeMenu();
-                dispatch(openHelpWindow());
+                dispatch(setShowHelpWindow(true));
               }}
             >
               Help

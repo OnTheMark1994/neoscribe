@@ -20,7 +20,7 @@ import SettingsDisplay from './Tabs/SettingsDisplay';
 import SettingsAI from './Tabs/SettingsAI';
 import SettingsAccount from './Tabs/SettingsAccount';
 import SettingsDeveloper from './Tabs/SettingsDeveloper';
-import { closeSettingsWindow } from '../../Global/ReduxSlices/WindowSlice';
+import { setShowSettingsWindow } from '../../Global/ReduxSlices/WindowSlice';
 import "./SettingsWindow.css"
 
 export default function SettingsWindow() {
@@ -67,7 +67,7 @@ export default function SettingsWindow() {
     // Conditional display window
     <Window
       title="Settings"
-      onClose={() => dispatch(closeSettingsWindow())}
+      onClose={() => dispatch(setShowSettingsWindow(false))}
       open={showWindow}
       className="settingsWindow"
     >

@@ -12,7 +12,7 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { triggerReloadUserData } from '../../../Global/ReduxSlices/UserSlice';
-import { openHelpWindow } from '../../../Global/ReduxSlices/WindowSlice';
+import { setShowHelpWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import RefreshButton from '../../Util/RefreshButton';
 import InfoButton from '../../Util/InfoButton';
 import './AiChatTokenDisplay.css';
@@ -68,7 +68,7 @@ export default function AiChatTokenDisplay() {
           <InfoButton
             title="Token usage help"
             // Opens the help window directly to the AI help section.
-            onClick={() => dispatch(openHelpWindow('ai-help'))}
+            onClick={() => dispatch(setShowHelpWindow('token-usage'))}
           />
         </div>
       </div>

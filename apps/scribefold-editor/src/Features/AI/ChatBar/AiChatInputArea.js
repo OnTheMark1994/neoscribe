@@ -16,7 +16,7 @@ import React, { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import { addMessage, addProposedChanges } from '../../../Global/ReduxSlices/AiSlice';
-import { openSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
+import { setShowSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import { getLinesArrayWithAssertedIds } from '../../Editors/EditorMonaco/MonacoFunctions';
 import './AiChatInputArea.css';
 
@@ -254,7 +254,7 @@ export default function AiChatInputArea({ monacoEditorRef }) {
           className="aiChatSettingsButton"
           type="button"
           // Opens the Settings window directly to the AI tab.
-          onClick={() => dispatch(openSettingsWindow('AI'))}
+          onClick={() => dispatch(setShowSettingsWindow('AI'))}
         >
           ⚙️ Settings
         </button>

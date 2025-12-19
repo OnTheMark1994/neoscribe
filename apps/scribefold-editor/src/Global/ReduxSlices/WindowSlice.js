@@ -7,17 +7,14 @@ const initialState = {
   // Settings window
   showSettingsWindow: false,
   settingsInitialTab: null,
-
   // Save before closing window
   showSaveBeforeClosingWindow: false,
-
   // Message detail (developer) window
-  showMessageDetailWindow: false,
   messageDetailData: null,
-
+  // Help winodw data
   showHelpWindow: false,
   helpWindowInitialSection: null,
-
+  // Right click menu data 
   showRightClickWindow: false,
   rightClickWindowType: null,
   rightClickWindowLeft: 0,
@@ -28,49 +25,46 @@ const windowSlice = createSlice({
   name: 'windowSlice',
   initialState,
   reducers: {
+    // Show or hide the settings and set an intial tab with a string 
     setShowSettingsWindow(state, action) {
+      // if its a string set initial tab to that string and show the window
+      if(typeof action.payload === "string"){
+        state.settingsInitialTab = action.payload
+        state.showSettingsWindow = true
+      }
+      // If its a boolean set the show state to that boolean and clear initial tab
+      else if (typeof action.payload === "boolean"){
+        state.settingsInitialTab = null
+        state.showSettingsWindow = action.payload
+      }
+    },
+    // Show or hide the help window and set an intial section with a string 
+    setShowHelpWindow(state, action) {
       const next = action.payload;
-      state.showSettingsWindow = typeof next === 'boolean' ? next : !state.showSettingsWindow;
-      if (!state.showSettingsWindow) state.settingsInitialTab = null;
+      state.showHelpWindow = typeof next === 'boolean' ? next : !state.showHelpWindow;
+      
+      // if its a string set initial tab to that string and show the window
+      if(typeof action.payload === "string"){
+        state.helpWindowInitialSection = action.payload
+        state.showHelpWindow = true
+      }
+      // If its a boolean set the show state to that boolean and clear initial tab
+      else if (typeof action.payload === "boolean"){
+        state.helpWindowInitialSection = null
+        state.showHelpWindow = action.payload
+      }
+    
     },
-    setSettingsInitialTab(state, action) {
-      state.settingsInitialTab = action.payload ?? null;
-    },
-    openSettingsWindow(state, action) {
-      state.showSettingsWindow = true;
-      state.settingsInitialTab = action.payload ?? null;
-    },
-    closeSettingsWindow(state) {
-      state.showSettingsWindow = false;
-      state.settingsInitialTab = null;
-    },
-
+    // Save before closing window shows when user leaves with unsaved changes
     setShowSaveBeforeClosingWindow(state, action) {
       const next = action.payload;
       state.showSaveBeforeClosingWindow = typeof next === 'boolean' ? next : !state.showSaveBeforeClosingWindow;
     },
-
+    // Dev debug window for messages, setting data to display shows menu 
     setMessageDetailDisplayData(state, action) {
       state.messageDetailData = action.payload ?? null;
-      state.showMessageDetailWindow = Boolean(state.messageDetailData);
     },
-
-    setShowHelpWindow(state, action) {
-      const next = action.payload;
-      state.showHelpWindow = typeof next === 'boolean' ? next : !state.showHelpWindow;
-    },
-    setHelpWindowInitialSection(state, action) {
-      state.helpWindowInitialSection = action.payload ?? null;
-    },
-    openHelpWindow(state, action) {
-      state.showHelpWindow = true;
-      state.helpWindowInitialSection = action.payload ?? null;
-    },
-    closeHelpWindow(state) {
-      state.showHelpWindow = false;
-      state.helpWindowInitialSection = null;
-    },
-
+    // Opens on mous click with event data for positioning
     openRightClickWindow(state, action) {
       const { left = 0, top = 0, type = null } = action.payload || {};
       state.showRightClickWindow = true;
@@ -78,6 +72,7 @@ const windowSlice = createSlice({
       state.rightClickWindowTop = top;
       state.rightClickWindowType = type;
     },
+    // Close the right click menu
     closeRightClickWindow(state) {
       state.showRightClickWindow = false;
       state.rightClickWindowType = null;
@@ -87,15 +82,9 @@ const windowSlice = createSlice({
 
 export const {
   setShowSettingsWindow,
-  setSettingsInitialTab,
-  openSettingsWindow,
-  closeSettingsWindow,
   setShowSaveBeforeClosingWindow,
   setMessageDetailDisplayData,
   setShowHelpWindow,
-  setHelpWindowInitialSection,
-  openHelpWindow,
-  closeHelpWindow,
   openRightClickWindow,
   closeRightClickWindow,
 } = windowSlice.actions;
