@@ -223,11 +223,71 @@ export default function EditorMonaco({ monacoEditorRef }) {
         defaultLanguage="markdown"
         defaultValue={initialValue}
         onChange={(nextValue) => setValue(nextValue ?? '')}
-        onMount={(editor) => {
-          // This is sent up to App.js so we can send helper functions the ref (like when we call send in ai chat)
-          if(monacoEditorRef){
-            monacoEditorRef.current = editor
+        onMount={(editor, monaco) => {
+          if (monacoEditorRef) {
+            monacoEditorRef.current = editor;
           }
+          
+          const foldingProvider = monaco.languages.registerFoldingRangeProvider('markdown', {
+            provideFoldingRanges: (model) => {
+              const lines = model.getLinesContent();
+              const ranges = [];
+              
+              // Track chapters and their sections
+              const chapters = [];
+              const sections = [];
+              
+              // First, identify all markers
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                const lineNum = i + 1;
+                
+                if (line.startsWith('#chapter')) {
+                  chapters.push({ line: lineNum, index: i });
+                } else if (line.startsWith('#section')) {
+                  sections.push({ line: lineNum, index: i });
+                }
+              }
+              
+              // Create chapter ranges
+              for (let i = 0; i < chapters.length; i++) {
+                const chapter = chapters[i];
+                const nextChapter = chapters[i + 1];
+                const endLine = nextChapter ? nextChapter.index : lines.length;
+                
+                ranges.push({
+                  start: chapter.line,
+                  end: endLine,
+                  kind: monaco.languages.FoldingRangeKind.Region
+                });
+              }
+              
+              // Create section ranges (must be within a chapter)
+              for (let i = 0; i < sections.length; i++) {
+                const section = sections[i];
+                const nextSection = sections[i + 1];
+                const nextChapter = chapters.find(c => c.index > section.index);
+                
+                // Determine end of this section
+                let endLine = lines.length;
+                if (nextSection && nextSection.index < (nextChapter?.index || Infinity)) {
+                  endLine = nextSection.index;
+                } else if (nextChapter) {
+                  endLine = nextChapter.index;
+                }
+                
+                ranges.push({
+                  start: section.line,
+                  end: endLine,
+                  kind: monaco.languages.FoldingRangeKind.Region
+                });
+              }
+              
+              return ranges;
+            }
+          });
+          
+          return () => foldingProvider.dispose();
         }}
         beforeMount={(monaco) => {
           // Create a theme that matches vs-dark but uses a transparent editor background.
@@ -291,7 +351,10 @@ export default function EditorMonaco({ monacoEditorRef }) {
           // Remove "click word" / occurrences / selection highlight overlays.
           selectionHighlight: false,
           occurrencesHighlight: 'off',
-
+          
+          // Folding controls
+          showFoldingControls: 'always',
+          
           fontSize: 14,
           wordWrap: 'on',
           automaticLayout: true,

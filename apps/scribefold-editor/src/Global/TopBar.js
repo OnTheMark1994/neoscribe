@@ -60,7 +60,7 @@ import './TopBar.css';
 // Detect whether we are running in Electron or browser
 const IS_ELECTRON = Boolean(window.electronAPI);
 
-export default function TopBar() {
+export default function TopBar({monacoEditorRef}) {
   // Redux dispatch for menu actions.
   const dispatch = useDispatch();
 
@@ -135,6 +135,19 @@ export default function TopBar() {
   const openFile = () => {
     console.log('Open file action');
     // TODO: Implement open file logic
+    let fileContent 
+    if(IS_ELECTRON){
+      // fileContent = Electron file open
+    }else{
+      // fileContent = Browser open file / upload
+    }
+    // If there is no content for some reason
+    if(!fileContent) {
+      console.log("File open error: No file content.")
+      return
+    }
+    // Put the content in the monaco editor with monacoEditorRef
+    // monacoEditorRef.<>(fileContent) 
     closeMenu();
   };
 

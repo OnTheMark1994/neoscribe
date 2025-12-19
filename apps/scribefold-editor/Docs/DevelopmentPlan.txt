@@ -49,43 +49,45 @@ Phases:
     So 8 months total for the end result
 
     1 week
-    UI
-        main area ui (done)
-            background (done)
-            page (done)
-            ai side bar (done)
-        topbar (done)
+    UI (done) 
+        main area ui        (done)
+            background      (done)
+            page            (done)
+            ai side bar     (done)
+        topbar              (done)
         ai chat area layout (done)
 
     1 week 
-    settings and windows
-        f11 mode (done)
-        ai mode on / off (done)
-        windows slice (done)
-            just showing windows (done)
-            settings window opens (done)
+    settings and windows (done)
+        f11 mode                    (done)
+        ai mode on / off            (done)
+        windows slice               (done)
+            just showing windows    (done)
+            settings window opens   (done)
             help button shows help window (done)
         settings ui
             tabs
-                tabs UI (done) 
-                tabs change what shows (done)
-                components for each (done)
-                UI for each component (done)
+                tabs UI                     (done) 
+                tabs change what shows      (done)
+                components for each         (done)
+                UI for each component       (done)
                 components change settingsObject (done) 
                 they display based on the selected tab (done)
-                tab component UIs (done)
+                tab component UIs           (done)
 			
     1 week
-    monaco basic
-        embed editor (done)
-        basic ui display (done) 
-        view reflects settings (done)
+    monaco basic (done)
+        embed editor            (done)
+        basic ui display        (done) 
+        view reflects settings  (done)
 
     monaco additional
         chapter and section folding
         glyphs for ai-hide options
+            glyphs show
             they change when clicked
-        index values
+            that data is used to create the lines array sent to the ai endpoint (filtering out the hidden ones)
+        index values (done)
             test by having a function that pulls it and logs with the indexs'
                 modify and pull again to see if they persist 
 
@@ -99,25 +101,39 @@ Phases:
             may need the explanation window to download file instead of save on browser
 
     1 week 
-    ai chat area 
-        sends to api
-            after gathering from the editor ref
-            just getting a response, no user token updates now
-        gets response, prases it, puts it into redux
-            just logs it for now
+    ai chat area  (done)
+        sends to api (done)
+            after gathering from the editor ref (done)
+            just getting a response, no user token updates now (done)
+        gets response, prases it, puts it into redux (done)
+            just logs it for now (done)
 
 
     1 week 
     connecting monaco and the ai response
+        data pulls
+            before send pulling text from monaco and sending it (done)
+            after send pulling from monaco and combining
         diff view
+            shows both 
+            allows editing
+            pulls from modified for new sends and combines while diff is open
+            content stays when switching from diff to normal (or is just always in diff)
+        navigator component 
+            shows when there are propsed changes 
+            modifiex redux state for the sleected line
+            accept /  reject all buttons 
         accept reject buttons
-            insert them in best place
-            they actually work
+            insert buttons boxes them in best place
+                view zones vs widgets vs some other way idk
+            button press accepts or rejects the ine
             jumping to selected one with bottom diff and jump
-                maybe need to add those components
+                need to add those components
 
     1 week
     array editor (optional/conditional)
+        this is working in the other app so if monaco doesn't work thers a backup
+        but monaco is much better and it should work
 
     1 week
     user id and user row creation

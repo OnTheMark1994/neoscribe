@@ -63,7 +63,7 @@ export default function App() {
       <div className="pageArea">
 
         {/* The top bar with options like File => Open etc */}
-        <TopBar/>
+        <TopBar monacoEditorRef={monacoEditorRef}/>
       
         {/* Centers the page area */}
         <div className="pageContainer">
