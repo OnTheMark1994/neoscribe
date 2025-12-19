@@ -57,8 +57,8 @@ import { setAiModeActive } from './ReduxSlices/AiSlice';
 import { setShowHelpWindow, setShowSettingsWindow } from './ReduxSlices/WindowSlice';
 import './TopBar.css';
 
-// Detect whether we are running in the browser (no Electron preload API).
-const IS_WEB = !window?.electronAPI;
+// Detect whether we are running in Electron or browser
+const IS_ELECTRON = Boolean(window.electronAPI);
 
 export default function TopBar() {
   // Redux dispatch for menu actions.
@@ -178,19 +178,21 @@ export default function TopBar() {
                   <span>New</span><span className="shortcut">Ctrl+N</span>
                 </button>
 
-                <button onClick={openFile}>
-                  <span>Open</span><span className="shortcut">Ctrl+O</span>
+                <button onClick={openFile}  title={IS_ELECTRON ? "Open a file":"Browser can't open from file system automatically so you can select a file."}>
+                  <span>{IS_ELECTRON ? "Open":"Open / Upload"}</span><span className="shortcut">Ctrl+O</span>
                 </button>
 
                 <div className="topBarDivider" />
 
-                <button onClick={saveFile}>
-                  <span>Save</span><span className="shortcut">Ctrl+S</span>
+                <button onClick={saveFile} title={IS_ELECTRON ? "Save File":"Browser can't save to file system this downloads the file."}>
+                  <span>{IS_ELECTRON ? "Save":"Save / Download"}</span><span className="shortcut">Ctrl+S</span>
                 </button>
 
-                <button onClick={saveFileAs}>
-                  <span>Save As</span><span className="shortcut">Ctrl+Shift+S</span>
-                </button>
+                {IS_ELECTRON &&
+                  <button onClick={saveFileAs}>
+                    <span>{"Save As"}</span><span className="shortcut">Ctrl+Shift+S</span>
+                  </button>
+                }
                 <div className="topBarDivider" />
                 <button
                   onClick={() => {
@@ -317,7 +319,7 @@ export default function TopBar() {
         </div>
 
         <div className="topBarRight">
-          {IS_WEB && (
+          {!IS_ELECTRON && (
             // In the web build we show a "Desktop App" link (Electron apps don't need it).
             <a
               href="#"
