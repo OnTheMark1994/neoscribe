@@ -81,15 +81,20 @@ Phases:
         basic ui display        (done) 
         view reflects settings  (done)
 
-    monaco additional
+    monaco additional (working on this)
         chapter and section folding (done)
         glyphs for ai-hide options
-            glyphs show
-            they change when clicked
-            that data is used to create the lines array sent to the ai endpoint (filtering out the hidden ones)
+            glyphs show (done)
+            they change when clicked (done)
+            that data is used to create the lines array sent to the ai endpoint (filtering out the hidden ones) (done)
+            glyphs show correct icons, images etc 
+            right click menu works to set ai show decoration
+                so need to add right click menu options like in other version
+                then wire it up to change monaco editor line decoration content 
+            glyphs show and hide from ai active setting (needs refactor, maybe move some functions to external file)
         index values (done)
-            test by having a function that pulls it and logs with the indexs'
-                modify and pull again to see if they persist 
+            test by having a function that pulls it and logs with the indexs (done)
+                modify and pull again to see if they persist (done)
 
     file IO
         load file

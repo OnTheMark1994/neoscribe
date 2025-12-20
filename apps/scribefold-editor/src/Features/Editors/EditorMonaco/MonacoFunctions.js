@@ -16,6 +16,71 @@
 
 */
 
+export function assertLineIds(editorRef){
+  
+  if (!editorRef?.current) {
+    console.error('No editor reference');
+    return;
+  }
+  
+  const model = editorRef.current.getModel();
+  if (!model) {
+    console.error('No editor model');
+    return;
+  }
+  
+  const lines = model.getLinesContent();
+  const linesWithMetadata = lines.map((content, index) => {
+    const lineNumber = index + 1;
+    return {
+      lineNumber,
+      content,
+      metadata: model.__lineMetadata?.[lineNumber] || {}
+    };
+  });
+  
+  // Log lines before making API call
+  console.log('Preparing to send to AI - Lines with metadata:', linesWithMetadata);
+  
+  // Return structured data for API call
+  return {
+    lines: linesWithMetadata,
+    timestamp: new Date().toISOString()
+  };
+}
+
+export function getEditorContentWithMetadata(editorRef) {
+  if (!editorRef?.current) {
+    console.error('No editor reference');
+    return;
+  }
+  
+  const model = editorRef.current.getModel();
+  if (!model) {
+    console.error('No editor model');
+    return;
+  }
+  
+  const lines = model.getLinesContent();
+  const linesWithMetadata = lines.map((content, index) => {
+    const lineNumber = index + 1;
+    return {
+      lineNumber,
+      content,
+      metadata: model.__lineMetadata?.[lineNumber] || {}
+    };
+  });
+  
+  // Log lines before making API call
+  console.log('Preparing to send to AI - Lines with metadata:', linesWithMetadata);
+  
+  // Return structured data for API call
+  return {
+    lines: linesWithMetadata,
+    timestamp: new Date().toISOString()
+  };
+}
+
 export function logMonacoEditorLines(monacoEditorRef) {
   // This log is intentionally very explicit so debugging ref wiring is easy.
   console.log('[MonacoFunctions] logMonacoEditorLines called', {

@@ -33,6 +33,7 @@
     showMonacoLineNumbers: true,
     monacoStickyTopBar: true,
     showPreviewBar: true,
+    aiModeActive: true,
   };
 
  // Saves the settings object to localStorage.

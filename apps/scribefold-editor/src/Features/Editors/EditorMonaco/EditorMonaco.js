@@ -10,70 +10,6 @@ import PerformanceTest from './PerformanceTest';
 import './EditorMonaco.css';
 import { getLinesArrayWithAssertedIds, createLineMetadataDecoration, getLineMetadataFromDecorations } from './MonacoFunctions';
 
-function assertLineIds(editorRef){
-  
-  if (!editorRef?.current) {
-    console.error('No editor reference');
-    return;
-  }
-  
-  const model = editorRef.current.getModel();
-  if (!model) {
-    console.error('No editor model');
-    return;
-  }
-  
-  const lines = model.getLinesContent();
-  const linesWithMetadata = lines.map((content, index) => {
-    const lineNumber = index + 1;
-    return {
-      lineNumber,
-      content,
-      metadata: model.__lineMetadata?.[lineNumber] || {}
-    };
-  });
-  
-  // Log lines before making API call
-  console.log('Preparing to send to AI - Lines with metadata:', linesWithMetadata);
-  
-  // Return structured data for API call
-  return {
-    lines: linesWithMetadata,
-    timestamp: new Date().toISOString()
-  };
-}
-
-function getEditorContentWithMetadata(editorRef) {
-  if (!editorRef?.current) {
-    console.error('No editor reference');
-    return;
-  }
-  
-  const model = editorRef.current.getModel();
-  if (!model) {
-    console.error('No editor model');
-    return;
-  }
-  
-  const lines = model.getLinesContent();
-  const linesWithMetadata = lines.map((content, index) => {
-    const lineNumber = index + 1;
-    return {
-      lineNumber,
-      content,
-      metadata: model.__lineMetadata?.[lineNumber] || {}
-    };
-  });
-  
-  // Log lines before making API call
-  console.log('Preparing to send to AI - Lines with metadata:', linesWithMetadata);
-  
-  // Return structured data for API call
-  return {
-    lines: linesWithMetadata,
-    timestamp: new Date().toISOString()
-  };
-}
 
 export default function EditorMonaco({ monacoEditorRef }) {
   const dispatch = useDispatch();
@@ -88,6 +24,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
 
   // This is supposed to update the decorations when the aiModeActive changes but the updateDecorations function is in a different scope
   useEffect(() => {
+    // This requires a lot of changes
     if (monacoEditorRef.current) {
       // updateDecorations();
       // monacoEditorRef.current.deltaDecorations(
@@ -134,15 +71,10 @@ export default function EditorMonaco({ monacoEditorRef }) {
           if (monacoEditorRef) {
             monacoEditorRef.current = editor;
           }
-
-          // Ensure glyph margin is visible
-          editor.updateOptions({
-            glyphMargin: true,
-            lineNumbersMinChars: 3
-          });
           
           const updateDecorations = () => {
             const model = editor.getModel();
+            // if !aiModeActive we don't show the ai eye glyphs 
             if (!model || !aiModeActive) return;
             // if (!model) return;
             
@@ -177,10 +109,10 @@ export default function EditorMonaco({ monacoEditorRef }) {
           
           // Toggle aiShare metadata on click
           editor.onMouseDown((e) => {
-              if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
-                console.log('[DEBUG] Ignoring non-glyph click');
-                return;
-              }
+            if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+              console.log('[DEBUG] Ignoring non-glyph click');
+              return;
+            }
 
             if(e.event.rightButton){
                 e.event.preventDefault(); // THIS prevents browser context menu
@@ -398,6 +330,9 @@ export default function EditorMonaco({ monacoEditorRef }) {
           // Folding controls
           showFoldingControls: 'always',
           
+          glyphMargin: true,
+          lineNumbersMinChars: 3,
+
           fontSize: 14,
           wordWrap: 'on',
           automaticLayout: true,
@@ -406,7 +341,3 @@ export default function EditorMonaco({ monacoEditorRef }) {
     </div>
   );
 }
-
-export {
-  getEditorContentWithMetadata
-};
