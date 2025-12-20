@@ -1836,6 +1836,31 @@ app.post('/api/email/confirm', async (req, res) => {
   }
 });
 
+
+app.post('/api/deepseek/query/dev', async (req, res) => {
+    
+  const { messages } = req.body;
+
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      messages = ["no messages were added?"]
+      console.log("Error: no messages array sent to /query api!")
+      // return res.status(400).json({ 
+        // error: 'Invalid request: messages array is required and must not be empty' 
+      // });
+    }
+
+    const apiResponse = await callDeepSeekAPI(messages, { temperature: 0.7, model:'deepseek-chat' });
+
+    // Extract response content
+    const responseContent = apiResponse.choices?.[0]?.message?.content || '';
+
+    res.json({
+      success: true,
+      response: responseContent,
+      message: apiResponse.choices?.[0]?.message,
+    });
+})
+
 // DeepSeek query endpoint
 app.post('/api/deepseek/query', async (req, res) => {
   try {

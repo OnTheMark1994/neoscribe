@@ -473,7 +473,7 @@ export function generateChangeId(lineID, type, index = 0) {
 }
 
 // Call DeepSeek Server API (custom server endpoint)
-export async function callDeepSeekServerAPI(userPrompt, lines, anonId, authId, deviceId = null) {
+export async function callDeepSeekServerAPI(userPrompt, lines, anonId = 'dev-anon-id', authId = null, deviceId = null) {
   const bookContent = getBookContent(lines);
   const systemPrompt = getPromptPreface();
 
@@ -489,13 +489,15 @@ Request: ${userPrompt}`;
     { role: 'user', content: userMessage }
   ];
 
-  const identity = buildUserIdentity(anonId, authId, deviceId);
-
+  // Development mode - bypass auth checks
   const requestBody = {
     messages,
-    ...identity,
+    anonId,
+    authId: null,
+    deviceId: null,
     temperature: 0.7,
-    model: 'deepseek-chat'
+    model: 'deepseek-chat',
+    _devMode: true
   };
 
   const fetchOptions = {
@@ -506,11 +508,13 @@ Request: ${userPrompt}`;
     body: JSON.stringify(requestBody)
   };
 
+  const queryUrl = `${serverUrl}/api/deepseek/query/dev`
+
   const debugInfo = {
     serverUrl: serverUrl,
-    endpoint: `${serverUrl}/api/deepseek/query`,
+    endpoint: queryUrl,
     fetchRequest: {
-      url: `${serverUrl}/api/deepseek/query`,
+      url: queryUrl,
       method: fetchOptions.method,
       headers: fetchOptions.headers,
       body: requestBody,
@@ -520,7 +524,7 @@ Request: ${userPrompt}`;
   };
 
   try {
-    const response = await fetch(`${serverUrl}/api/deepseek/query`, fetchOptions);
+    const response = await fetch(queryUrl, fetchOptions);
 
     debugInfo.status = response.status;
     debugInfo.statusText = response.statusText;
