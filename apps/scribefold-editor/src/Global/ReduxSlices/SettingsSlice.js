@@ -86,6 +86,7 @@
    initialState,
    reducers: {
      setSettingsObject(state, action) {
+      console.log("setSettingsObject", action.payload)
        // Bulk replace settingsObject.
        // This is useful for initialization, imports, or any future "load settings" flow.
        // We persist immediately so localStorage stays in sync with redux state.
@@ -94,6 +95,7 @@
        saveSettingsObjectToLocalStorage(nextSettingsObject);
      },
      updateSetting(state, action) {
+        console.log("updateSetting", "x"+action.payload+"x")
        const { key, value } = action.payload || {};
        if (!key) return;
 

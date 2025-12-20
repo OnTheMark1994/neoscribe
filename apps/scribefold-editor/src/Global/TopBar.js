@@ -53,9 +53,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleFullscreenActive } from './ReduxSlices/MenuSlice';
-import { setAiModeActive } from './ReduxSlices/AiSlice';
 import { setShowHelpWindow, setShowSettingsWindow } from './ReduxSlices/WindowSlice';
 import './TopBar.css';
+import { updateSetting } from './ReduxSlices/SettingsSlice';
 
 // Detect whether we are running in Electron or browser
 const IS_ELECTRON = Boolean(window.electronAPI);
@@ -78,7 +78,7 @@ export default function TopBar({monacoEditorRef}) {
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
 
   // Controls whether the AI chat sidebar is visible.
-  const aiModeActive = useSelector(state => state.aiSlice.aiModeActive);
+  const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
 
   // Derive file name from path (handles both / and \ path separators).
   const fileName = filepath ? filepath.split(/[/\\]/).pop() : 'Untitled';
@@ -285,8 +285,9 @@ export default function TopBar({monacoEditorRef}) {
               <div className="topBarDropdown">
                 <button
                   onClick={() => {
+                    console.log("top bar click")
+                    dispatch(updateSetting({key: "aiModeActive", value: !aiModeActive}));
                     closeMenu();
-                    dispatch(setAiModeActive());
                   }}
                 >
                   <span>{aiModeActive ? 'Hide AI Chat' : 'Show AI Chat'}</span>

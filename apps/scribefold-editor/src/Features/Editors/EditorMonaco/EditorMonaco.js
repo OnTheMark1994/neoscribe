@@ -79,12 +79,23 @@ export default function EditorMonaco({ monacoEditorRef }) {
   const dispatch = useDispatch();
   // User preferences that should affect Monaco rendering.
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
-  const aiModeActive = useSelector(state => state.aiSlice.aiModeActive)
+  const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
   const proposedChanges = useSelector(state => state.aiSlice.proposedChanges);
 
   useEffect(() => {
     console.log('[EditorMonaco] proposedChanges updated:', proposedChanges);
   }, [proposedChanges]);
+
+  // This is supposed to update the decorations when the aiModeActive changes but the updateDecorations function is in a different scope
+  useEffect(() => {
+    if (monacoEditorRef.current) {
+      // updateDecorations();
+      // monacoEditorRef.current.deltaDecorations(
+      //   decorationsRef.current || [],
+      //   aiModeActive ? createDecorations(monacoEditorRef.current.getModel()) : []
+      // );
+    }
+  }, [aiModeActive]);
 
   const initialValue = useMemo(() => {
     return [
@@ -133,6 +144,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
           const updateDecorations = () => {
             const model = editor.getModel();
             if (!model || !aiModeActive) return;
+            // if (!model) return;
             
             // Clear existing decorations first
             decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);

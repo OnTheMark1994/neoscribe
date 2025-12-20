@@ -26,7 +26,7 @@ import './AiChatBar.css';
 export default function AiChatBar({ monacoEditorRef }) {
 
   // Determines whether we render the chat bar at all.
-  const showChatBar = useSelector(state => state.aiSlice.aiModeActive)
+  const showChatBar = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
 
   // The full chat history (user + assistant + placeholder thinking messages).
   const messages = useSelector(state => state.aiSlice.messages)
