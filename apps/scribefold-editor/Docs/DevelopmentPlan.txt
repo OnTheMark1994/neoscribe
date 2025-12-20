@@ -48,7 +48,7 @@ Phases:
     then 4 months post development to make use of it  
     So 8 months total for the end result
 
-    1 week
+    1 day
     UI (done) 
         main area ui        (done)
             background      (done)
@@ -57,7 +57,7 @@ Phases:
         topbar              (done)
         ai chat area layout (done)
 
-    1 week 
+    1 day 
     settings and windows (done)
         f11 mode                    (done)
         ai mode on / off            (done)
@@ -75,12 +75,13 @@ Phases:
                 they display based on the selected tab (done)
                 tab component UIs           (done)
 			
-    1 week
+    1 day
     monaco basic (done)
         embed editor            (done)
         basic ui display        (done) 
         view reflects settings  (done)
 
+    3 days
     monaco additional (working on this)
         chapter and section folding (done)
         glyphs for ai-hide options
@@ -96,6 +97,7 @@ Phases:
             test by having a function that pulls it and logs with the indexs (done)
                 modify and pull again to see if they persist (done)
 
+    2 days
     file IO
         load file
         save file
@@ -105,7 +107,7 @@ Phases:
             may be different top menu options in browser
             may need the explanation window to download file instead of save on browser
 
-    1 week 
+    2 days 
     ai chat area  (done)
         sends to api (done)
             after gathering from the editor ref (done)
@@ -114,7 +116,7 @@ Phases:
             just logs it for now (done)
 
 
-    1 week 
+    3 days 
     connecting monaco and the ai response
         data pulls
             before send pulling text from monaco and sending it (done)
@@ -135,21 +137,60 @@ Phases:
             jumping to selected one with bottom diff and jump
                 need to add those components
 
-    1 week
+    3 days
     array editor (optional/conditional)
         this is working in the other app so if monaco doesn't work thers a backup
         but monaco is much better and it should work
 
     1 week
-    user id and user row creation
-        start on web, start on desktop, create account, login, log out, log in on new device, etc  
-    token flow 
-        initial tokens
-        subscription tokens
-        token use
+    server functionality 
+        plan out how this should work
+            are we going to have supabase auth object in the client?
+            where do we crete the new row and see if we should add tokens
+                that should happen on the server
+                so should we create the account on the server and return a auth token that signes them in
+                    can we even do that  
+                or create the account on client so they are logged in automatically and then call an endpoint to create the user row
+                    checking the token grants table and deciding what to add from there
+                and what about combining user rows?
+                    need to detail how this should work in each situation
+                        user can use web anon, use desktop anon, create account on web, crate on desktop, log out, log back it, create account on web portal
+                            we want each combination to work as expected
+                            so typing out flows for that while creating a plan so how they work 
+                                user auth + user table interaction flows 
+                                which endpoints we will have
+                                what each one will do 
+                                how to handle the different cases
+                the token usage part too
+                    free grant tokens
+                        the free grant table
+                        email confirmations token granting
+                    adding tokens from subscription,
+                        recurring web hooks  
+                    probably doing all of that on the server just sending it an id from the auth object or device/anon id otherwise
+        user id and user row creation
+            start on web, start on desktop, create account, login, log out, log in on new device, etc  
+        token flow 
+            initial tokens
+            subscription tokens
+            token use
 
     1 week
     referrals feature
+        Tracking
+            when user downloads application referral id is tracked somehow
+            maybe from their ip on download, and then if they use from that ip for first time around the same time with granted credits we can link that account to that ref id
+            and then if they subscribe we will know where the referral came from
+        Dashboard
+            have referral accounts
+            show 
+                number of downloads
+                number and percent that then subscribed
+                percentage they get
+                    and terms etc in an info window
+                calculation of what the percentage times subscriptions amounts are
+                graph of how many by date for each thing with recharts (downloads, subscriptions, etc)
+
 
     1 week
     general use and bug resolution
