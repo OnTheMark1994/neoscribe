@@ -2,9 +2,10 @@
  
  
   */
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { openRightClickWindow } from '../../../Global/ReduxSlices/WindowSlice';
+import { setModified } from '../../../Global/ReduxSlices/EditorSlice';
 import Editor from '@monaco-editor/react';
 import PerformanceTest from './PerformanceTest';
 import './EditorMonaco.css';
@@ -13,10 +14,12 @@ import { getLinesArrayWithAssertedIds, createLineMetadataDecoration, getLineMeta
 
 export default function EditorMonaco({ monacoEditorRef }) {
   const dispatch = useDispatch();
+
   // User preferences that should affect Monaco rendering.
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
   const proposedChanges = useSelector(state => state.aiSlice.proposedChanges);
+
 
   useEffect(() => {
     console.log('[EditorMonaco] proposedChanges updated:', proposedChanges);
@@ -34,19 +37,9 @@ export default function EditorMonaco({ monacoEditorRef }) {
     }
   }, [aiModeActive]);
 
-  const initialValue = useMemo(() => {
-    return [
-      '#chapter Introduction',
-      '',
-      'This is a basic Monaco editor instance.',
-      '',
-      '#section Notes',
-      '- You can type here.',
-    ].join('\n');
-  }, []);
-
   const [showPerformanceTest, setShowPerformanceTest] = useState(false);
   const decorationsRef = useRef(null);
+
 
   return (
     <div className="editorMonacoContainer">
@@ -66,10 +59,20 @@ export default function EditorMonaco({ monacoEditorRef }) {
       <Editor
         height="100%"
         defaultLanguage="markdown"
-        defaultValue={initialValue}
+        defaultValue=""
         onMount={(editor, monaco) => {
           if (monacoEditorRef) {
             monacoEditorRef.current = editor;
+          }
+
+          const model = editor.getModel?.();
+          if (model) {
+            dispatch(setModified(false));
+
+            model.onDidChangeContent(() => {
+              if (editor.__sfIsHydrating) return;
+              dispatch(setModified(true));
+            });
           }
           
           const updateDecorations = () => {

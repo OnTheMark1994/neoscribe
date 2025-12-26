@@ -278,3 +278,13 @@ export function getLinesArrayWithAssertedIds(monacoEditorRef){
   // return createLinesArrayFromMonaco(monacoEditorRef).linesArray
   return linesArray
 }
+
+export function setMonacoEditorContent(monacoEditorRef, content) {
+  const editor = monacoEditorRef?.current;
+  if (!editor || typeof editor.setValue !== 'function') return false;
+
+  editor.__sfIsHydrating = true;
+  editor.setValue(String(content ?? ''));
+  editor.__sfIsHydrating = false;
+  return true;
+}

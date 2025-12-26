@@ -1,6 +1,6 @@
 .editorMonacoContainer {
   width: 100%;
-  height: 70vh;
+  height: 100%;
 }
 
 /* Make Monaco transparent so the app background shows through */

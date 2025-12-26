@@ -17,7 +17,63 @@
     if there is other data that loads on initilazation we will add it here
  
  */
-export default function AppInitializer() {
+import React, { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { fileOpened, setModified } from './ReduxSlices/EditorSlice';
+import { openLastFile } from './FileIO';
+import { setMonacoEditorContent } from '../Features/Editors/EditorMonaco/MonacoFunctions';
+
+export default function AppInitializer({ monacoEditorRef }) {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId = null;
+
+    async function loadLastFile() {
+      try {
+        const result = await openLastFile();
+        if (cancelled) return;
+        if (!result?.success) return;
+
+        const content = String(result.content ?? '');
+        const filepath = String(result.filePath || result.fileName || '');
+        dispatch(fileOpened({ filepath }));
+
+        const didSet = setMonacoEditorContent(monacoEditorRef, content);
+        if (!didSet) {
+          let attempts = 0;
+          intervalId = setInterval(() => {
+            if (cancelled) {
+              clearInterval(intervalId);
+              intervalId = null;
+              return;
+            }
+
+            attempts += 1;
+            const ok = setMonacoEditorContent(monacoEditorRef, content);
+            if (ok || attempts >= 50) {
+              clearInterval(intervalId);
+              intervalId = null;
+            }
+          }, 100);
+        }
+        dispatch(setModified(false));
+      } catch (e) {
+        console.error('[AppInitializer] openLastFile failed', e);
+      }
+    }
+
+    loadLastFile();
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+  }, [dispatch]);
+
   return (
     <div>
       

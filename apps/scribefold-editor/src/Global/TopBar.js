@@ -50,12 +50,15 @@
 
 */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleFullscreenActive } from './ReduxSlices/MenuSlice';
 import { setShowHelpWindow, setShowSettingsWindow } from './ReduxSlices/WindowSlice';
 import './TopBar.css';
 import { updateSetting } from './ReduxSlices/SettingsSlice';
+import { fileOpened, resetEditor, setFilepath, setModified } from './ReduxSlices/EditorSlice';
+import { openFile as openFileIO, saveFile as saveFileIO, saveFileAs as saveFileAsIO } from './FileIO';
+import { setMonacoEditorContent } from '../Features/Editors/EditorMonaco/MonacoFunctions';
 
 // Detect whether we are running in Electron or browser
 const IS_ELECTRON = Boolean(window.electronAPI);
@@ -85,6 +88,87 @@ export default function TopBar({monacoEditorRef}) {
 
   // Add a trailing * to indicate unsaved changes.
   const displayName = `${fileName}${modified ? '*' : ''}`;
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      // Close dropdown menus when user clicks outside of the top bar.
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setActiveMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Helper used by many menu items to close the active dropdown.
+  const closeMenu = useCallback(() => setActiveMenu(null), []);
+
+  // File operation functions
+  const newFile = useCallback(() => {
+    if(modified){
+      const confirmed = window.confirm('You have unsaved changes. Continue?');
+      if(!confirmed) return;
+    }
+
+    dispatch(resetEditor());
+    setMonacoEditorContent(monacoEditorRef, '');
+    dispatch(setModified(false));
+    closeMenu();
+  }, [closeMenu, dispatch, modified, monacoEditorRef]);
+
+  const openFile = useCallback(async () => {
+    if(modified){
+      const confirmed = window.confirm('You have unsaved changes. Continue?');
+      if(!confirmed) return;
+    }
+
+    try {
+      const result = await openFileIO();
+      if(!result?.success) {
+        closeMenu();
+        return;
+      }
+
+      const content = String(result.content ?? '');
+      const nextFilepath = String(result.filePath || result.fileName || '');
+
+      dispatch(fileOpened({ filepath: nextFilepath }));
+
+      setMonacoEditorContent(monacoEditorRef, content);
+      dispatch(setModified(false));
+    } catch (e) {
+      console.error('[TopBar] openFile failed', e);
+    }
+    closeMenu();
+  }, [closeMenu, dispatch, modified, monacoEditorRef]);
+
+  const saveFile = useCallback(async () => {
+    try {
+      const content = monacoEditorRef?.current?.getValue ? monacoEditorRef.current.getValue() : '';
+      const result = await saveFileIO({ filePath: filepath || '', fileName, content });
+      if(result?.success){
+        dispatch(setModified(false));
+        if(result.filePath) dispatch(setFilepath(result.filePath));
+      }
+    } catch (e) {
+      console.error('[TopBar] saveFile failed', e);
+    }
+    closeMenu();
+  }, [closeMenu, dispatch, fileName, filepath, monacoEditorRef]);
+
+  const saveFileAs = useCallback(async () => {
+    try {
+      const content = monacoEditorRef?.current?.getValue ? monacoEditorRef.current.getValue() : '';
+      const result = await saveFileAsIO({ content, suggestedName: fileName });
+      if(result?.success){
+        dispatch(setModified(false));
+        if(result.filePath) dispatch(setFilepath(result.filePath));
+        else if(result.fileName) dispatch(setFilepath(result.fileName));
+      }
+    } catch (e) {
+      console.error('[TopBar] saveFileAs failed', e);
+    }
+    closeMenu();
+  }, [closeMenu, dispatch, fileName, monacoEditorRef]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -109,59 +193,7 @@ export default function TopBar({monacoEditorRef}) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      // Close dropdown menus when user clicks outside of the top bar.
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setActiveMenu(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Helper used by many menu items to close the active dropdown.
-  const closeMenu = () => setActiveMenu(null);
-
-  // File operation functions
-  const newFile = () => {
-    console.log('New file action');
-    // TODO: Implement new file logic
-    closeMenu();
-  };
-
-  const openFile = () => {
-    console.log('Open file action');
-    // TODO: Implement open file logic
-    let fileContent 
-    if(IS_ELECTRON){
-      // fileContent = Electron file open
-    }else{
-      // fileContent = Browser open file / upload
-    }
-    // If there is no content for some reason
-    if(!fileContent) {
-      console.log("File open error: No file content.")
-      return
-    }
-    // Put the content in the monaco editor with monacoEditorRef
-    // monacoEditorRef.<>(fileContent) 
-    closeMenu();
-  };
-
-  const saveFile = () => {
-    console.log('Save file action');
-    // TODO: Implement save file logic
-    closeMenu();
-  };
-
-  const saveFileAs = () => {
-    console.log('Save As file action');
-    // TODO: Implement save as logic
-    closeMenu();
-  };
+  }, [newFile, openFile, saveFile, saveFileAs]);
 
   // If fullscreen mode is active, the CSS class hides the bar (hover container still exists).
   const barClasses = `topBar ${fullscreenActive ? 'topBarHidden' : ''}`;

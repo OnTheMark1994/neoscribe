@@ -57,7 +57,7 @@ export default function App() {
       <KeypressListeners/>
 
       {/* Contains auth listener and loads initial data like user table data */}
-      <AppInitializer/>
+      <AppInitializer monacoEditorRef={monacoEditorRef}/>
 
       {/* Left side: top bar + centered page */}
       <div className="pageArea">

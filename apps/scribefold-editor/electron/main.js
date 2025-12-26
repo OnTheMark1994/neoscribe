@@ -1,8 +1,80 @@
 const path = require('path');
 const fs = require('fs');
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 
 let mainWindow = null;
+
+ipcMain.handle('open-file', async () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { success: false, error: 'Window not ready' };
+  }
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Text', extensions: ['txt', 'md', 'markdown'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+
+  if (result.canceled || !Array.isArray(result.filePaths) || !result.filePaths[0]) {
+    return { success: false };
+  }
+
+  const filePath = result.filePaths[0];
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return { success: true, filePath, content };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('read-file', async (event, filePath) => {
+  try {
+    if (!filePath) return { success: false, error: 'Missing filePath' };
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return { success: true, content };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('save-file', async (event, { filePath, content }) => {
+  try {
+    if (!filePath) return { success: false, error: 'Missing filePath' };
+    fs.writeFileSync(filePath, content ?? '', 'utf-8');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('save-file-as', async (event, content) => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { success: false, error: 'Window not ready' };
+  }
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    filters: [
+      { name: 'Text', extensions: ['txt'] },
+      { name: 'Markdown', extensions: ['md'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+
+  if (result.canceled || !result.filePath) {
+    return { success: false };
+  }
+
+  try {
+    fs.writeFileSync(result.filePath, content ?? '', 'utf-8');
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
