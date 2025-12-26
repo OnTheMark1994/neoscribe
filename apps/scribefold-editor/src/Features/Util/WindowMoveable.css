@@ -1,0 +1,19 @@
+.windowMoveableRoot {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9000;
+}
+
+.windowMoveableContainer {
+  min-width: 0;
+  resize: none;
+}
+
+.windowMoveableTopBar {
+  cursor: grab;
+}
+
+.windowMoveableTopBar:active {
+  cursor: grabbing;
+}

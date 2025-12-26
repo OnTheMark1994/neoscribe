@@ -7,6 +7,7 @@ import KeypressListeners from './Global/KeypressListeners';
 import Editor from './Features/Editors/Editor';
 import AiChatBar from './Features/AI/ChatBar/AiChatBar';
 import Windows from './Features/Windows/Windows';
+import KeyboardWindow from './Features/Windows/KeyboardWindow';
 
 /*
   This component will contain: 
@@ -85,6 +86,8 @@ export default function App() {
 
       {/* All windows show from here (right click, settings, help etc) */}
       <Windows monacoEditorRef={monacoEditorRef}/>
+
+      <KeyboardWindow monacoEditorRef={monacoEditorRef}/>
    
     </div>
   );

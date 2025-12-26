@@ -13,6 +13,7 @@ export default function SettingsDisplay() {
 
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const backgroundImageUri = settingsObject?.backgroundImageUri;
+  const showMiniKeyboard = settingsObject?.showMiniKeyboard === true;
   const showArrayLineNumbers = settingsObject?.showArrayLineNumbers !== false;
   const showMonacoLineNumbers = settingsObject?.showMonacoLineNumbers !== false;
   const monacoStickyTopBar = settingsObject?.monacoStickyTopBar !== false;
@@ -50,6 +51,21 @@ export default function SettingsDisplay() {
               {theme.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="settingsSection">
+        <div className="settingsSectionTitle">Keyboard</div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Show mini keyboard</div>
+            <div className="settingsRowLabelSub">Shows a draggable on-screen keyboard window.</div>
+          </div>
+          <ToggleSwitch
+            on={showMiniKeyboard}
+            onClick={() => dispatch(updateSetting({ key: 'showMiniKeyboard', value: !showMiniKeyboard }))}
+          />
         </div>
       </div>
 
