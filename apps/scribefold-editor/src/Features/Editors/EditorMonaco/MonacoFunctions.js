@@ -288,3 +288,88 @@ export function setMonacoEditorContent(monacoEditorRef, content) {
   editor.__sfIsHydrating = false;
   return true;
 }
+
+export function insertTextAtMonacoCursor(monacoEditorRef, text) {
+  const editor = monacoEditorRef?.current;
+  if (!editor || typeof editor.executeEdits !== 'function') return false;
+
+  const model = editor.getModel?.();
+  if (!model) return false;
+
+  const selection = editor.getSelection?.();
+  if (!selection) return false;
+
+  editor.pushUndoStop?.();
+  editor.executeEdits('sf_keyboard', [
+    {
+      range: selection,
+      text: String(text ?? ''),
+      forceMoveMarkers: true,
+    },
+  ]);
+  editor.pushUndoStop?.();
+  editor.focus?.();
+  return true;
+}
+
+export function backspaceAtMonacoCursor(monacoEditorRef) {
+  const editor = monacoEditorRef?.current;
+  if (!editor || typeof editor.executeEdits !== 'function') return false;
+
+  const model = editor.getModel?.();
+  if (!model) return false;
+
+  const selection = editor.getSelection?.();
+  if (!selection) return false;
+
+  // If there is a selection, delete it.
+  if (typeof selection.isEmpty === 'function' ? !selection.isEmpty() : !(selection.startLineNumber === selection.endLineNumber && selection.startColumn === selection.endColumn)) {
+    editor.pushUndoStop?.();
+    editor.executeEdits('sf_keyboard', [{ range: selection, text: '', forceMoveMarkers: true }]);
+    editor.pushUndoStop?.();
+    editor.focus?.();
+    return true;
+  }
+
+  const pos = editor.getPosition?.();
+  if (!pos) return false;
+
+  // At very start of document: nothing to delete.
+  if (pos.lineNumber === 1 && pos.column === 1) return true;
+
+  let range;
+
+  if (pos.column > 1) {
+    range = {
+      startLineNumber: pos.lineNumber,
+      startColumn: pos.column - 1,
+      endLineNumber: pos.lineNumber,
+      endColumn: pos.column,
+    };
+  } else {
+    // Column 1: delete the newline by merging with previous line.
+    const prevLine = pos.lineNumber - 1;
+    const prevLen = model.getLineLength(prevLine);
+    range = {
+      startLineNumber: prevLine,
+      startColumn: prevLen + 1,
+      endLineNumber: pos.lineNumber,
+      endColumn: 1,
+    };
+  }
+
+  editor.pushUndoStop?.();
+  editor.executeEdits('sf_keyboard', [{ range, text: '', forceMoveMarkers: true }]);
+  editor.pushUndoStop?.();
+  editor.focus?.();
+  return true;
+}
+
+export function handleMiniKeyboardMonacoKeyPress(monacoEditorRef, key) {
+  const k = String(key ?? '');
+  if (!k) return false;
+
+  if (k === 'Backspace') return backspaceAtMonacoCursor(monacoEditorRef);
+  if (k === 'Enter') return insertTextAtMonacoCursor(monacoEditorRef, '\n');
+  return insertTextAtMonacoCursor(monacoEditorRef, k);
+}
