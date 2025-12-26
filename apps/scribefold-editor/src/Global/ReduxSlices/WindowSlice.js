@@ -19,6 +19,12 @@ const initialState = {
   rightClickWindowType: null,
   rightClickWindowLeft: 0,
   rightClickWindowTop: 0,
+
+  // File encryption
+  showFileEncryptionWindow: false,
+  fileEncryptionMode: null, // 'encrypt' | 'unlock'
+  fileEncryptionFilePath: null,
+  fileEncryptionEncryptedText: null,
 };
 
 const windowSlice = createSlice({
@@ -78,6 +84,27 @@ const windowSlice = createSlice({
       state.showRightClickWindow = false;
       state.rightClickWindowType = null;
     },
+
+    setShowFileEncryptionWindow(state, action) {
+      const next = action.payload;
+
+      if (typeof next === 'boolean') {
+        state.showFileEncryptionWindow = next;
+        if (!next) {
+          state.fileEncryptionMode = null;
+          state.fileEncryptionFilePath = null;
+          state.fileEncryptionEncryptedText = null;
+        }
+        return;
+      }
+
+      if (next && typeof next === 'object') {
+        state.showFileEncryptionWindow = true;
+        state.fileEncryptionMode = next.mode ?? null;
+        state.fileEncryptionFilePath = next.filePath ?? null;
+        state.fileEncryptionEncryptedText = next.encryptedText ?? null;
+      }
+    },
   },
 });
 
@@ -88,6 +115,7 @@ export const {
   setShowHelpWindow,
   openRightClickWindow,
   closeRightClickWindow,
+  setShowFileEncryptionWindow,
 } = windowSlice.actions;
 
 export default windowSlice.reducer;

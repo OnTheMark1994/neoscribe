@@ -84,7 +84,7 @@ export default function App() {
       <AiChatBar monacoEditorRef={monacoEditorRef}/>
 
       {/* All windows show from here (right click, settings, help etc) */}
-      <Windows/>
+      <Windows monacoEditorRef={monacoEditorRef}/>
    
     </div>
   );

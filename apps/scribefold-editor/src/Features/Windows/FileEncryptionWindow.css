@@ -1,0 +1,79 @@
+.fileEncryptionWindow {
+  width: 520px;
+  max-width: 92vw;
+}
+
+.fileEncryptionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fileEncryptionWarning {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.fileEncryptionWarningTitle {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #ffd24a;
+}
+
+.fileEncryptionWarningText {
+  opacity: 0.9;
+  line-height: 1.35;
+  color: white;
+}
+
+.fileEncryptionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fileEncryptionLabel {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.fileEncryptionInput {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+  color: white;
+}
+
+.fileEncryptionError {
+  color: #ffb2b2;
+  background: rgba(255, 0, 0, 0.12);
+  border: 1px solid rgba(255, 0, 0, 0.25);
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.fileEncryptionButtons {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.fileEncryptionButtons button {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+  color: white;
+  cursor: pointer;
+}
+
+.fileEncryptionButtons button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

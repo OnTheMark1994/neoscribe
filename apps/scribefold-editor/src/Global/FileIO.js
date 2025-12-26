@@ -1,8 +1,26 @@
 // Global/FileIO.js
 
+import { decryptText, encryptText, isEncryptedText } from './CryptoIO';
+
 const LAST_FILE_PATH_KEY = 'scribefold:lastFilePath';
 const LAST_FILE_NAME_KEY = 'scribefold:lastFileName';
 const LAST_FILE_CONTENT_KEY = 'scribefold:lastFileContent';
+
+const sessionEncryptionPasswords = new Map();
+
+function getSessionPassword(filePath) {
+  if (!filePath) return '';
+  return String(sessionEncryptionPasswords.get(String(filePath)) || '');
+}
+
+function setSessionPassword(filePath, password) {
+  if (!filePath) return;
+  if (!password) {
+    sessionEncryptionPasswords.delete(String(filePath));
+    return;
+  }
+  sessionEncryptionPasswords.set(String(filePath), String(password));
+}
 
 function isElectron() {
   return Boolean(typeof window !== 'undefined' && window.electronAPI);
@@ -44,6 +62,34 @@ function promptForFileName(defaultName) {
   const proposed = window.prompt('File name:', defaultName || 'Untitled.txt');
   if (!proposed) return null;
   return proposed;
+}
+
+async function platformSaveTextFile({ filePath, fileName, content, suggestedName }) {
+  if (isElectron()) {
+    const api = window.electronAPI;
+
+    if (filePath && api?.saveFile) {
+      return api.saveFile(filePath, content ?? '');
+    }
+
+    if (api?.saveFileAs) {
+      return api.saveFileAs({
+        content: content ?? '',
+        suggestedName: suggestedName ?? fileName ?? '',
+      });
+    }
+
+    return { success: false, error: 'Electron save API not available' };
+  }
+
+  const resolvedName = suggestedName || fileName || getLastFileInfo().fileName || 'Untitled.txt';
+  downloadTextFile({ content: content ?? '', fileName: resolvedName });
+  return { success: true, fileName: resolvedName };
+}
+
+function maybeRememberLastFileAfterSave({ filePath, fileName, content }) {
+  if (filePath) rememberLastFile({ filePath, content });
+  else if (fileName) rememberLastFile({ fileName, content });
 }
 
 async function uploadTextFile() {
@@ -105,6 +151,22 @@ export async function openFile() {
       const result = await api.openFile();
       if (result?.success) {
         rememberLastFile({ filePath: result.filePath, content: result.content });
+
+        const filePath = String(result.filePath || '');
+        const rawText = String(result.content ?? '');
+        if (isEncryptedText(rawText)) {
+          const pwd = getSessionPassword(filePath);
+          if (pwd) {
+            try {
+              const plaintext = await decryptText({ encryptedText: rawText, password: pwd });
+              return { success: true, filePath, content: plaintext };
+            } catch {
+              setSessionPassword(filePath, '');
+            }
+          }
+
+          return { success: true, filePath, encrypted: true, encryptedText: rawText };
+        }
       }
       return result;
     }
@@ -123,6 +185,21 @@ export async function openFile() {
   const result = await uploadTextFile();
   if (result?.success) {
     rememberLastFile({ fileName: result.fileName, content: result.content });
+
+    const rawText = String(result.content ?? '');
+    const fileName = String(result.fileName || '');
+    if (isEncryptedText(rawText)) {
+      const pwd = getSessionPassword(fileName);
+      if (pwd) {
+        try {
+          const plaintext = await decryptText({ encryptedText: rawText, password: pwd });
+          return { success: true, fileName, content: plaintext };
+        } catch {
+          setSessionPassword(fileName, '');
+        }
+      }
+      return { success: true, fileName, encrypted: true, encryptedText: rawText };
+    }
   }
   return result;
 }
@@ -147,8 +224,23 @@ export async function openLastFile() {
     if (api?.readFile) {
       const result = await api.readFile(filePath);
       if (result?.success) {
-        rememberLastFile({ filePath, content: result.content });
-        return { success: true, filePath, content: result.content };
+        const rawText = String(result.content ?? '');
+        rememberLastFile({ filePath, content: rawText });
+
+        if (isEncryptedText(rawText)) {
+          const pwd = getSessionPassword(filePath);
+          if (pwd) {
+            try {
+              const plaintext = await decryptText({ encryptedText: rawText, password: pwd });
+              return { success: true, filePath, content: plaintext };
+            } catch {
+              setSessionPassword(filePath, '');
+            }
+          }
+          return { success: true, filePath, encrypted: true, encryptedText: rawText };
+        }
+
+        return { success: true, filePath, content: rawText };
       }
       return result;
     }
@@ -157,50 +249,100 @@ export async function openLastFile() {
   }
 
   if (!last.content) return { success: false };
-  return { success: true, fileName: last.fileName || 'Untitled.txt', content: last.content };
+
+  const rawText = String(last.content ?? '');
+  const fileName = String(last.fileName || 'Untitled.txt');
+
+  if (isEncryptedText(rawText)) {
+    const pwd = getSessionPassword(fileName);
+    if (pwd) {
+      try {
+        const plaintext = await decryptText({ encryptedText: rawText, password: pwd });
+        return { success: true, fileName, content: plaintext };
+      } catch {
+        setSessionPassword(fileName, '');
+      }
+    }
+    return { success: true, fileName, encrypted: true, encryptedText: rawText };
+  }
+
+  return { success: true, fileName, content: rawText };
 }
 
 export async function saveFile({ filePath, fileName, content }) {
-  if (isElectron()) {
-    const api = window.electronAPI;
+  const password = getSessionPassword(filePath);
+  const shouldEncrypt = Boolean(password);
 
-    if (filePath && api?.saveFile) {
-      const result = await api.saveFile(filePath, content ?? '');
-      if (result?.success) {
-        rememberLastFile({ filePath, content });
-      }
-      return result;
+  const toWrite = shouldEncrypt
+    ? await encryptText({ plaintext: content ?? '', password })
+    : String(content ?? '');
+
+  const result = await platformSaveTextFile({ filePath, fileName, content: toWrite, suggestedName: fileName });
+  if (result?.success) {
+    const nextFilePath = String(result.filePath || filePath || '');
+    const nextFileName = String(result.fileName || fileName || '');
+    maybeRememberLastFileAfterSave({
+      filePath: nextFilePath,
+      fileName: nextFileName,
+      content: toWrite,
+    });
+
+    if (shouldEncrypt && nextFilePath) {
+      setSessionPassword(nextFilePath, password);
     }
-
-    return saveFileAs({ content });
   }
-
-  const resolvedName = fileName || getLastFileInfo().fileName || 'Untitled.txt';
-  downloadTextFile({ content: content ?? '', fileName: resolvedName });
-  rememberLastFile({ fileName: resolvedName, content: content ?? '' });
-  return { success: true, fileName: resolvedName };
+  return result;
 }
 
-export async function saveFileAs({ content, suggestedName }) {
-  if (isElectron()) {
-    const api = window.electronAPI;
+export async function saveFileAs({ content, suggestedName, sourceFilePath }) {
+  const password = getSessionPassword(sourceFilePath);
+  const shouldEncrypt = Boolean(password);
 
-    if (!api?.saveFileAs) {
-      return { success: false, error: 'Electron saveFileAs API not available' };
-    }
+  const toWrite = shouldEncrypt
+    ? await encryptText({ plaintext: content ?? '', password })
+    : String(content ?? '');
 
-    const result = await api.saveFileAs({ content: content ?? '', suggestedName: suggestedName ?? '' });
-    if (result?.success && result.filePath) {
-      rememberLastFile({ filePath: result.filePath, content });
+  if (!isElectron()) {
+    const proposed = suggestedName || getLastFileInfo().fileName || 'Untitled.txt';
+    const name = promptForFileName(proposed);
+    if (!name) return { success: false };
+
+    const webResult = await platformSaveTextFile({ fileName: name, content: toWrite, suggestedName: name });
+    if (webResult?.success) {
+      maybeRememberLastFileAfterSave({ fileName: name, content: toWrite });
+      if (shouldEncrypt) setSessionPassword(name, password);
     }
-    return result;
+    return { success: Boolean(webResult?.success), fileName: name };
   }
 
-  const proposed = getLastFileInfo().fileName || 'Untitled.txt';
-  const name = promptForFileName(proposed);
-  if (!name) return { success: false };
+  const result = await platformSaveTextFile({ content: toWrite, suggestedName: suggestedName ?? '' });
+  if (result?.success) {
+    const nextFilePath = String(result.filePath || '');
+    maybeRememberLastFileAfterSave({ filePath: nextFilePath, content: toWrite });
+    if (shouldEncrypt && nextFilePath) setSessionPassword(nextFilePath, password);
+  }
+  return result;
+}
 
-  downloadTextFile({ content: content ?? '', fileName: name });
-  rememberLastFile({ fileName: name, content: content ?? '' });
-  return { success: true, fileName: name };
+export async function encryptAndSaveFile({ filePath, fileName, plaintext, password, suggestedName }) {
+  const encrypted = await encryptText({ plaintext: plaintext ?? '', password });
+  const result = await platformSaveTextFile({ filePath, fileName, content: encrypted, suggestedName });
+  if (result?.success) {
+    const nextFilePath = String(result.filePath || filePath || '');
+    const nextFileName = String(result.fileName || fileName || '');
+    maybeRememberLastFileAfterSave({ filePath: nextFilePath, fileName: nextFileName, content: encrypted });
+    if (nextFilePath) setSessionPassword(nextFilePath, password);
+    else if (nextFileName) setSessionPassword(nextFileName, password);
+  }
+  return result;
+}
+
+export async function decryptAndOpenEncryptedText({ filePath, encryptedText, password }) {
+  try {
+    const plaintext = await decryptText({ encryptedText: encryptedText ?? '', password });
+    setSessionPassword(filePath, password);
+    return { success: true, content: plaintext };
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) };
+  }
 }

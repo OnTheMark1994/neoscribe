@@ -20,6 +20,7 @@
 import React, { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { fileOpened, setModified } from './ReduxSlices/EditorSlice';
+import { setShowFileEncryptionWindow } from './ReduxSlices/WindowSlice';
 import { openLastFile } from './FileIO';
 import { setMonacoEditorContent } from '../Features/Editors/EditorMonaco/MonacoFunctions';
 
@@ -39,6 +40,16 @@ export default function AppInitializer({ monacoEditorRef }) {
         const content = String(result.content ?? '');
         const filepath = String(result.filePath || result.fileName || '');
         dispatch(fileOpened({ filepath }));
+
+        if (result.encrypted) {
+          dispatch(setShowFileEncryptionWindow({
+            mode: 'unlock',
+            filePath: filepath,
+            encryptedText: String(result.encryptedText ?? ''),
+          }));
+          dispatch(setModified(false));
+          return;
+        }
 
         const didSet = setMonacoEditorContent(monacoEditorRef, content);
         if (!didSet) {

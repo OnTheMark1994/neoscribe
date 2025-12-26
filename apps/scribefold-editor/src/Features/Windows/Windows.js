@@ -4,6 +4,7 @@ import RightClickWindow from './RightClickWindow';
 import SaveBeforeClosingWindow from './SaveBeforeClosingWindow';
 import HelpWindow from './HelpWindow';
 import AiChatMessageDetail from '../AI/ChatBar/AiChatMessageDetail';
+import FileEncryptionWindow from './FileEncryptionWindow';
 /*
     Contains conditional windows
 
@@ -11,7 +12,7 @@ import AiChatMessageDetail from '../AI/ChatBar/AiChatMessageDetail';
     so this is a very simple comonent just containing others 
 
 */
-export default function Windows() {
+export default function Windows({ monacoEditorRef }) {
 
   return (
     <>
@@ -20,6 +21,7 @@ export default function Windows() {
       <SaveBeforeClosingWindow/>
       <HelpWindow/>
       <AiChatMessageDetail/>
+      <FileEncryptionWindow monacoEditorRef={monacoEditorRef}/>
     </>
   );
 }

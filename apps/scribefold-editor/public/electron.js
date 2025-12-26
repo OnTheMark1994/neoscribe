@@ -108,10 +108,27 @@ ipcMain.handle('save-file-as', async (event, payload) => {
   const content = typeof payload === 'string' ? payload : payload?.content;
   const suggestedName = typeof payload === 'object' ? payload?.suggestedName : '';
   const safeSuggestedName = typeof suggestedName === 'string' ? suggestedName.trim() : '';
+  const forceScb = safeSuggestedName.toLowerCase().endsWith('.scb');
+
+  const normalizeScbPath = (inputPath) => {
+    if (!inputPath) return inputPath;
+
+    let p = String(inputPath);
+
+    const removable = new Set(['.txt', '.md', '.markdown', '.scb']);
+    let ext = path.extname(p).toLowerCase();
+    while (ext && removable.has(ext)) {
+      p = p.slice(0, -ext.length);
+      ext = path.extname(p).toLowerCase();
+    }
+
+    return `${p}.scb`;
+  };
 
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: safeSuggestedName || undefined,
     filters: [
+      ...(forceScb ? [{ name: 'Scribefold Encrypted', extensions: ['scb'] }] : []),
       { name: 'Text', extensions: ['txt'] },
       { name: 'Markdown', extensions: ['md'] },
       { name: 'All Files', extensions: ['*'] },
@@ -122,9 +139,11 @@ ipcMain.handle('save-file-as', async (event, payload) => {
     return { success: false };
   }
 
+  const finalPath = forceScb ? normalizeScbPath(result.filePath) : result.filePath;
+
   try {
-    fs.writeFileSync(result.filePath, content ?? '', 'utf-8');
-    return { success: true, filePath: result.filePath };
+    fs.writeFileSync(finalPath, content ?? '', 'utf-8');
+    return { success: true, filePath: finalPath };
   } catch (error) {
     return { success: false, error: error.message };
   }

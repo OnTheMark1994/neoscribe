@@ -53,7 +53,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleFullscreenActive } from './ReduxSlices/MenuSlice';
-import { setShowHelpWindow, setShowSettingsWindow } from './ReduxSlices/WindowSlice';
+import { setShowFileEncryptionWindow, setShowHelpWindow, setShowSettingsWindow } from './ReduxSlices/WindowSlice';
 import './TopBar.css';
 import { updateSetting } from './ReduxSlices/SettingsSlice';
 import { fileOpened, resetEditor, setFilepath, setModified } from './ReduxSlices/EditorSlice';
@@ -128,10 +128,22 @@ export default function TopBar({monacoEditorRef}) {
         return;
       }
 
-      const content = String(result.content ?? '');
       const nextFilepath = String(result.filePath || result.fileName || '');
 
       dispatch(fileOpened({ filepath: nextFilepath }));
+
+      if (result.encrypted) {
+        dispatch(setShowFileEncryptionWindow({
+          mode: 'unlock',
+          filePath: nextFilepath,
+          encryptedText: String(result.encryptedText ?? ''),
+        }));
+        dispatch(setModified(false));
+        closeMenu();
+        return;
+      }
+
+      const content = String(result.content ?? '');
 
       setMonacoEditorContent(monacoEditorRef, content);
       dispatch(setModified(false));
@@ -158,7 +170,7 @@ export default function TopBar({monacoEditorRef}) {
   const saveFileAs = useCallback(async () => {
     try {
       const content = monacoEditorRef?.current?.getValue ? monacoEditorRef.current.getValue() : '';
-      const result = await saveFileAsIO({ content, suggestedName: fileName });
+      const result = await saveFileAsIO({ content, suggestedName: fileName, sourceFilePath: filepath || '' });
       if(result?.success){
         dispatch(setModified(false));
         if(result.filePath) dispatch(setFilepath(result.filePath));
@@ -168,7 +180,7 @@ export default function TopBar({monacoEditorRef}) {
       console.error('[TopBar] saveFileAs failed', e);
     }
     closeMenu();
-  }, [closeMenu, dispatch, fileName, monacoEditorRef]);
+  }, [closeMenu, dispatch, fileName, filepath, monacoEditorRef]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
