@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Window from '../Util/Window';
+import Keyboard from '../Util/Keyboard';
 import { setShowFileEncryptionWindow } from '../../Global/ReduxSlices/WindowSlice';
 import { fileOpened, setModified } from '../../Global/ReduxSlices/EditorSlice';
 import { setMonacoEditorContent } from '../Editors/EditorMonaco/MonacoFunctions';
@@ -136,6 +137,22 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
           </div>
         )}
 
+        {mode === 'encrypt' && (
+          <Keyboard
+            onPress={(key) => {
+              if (working) return;
+              if (key === 'Backspace') {
+                setPassword((prev) => String(prev || '').slice(0, -1));
+                return;
+              }
+              if (key === 'Enter') {
+                // Do nothing in this case
+              }
+              setPassword((prev) => `${String(prev || '')}${String(key || '')}`);
+            }}
+          />
+        )}
+
         {mode === 'unlock' && (
           <div className="fileEncryptionWarning">
             <div className="fileEncryptionWarningTitle">Encrypted file</div>
@@ -145,8 +162,24 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
           </div>
         )}
 
+        {mode === 'unlock' && (
+          <Keyboard
+            onPress={(key) => {
+              if (working) return;
+              if (key === 'Backspace') {
+                setPassword((prev) => String(prev || '').slice(0, -1));
+                return;
+              }
+              if (key === 'Enter') {
+                handleUnlock();
+                return;
+              }
+              setPassword((prev) => `${String(prev || '')}${String(key || '')}`);
+            }}
+          />
+        )}
+
         <div className="fileEncryptionRow">
-          <div className="fileEncryptionLabel">Password / PIN</div>
           <input
             className="fileEncryptionInput"
             type="password"
