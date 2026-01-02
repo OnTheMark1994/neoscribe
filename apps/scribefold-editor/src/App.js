@@ -8,6 +8,7 @@ import Editor from './Features/Editors/Editor';
 import AiChatBar from './Features/AI/ChatBar/AiChatBar';
 import Windows from './Features/Windows/Windows';
 import KeyboardWindow from './Features/Windows/KeyboardWindow';
+import OpenSignTest from './OpenSignTest';
 
 /*
   This component will contain: 
@@ -88,6 +89,8 @@ export default function App() {
       <Windows monacoEditorRef={monacoEditorRef}/>
 
       <KeyboardWindow monacoEditorRef={monacoEditorRef}/>
+
+      {/* <OpenSignTest></OpenSignTest> */}
    
     </div>
   );

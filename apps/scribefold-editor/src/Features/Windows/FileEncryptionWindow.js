@@ -3,11 +3,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import Window from '../Util/Window';
 import Keyboard from '../Util/Keyboard';
 import { setShowFileEncryptionWindow } from '../../Global/ReduxSlices/WindowSlice';
-import { fileOpened, setModified } from '../../Global/ReduxSlices/EditorSlice';
+import { fileOpened, resetEditor, setModified } from '../../Global/ReduxSlices/EditorSlice';
 import { setMonacoEditorContent } from '../Editors/EditorMonaco/MonacoFunctions';
 import {
   decryptAndOpenEncryptedText,
   encryptAndSaveFile,
+  openFile as openFileIO,
 } from '../../Global/FileIO';
 import './FileEncryptionWindow.css';
 
@@ -20,6 +21,7 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
   const filePathFromState = useSelector(state => state.windowSlice.fileEncryptionFilePath);
 
   const filepath = useSelector(state => state.editorSlice.filepath);
+  const modified = useSelector(state => state.editorSlice.modified);
   const fileName = useMemo(() => (filepath ? filepath.split(/[/\\]/).pop() : 'Untitled'), [filepath]);
   const fileNameBase = useMemo(() => {
     let name = String(fileName || 'Untitled');
@@ -49,6 +51,50 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
     setError('');
     setWorking(false);
     dispatch(setShowFileEncryptionWindow(false));
+  }
+
+  function resetEditorToBlankAndClose() {
+    dispatch(resetEditor());
+    setMonacoEditorContent(monacoEditorRef, '');
+    dispatch(setModified(false));
+    close();
+  }
+
+  async function openAnotherFile() {
+    if (modified) {
+      const confirmed = window.confirm('You have unsaved changes. Continue?');
+      if (!confirmed) return;
+    }
+
+    try {
+      setWorking(true);
+      const result = await openFileIO();
+      if (!result?.success) return;
+
+      const nextFilepath = String(result.filePath || result.fileName || '');
+      dispatch(fileOpened({ filepath: nextFilepath }));
+
+      if (result.encrypted) {
+        // Keep this window open, but swap it to the newly selected encrypted file.
+        setPassword('');
+        setError('');
+        dispatch(setShowFileEncryptionWindow({
+          mode: 'unlock',
+          filePath: nextFilepath,
+          encryptedText: String(result.encryptedText ?? ''),
+        }));
+        dispatch(setModified(false));
+        return;
+      }
+
+      setMonacoEditorContent(monacoEditorRef, String(result.content ?? ''));
+      dispatch(setModified(false));
+      close();
+    } catch (e) {
+      console.error('[FileEncryptionWindow] openAnotherFile failed', e);
+    } finally {
+      setWorking(false);
+    }
   }
 
   async function handleEncrypt() {
@@ -126,7 +172,12 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
   }
 
   return (
-    <Window title={title} open={open} onClose={close} className="fileEncryptionWindow">
+    <Window
+      title={title}
+      open={open}
+      onClose={mode === 'unlock' ? resetEditorToBlankAndClose : close}
+      className="fileEncryptionWindow"
+    >
       <div className="fileEncryptionBody">
         {mode === 'encrypt' && (
           <div className="fileEncryptionWarning">
@@ -193,17 +244,27 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
         {error ? <div className="fileEncryptionError">{error}</div> : null}
 
         <div className="fileEncryptionButtons">
-          <button type="button" onClick={close} disabled={working}>
-            Close
-          </button>
           {mode === 'unlock' ? (
-            <button type="button" onClick={handleUnlock} disabled={working}>
-              Open
-            </button>
+            <>
+              <button type="button" onClick={resetEditorToBlankAndClose} disabled={working}>
+                New File
+              </button>
+              <button type="button" onClick={openAnotherFile} disabled={working}>
+                Open Another File
+              </button>
+              <button type="button" onClick={handleUnlock} disabled={working}>
+                Decrypt & Open
+              </button>
+            </>
           ) : (
-            <button type="button" onClick={handleEncrypt} disabled={working}>
-              Encrypt
-            </button>
+            <>
+              <button type="button" onClick={close} disabled={working}>
+                Close
+              </button>
+              <button type="button" onClick={handleEncrypt} disabled={working}>
+                Encrypt
+              </button>
+            </>
           )}
         </div>
       </div>

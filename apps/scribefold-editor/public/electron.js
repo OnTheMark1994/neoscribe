@@ -61,7 +61,7 @@ ipcMain.handle('open-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     filters: [
-      { name: 'Text', extensions: ['txt', 'md', 'markdown'] },
+      { name: 'Scribefold / Text', extensions: ['scb', 'txt', 'md', 'markdown'] },
       { name: 'All Files', extensions: ['*'] },
     ],
   });

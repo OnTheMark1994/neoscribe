@@ -331,6 +331,8 @@ export default function EditorMonaco({ monacoEditorRef }) {
           occurrencesHighlight: 'off',
           
           // Folding controls
+          folding: true,
+          foldingStrategy: 'indentation',
           showFoldingControls: 'always',
           
           glyphMargin: true,
