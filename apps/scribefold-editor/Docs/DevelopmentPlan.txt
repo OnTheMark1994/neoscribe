@@ -85,6 +85,7 @@ Phases:
     monaco additional (working on this)
         chapter and section folding (done)
         glyphs for ai-hide options
+            currently: not showing on start, not conditional based on ai active setting, not correct images
             glyphs show (done)
             they change when clicked (done)
             that data is used to create the lines array sent to the ai endpoint (filtering out the hidden ones) (done)

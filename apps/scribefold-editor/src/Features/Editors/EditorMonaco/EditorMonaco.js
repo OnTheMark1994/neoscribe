@@ -17,29 +17,46 @@ export default function EditorMonaco({ monacoEditorRef }) {
 
   // User preferences that should affect Monaco rendering.
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
-  const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
   const proposedChanges = useSelector(state => state.aiSlice.proposedChanges);
+  const filepath = useSelector(state => state.editorSlice.filepath);
 
+  // Keeping settings object in a ref so the monaco functions can access it 
+  const settingsObjectRef = useRef()
+  useEffect(() => {
+    settingsObjectRef.current = settingsObject
+  }, [settingsObject]);
 
+  // The proposed changes just logging for now
   useEffect(() => {
     console.log('[EditorMonaco] proposedChanges updated:', proposedChanges);
   }, [proposedChanges]);
 
-  // This is supposed to update the decorations when the aiModeActive changes but the updateDecorations function is in a different scope
-  useEffect(() => {
-    // This requires a lot of changes
-    if (monacoEditorRef.current) {
-      // updateDecorations();
-      // monacoEditorRef.current.deltaDecorations(
-      //   decorationsRef.current || [],
-      //   aiModeActive ? createDecorations(monacoEditorRef.current.getModel()) : []
-      // );
-    }
-  }, [aiModeActive]);
+  // Show/hide AI icons when content loads
+  useEffect(()=>{
+    // updateDecorations()
+  },[])
+
+  // Show/hide AI icons when settings.aiModeActive changes
+  useEffect(()=>{
+    monacoEditorRef.current?.updateDecorations()
+  },[settingsObject?.aiModeActive])
 
   const [showPerformanceTest, setShowPerformanceTest] = useState(false);
   const decorationsRef = useRef(null);
 
+
+  // This is for initial file load on start
+  const firstChangeRef = useRef(true)
+  function handleChange(){
+    if(!firstChangeRef.current) return
+    firstChangeRef.current = false
+    monacoEditorRef.current?.updateDecorations()
+  }
+
+  // When a new file is loaded (file => open) we updateDecorations
+  useEffect(()=>{
+    monacoEditorRef.current?.updateDecorations()
+  },[filepath])
 
   return (
     <div className="editorMonacoContainer">
@@ -76,21 +93,30 @@ export default function EditorMonaco({ monacoEditorRef }) {
           }
           
           const updateDecorations = () => {
+            console.log("updateDecorations")
+
+
             const model = editor.getModel();
-            // if !aiModeActive we don't show the ai eye glyphs 
-            if (!model || !aiModeActive) return;
+            if (!model) return;
             // if (!model) return;
             
             // Clear existing decorations first
             decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);
             
+            // If ai mode is not active don't add decorations
+            if (!settingsObjectRef.current?.aiModeActive) return;
+
+            // Get each text line from the model
             const lines = model.getLinesContent();
             const newDecorations = [];
             
+            // Loop through each one to add icons where needed
             lines.forEach((line, index) => {
               const lineNumber = index + 1;
               const trimmed = line.trim();
               
+            // todo: Only show glyphs if aiModeActive true
+
               if (trimmed.startsWith('#chapter') || trimmed.startsWith('#section')) {
                 const lineDecorations = model.getLineDecorations(lineNumber);
                 const metadata = getLineMetadataFromDecorations(lineDecorations) || {};
@@ -109,7 +135,10 @@ export default function EditorMonaco({ monacoEditorRef }) {
             
             decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], newDecorations);
           };
-          
+
+          // Attach this function to the editor ref so it can be accessed anywher ehte editor ref is
+          editor.updateDecorations = updateDecorations
+
           const toggleAiShareForLine = (lineNumber) => {
             const model = editor.getModel();
             if (!model) return;
@@ -133,6 +162,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
             editor.layout();
             updateDecorations();
           };
+          editor.toggleAiShareForLine = toggleAiShareForLine
 
           // Allow RightClickWindow actions to toggle aiShare for a line.
           // This keeps the source of truth in the Monaco line metadata decoration.
@@ -450,6 +480,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
           });
         }}
         theme="scribefold-transparent-dark"
+        onChange={handleChange}
         options={{
           // Line number gutter.
           lineNumbers: settingsObject?.showMonacoLineNumbers ? 'on' : 'off',
