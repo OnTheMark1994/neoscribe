@@ -83,13 +83,23 @@ Phases:
 
     3 days
     monaco additional (working on this)
+        currently: 
+            only shown lines show to ai (done)
+            ai mode change has an error
+            right click menu
+            scb file contains the metadata for folded and ai hide strings as wel as encryption
+            maybe export formatted exports with the chapters and sections centered and with larger fornt and settings like canter text, cchapter and section show and format, text format, etc. 
+            
+        need to add update when new #chapter or #section (done)
         chapter and section folding (done)
         glyphs for ai-hide options
-            currently: not showing on start, not conditional based on ai active setting, not correct images
             glyphs show (done)
+            update glyph calculation so the nested ones show as there but grey when active but parent is hidden (done)
+            glyphs show on start, ai mode change, (done)
+            update images (done)
             they change when clicked (done)
             that data is used to create the lines array sent to the ai endpoint (filtering out the hidden ones) (done)
-            glyphs show correct icons, images etc 
+            glyphs show correct icons, images etc  (done)
             right click menu works to set ai show decoration
                 so need to add right click menu options like in other version
                 then wire it up to change monaco editor line decoration content 

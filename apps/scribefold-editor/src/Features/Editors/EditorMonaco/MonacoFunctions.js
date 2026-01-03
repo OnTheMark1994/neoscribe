@@ -373,3 +373,57 @@ export function handleMiniKeyboardMonacoKeyPress(monacoEditorRef, key) {
   if (k === 'Enter') return insertTextAtMonacoCursor(monacoEditorRef, '\n');
   return insertTextAtMonacoCursor(monacoEditorRef, k);
 }
+
+export function getAIVisibleLinesWithAssertedIds(monacoEditorRef) {
+  const editor = monacoEditorRef?.current;
+  if (!editor) return [];
+  
+  const model = editor.getModel?.();
+  if (!model) return [];
+  
+  const linesContent = model.getLinesContent();
+  const result = [];
+  const newDecorations = [];
+
+  let chapterHidden = false;
+  let sectionHidden = false;
+
+  // Cycle through all lines
+  linesContent.forEach((content, i) => {
+    const lineDecorations = model.getLineDecorations(i + 1);
+    let metadata = getLineMetadataFromDecorations(lineDecorations) || {};
+    
+    const trimmed = content.trim();
+    const isChapter = trimmed === '#chapter' || trimmed.startsWith('#chapter ');
+    const isSection = trimmed === '#section' || trimmed.startsWith('#section ');
+
+    // Update visibility state
+    if (isChapter) {
+      chapterHidden = metadata.aiShare === 'hide';
+      sectionHidden = false;
+    } else if (isSection) {
+      sectionHidden = chapterHidden || metadata.aiShare === 'hide';
+    }
+
+    // Assert line ID
+    if (!metadata.lineId) {
+      metadata = { ...metadata, lineId: createLineId() };
+      newDecorations.push(createLineMetadataDecoration(i + 1, metadata));
+    }
+
+    // Add to result if visible
+    if (!chapterHidden && !sectionHidden) {
+      result.push({
+        content,
+        lineId: metadata.lineId
+      });
+    }
+  });
+
+  // Apply decorations
+  if (newDecorations.length > 0) {
+    editor.deltaDecorations([], newDecorations);
+  }
+
+  return result;
+}

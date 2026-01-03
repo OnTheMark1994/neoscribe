@@ -31,10 +31,15 @@ export default function EditorMonaco({ monacoEditorRef }) {
     console.log('[EditorMonaco] proposedChanges updated:', proposedChanges);
   }, [proposedChanges]);
 
-  // Show/hide AI icons when content loads
-  useEffect(()=>{
-    // updateDecorations()
-  },[])
+  // Re check for ai share icons on enter press (in case a new chapter or section has been added or removed)
+  useEffect(() => {
+      const handleKeypress = (e) => {
+        if(e.key === "Enter")
+          monacoEditorRef.current?.updateDecorations()
+      };
+      document.addEventListener('keypress', handleKeypress);
+      return () => document.removeEventListener('mousedown', handleKeypress);
+  }, []);
 
   // Show/hide AI icons when settings.aiModeActive changes
   useEffect(()=>{
@@ -92,49 +97,86 @@ export default function EditorMonaco({ monacoEditorRef }) {
             });
           }
           
-          const updateDecorations = () => {
-            console.log("updateDecorations")
+        // Helper for updateDecorations
+        const getSectionIcon = (isSection, isHidden, parentChapterHidden) => {
+          // Chapter logic
+          if (!isSection) {
+            return isHidden ? 'ai-hide-icon' : 'ai-eye-icon';
+          }
+          
+          // Section logic
+          if (parentChapterHidden) {
+            // Chapter is hidden, section is always grey-eye (even if section is shown)
+            return 'ai-eye-icon-grey';
+          } else {
+            // Chapter is shown, section uses its own visibility
+            return isHidden ? 'ai-hide-icon' : 'ai-eye-icon';
+          }
+        };
 
+        // Helper for updateDecorations
+        const getSectionHoverMessage = (isSection, isHidden, parentChapterHidden) => {
+          if (!isSection) {
+            return isHidden ? 'Hidden from AI' : 'Visible to AI';
+          }
+          
+          if (parentChapterHidden) {
+            return 'Hidden because parent chapter hidden';
+          }
+          
+          return isHidden ? 'Hidden from AI' : 'Visible to AI';
+        };
 
-            const model = editor.getModel();
-            if (!model) return;
-            // if (!model) return;
+        const updateDecorations = () => {
+          console.log("updateDecorations");
+
+          const model = editor.getModel();
+          if (!model) return;
+          
+          decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);
+          
+          if (!settingsObjectRef.current?.aiModeActive) return;
+
+          const lines = model.getLinesContent();
+          const newDecorations = [];
+          
+          // Track the current chapter's hidden state
+          let currentChapterHidden = false;
+          
+          lines.forEach((line, index) => {
+            const lineNumber = index + 1;
+            const trimmed = line.trim();
             
-            // Clear existing decorations first
-            decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);
-            
-            // If ai mode is not active don't add decorations
-            if (!settingsObjectRef.current?.aiModeActive) return;
+            if (!trimmed.startsWith('#chapter') && !trimmed.startsWith('#section')) {
+              return;
+            }
 
-            // Get each text line from the model
-            const lines = model.getLinesContent();
-            const newDecorations = [];
+            const lineDecorations = model.getLineDecorations(lineNumber);
+            const metadata = getLineMetadataFromDecorations(lineDecorations) || {};
+            const isHidden = metadata.aiShare === 'hide';
             
-            // Loop through each one to add icons where needed
-            lines.forEach((line, index) => {
-              const lineNumber = index + 1;
-              const trimmed = line.trim();
-              
-            // todo: Only show glyphs if aiModeActive true
-
-              if (trimmed.startsWith('#chapter') || trimmed.startsWith('#section')) {
-                const lineDecorations = model.getLineDecorations(lineNumber);
-                const metadata = getLineMetadataFromDecorations(lineDecorations) || {};
-                const isHidden = metadata.aiShare === 'hide';
-                
-                newDecorations.push({
-                  range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-                  options: {
-                    glyphMarginClassName: isHidden ? 'ai-hide-icon' : 'ai-eye-icon',
-                    glyphMarginHoverMessage: { value: isHidden ? 'Hidden from AI' : 'Visible to AI' },
-                    stickiness: 1 /* NeverGrowsWhenTypingAtEdges */
-                  }
-                });
+            const isSection = trimmed.startsWith('#section');
+            
+            if (!isSection) {
+              // Update current chapter state
+              currentChapterHidden = isHidden;
+            }
+            
+            const iconClass = getSectionIcon(isSection, isHidden, currentChapterHidden);
+            const hoverMessage = getSectionHoverMessage(isSection, isHidden, currentChapterHidden);
+            
+            newDecorations.push({
+              range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+              options: {
+                glyphMarginClassName: iconClass,
+                glyphMarginHoverMessage: { value: hoverMessage },
+                stickiness: 1 /* NeverGrowsWhenTypingAtEdges */
               }
             });
-            
-            decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], newDecorations);
-          };
+          });
+          
+          decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], newDecorations);
+        };
 
           // Attach this function to the editor ref so it can be accessed anywher ehte editor ref is
           editor.updateDecorations = updateDecorations
