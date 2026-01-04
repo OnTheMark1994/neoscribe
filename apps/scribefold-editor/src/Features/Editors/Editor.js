@@ -116,6 +116,9 @@ Error: Illegal value for lineNumber
 
 
 
+
+monaco-editor modified-in-monaco-diff-editor no-user-select  showUnused showDeprecated vs-dark
+class="monaco-editor modified-in-monaco-diff-editor no-user-select  showUnused showDeprecated vs-dark"
 */
 export default function Editor({ monacoEditorRef }) {
 

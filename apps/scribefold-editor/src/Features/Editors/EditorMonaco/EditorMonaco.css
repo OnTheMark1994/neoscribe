@@ -1,5 +1,6 @@
 .editorMonacoContainer {
   width: calc(100% + 62px);
+  width: calc(100%);
   height: 100%;
 }
 
@@ -324,12 +325,7 @@
   font-weight: bold;
 }
 
-.editor-scrollable{
-  /* background-color: blue !important; */
-  width: calc(100% - 40px) !important;
-  width: calc(100% + 20px) !important;
-  width: 100% !important;
-}
+
 .scroll-decoration{
   /* background-color: blue !important; */
   width: 100% !important;
@@ -401,41 +397,12 @@
   left: 0 !important;
   width: 100% !important;
 }
-/* This overrides a broken width in the diff editor */
-.overflow-guard{
-  width: calc(100% - 40px) !important;
-}
-/* This overrides a broken width in the diff editor */
-.modified-in-monaco-diff-editor{
+
+.editor-scrollable{
   width: 100% !important;
 }
-.view-lines{
-  width: calc(100% - 20px) !important;
-  left: 0 !important;
-}
-.line-insert {
-  width: calc(100% - 20px) !important;
-  left: 0 !important;
-}
-.char-insert {
-  width: calc(100% - 50px) !important;
-  left: 0 !important;
-  background-color: rgba(0, 0, 255, 0.0) !important;
-}
-.diffOverview{
-  left: auto !important;
-  right: 56px;
-}
-.scroll-decoration{
-  display: none;
-}
-/* Ensure individual lines fill the available space */
-/* .line-insert{
-  width: calc(100% + 40px) !important;
-  background-color: rgba(255, 166, 0, 0.366) !important;
 
-} 
-.char-insert{
-  width: calc(100% + 40px) !important;
-  background-color: rgba(29, 96, 138, 0.366) !important;
-} */
+.glyph-margin{
+  /* background-color: orange; */
+  /* width: 5px !important; */
+}

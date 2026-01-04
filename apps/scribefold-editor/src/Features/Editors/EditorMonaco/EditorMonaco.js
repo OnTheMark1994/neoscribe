@@ -66,7 +66,7 @@ export default function EditorMonaco({ monacoEditorRef }) {
       <Editor
         height="100%"
         defaultLanguage="plaintext"
-        defaultValue=""
+        // defaultValue=""
 
         onMount={(editor, monaco) => {
           if (monacoEditorRef) {
@@ -497,10 +497,11 @@ export default function EditorMonaco({ monacoEditorRef }) {
         }}
         theme="scribefold-transparent-dark"
         onChange={handleChange}
+
         options={{
           // Line number gutter.
           lineNumbers: settingsObject?.showMonacoLineNumbers ? 'on' : 'off',
-
+          
           // Disable autocomplete / suggestion popups (word suggestions, etc).
           // This is a writing editor, not a code editor.
           quickSuggestions: false,

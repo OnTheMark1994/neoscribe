@@ -26,6 +26,25 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
     settingsObjectRef.current = settingsObject
   }, [settingsObject]);
 
+
+  // This solves a diff editor bug that changes the layout when a glyph is pressed
+  const setLayoutRef = useRef()
+  function layoutThing(){
+    if(setLayoutRef.current) return
+
+    if( monacoEditorRef.current?.getModifiedEditor()){
+      console.log("ccccccccccccccccccalling layout")
+      monacoEditorRef.current?.getModifiedEditor()?.layout()
+    }else
+    setTimeout(() => {
+      layoutThing()
+    }, 200);
+
+  }
+  useEffect(()=>{
+    layoutThing()
+  },[])
+
   // Re check for ai share icons on enter press (in case a new chapter or section has been added or removed)
   useEffect(() => {
       const handleKeypress = (e) => {
@@ -63,7 +82,11 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
     // updateDecorations only on first load
     if(!firstChangeRef.current) return
     firstChangeRef.current = false
-    monacoEditorRef.current?.updateDecorations()
+
+    setTimeout(() => {
+          monacoEditorRef.current?.updateDecorations()
+
+    }, 500);
 
   }
 
@@ -788,6 +811,7 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
         options={{
           // Line number gutter.
           lineNumbers: settingsObject?.showMonacoLineNumbers ? 'on' : 'off',
+          lineNumbersMinChars: 0,
 
           // Disable autocomplete / suggestion popups (word suggestions, etc).
           // This is a writing editor, not a code editor.
@@ -825,7 +849,7 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
 
           fontSize: 14,
           wordWrap: 'on',
-          automaticLayout: true,
+          // automaticLayout: true,
         }}
       />
     </div>
