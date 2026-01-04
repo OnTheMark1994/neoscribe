@@ -82,16 +82,17 @@ Phases:
         view reflects settings  (done)
 
     3 days
-    monaco additional (done, needs cleanup in <Editor/>, some pushed to later)
+    monaco additional (done, some non-essentials pushed to later)
         currently: 
-            font color
-            nice to have:
-                right click menu (can just remove for now)
-                ai mode change has an error (because monaco doesn't like to resize?) (prob just in dev mode so can ignore for now)
-                #c and #s for chapters and sections shorthand
-                scb file contains the metadata for folded and ai hide strings as wel as encryption
-                export formatted exports with the chapters and sections centered and with larger fornt and settings like canter text, cchapter and section show and format, text format, etc. 
-                in preview scroll view chapters show as big bold text and sections slightly smaller but still big and blue like how #region plugin is
+        nice to have:
+            right click menu (can just remove for now)
+            ai mode change has an error (because monaco doesn't like to resize?) (prob just in dev mode so can ignore for now)
+            #c and #s for chapters and sections shorthand
+            scb file contains the metadata for folded and ai hide strings as wel as encryption
+            export formatted exports with the chapters and sections centered and with larger fornt and settings like canter text, cchapter and section show and format, text format, etc. 
+            in preview scroll view chapters show as big bold text and sections slightly smaller but still big and blue like how #region plugin is
+            customizable font size, color, headers sizes and colors, hilight color
+        font color (done)
         only shown lines show to ai (done)
         need to add update when new #chapter or #section (done)
         chapter and section folding (done)

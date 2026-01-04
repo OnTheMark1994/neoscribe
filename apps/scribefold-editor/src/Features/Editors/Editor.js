@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import EditorMonaco from './EditorMonaco/EditorMonaco';
+import EditorMonacoDiff from './EditorMonaco/EditorMonacoDiff';
 /*
   EditorMonaco seems just as performat as EdtiroMonacoFoldOptamized so I'll just leave it
  
@@ -19,7 +20,8 @@ export default function Editor({ monacoEditorRef }) {
 
   return (
     <>
-      <EditorMonaco monacoEditorRef={monacoEditorRef}/>
+      {/* <EditorMonaco monacoEditorRef={monacoEditorRef}/> */}
+      <EditorMonacoDiff monacoEditorRef={monacoEditorRef}/>
     </>
   );
 }

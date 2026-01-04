@@ -10,9 +10,10 @@ import Editor from '@monaco-editor/react';
 import PerformanceTest from './PerformanceTest';
 import './EditorMonaco.css';
 import { getLinesArrayWithAssertedIds, createLineMetadataDecoration, getLineMetadataFromDecorations, getSectionIcon, getSectionHoverMessage } from './MonacoFunctions';
+import { DiffEditor } from '@monaco-editor/react';
 
 
-export default function EditorMonaco({ monacoEditorRef }) {
+export default function EditorMonacoDiff({ monacoEditorRef }) {
   const dispatch = useDispatch();
 
   // User preferences that should affect Monaco rendering.
@@ -57,37 +58,53 @@ export default function EditorMonaco({ monacoEditorRef }) {
     monacoEditorRef.current?.updateDecorations()
   },[filepath])
 
+
+  const originalContent = `
+    hello
+    #chapter
+    chapter stuff
+    #section
+    section stuff
+    section stuff 2
+  `
+  const modifiedContent = `
+    hello
+    #chapter
+    chapter stuff
+    #section
+    section stuff
+    section stuff 2 modified!
+  `
+
   return (
     <div className="editorMonacoContainer">
       {/* <PerformanceTest 
         editorRef={monacoEditorRef} 
         onClose={() => setShowPerformanceTest(false)}
       /> */}
-      <Editor
+      <DiffEditor
         height="100%"
         defaultLanguage="plaintext"
         defaultValue=""
 
-        onMount={(editor, monaco) => {
+        original={originalContent}
+        modified={modifiedContent}
+
+        onMount={(diffEditor, monaco) => {
+        const modifiedEditor = diffEditor.getModifiedEditor();
           if (monacoEditorRef) {
-            monacoEditorRef.current = editor;
+            monacoEditorRef.current = diffEditor;
           }
 
-          // todo: Content change listener? why not just using the onChange function??
-          const model = editor.getModel?.();
-          if (model) {
-            dispatch(setModified(false));
-          }
-          
           // This is here so it can be called with the editor ref
           const updateDecorations = () => {
 
             // Get the model from the editor (we need it to get the lines etc)
-            const model = editor.getModel();
+            const model = modifiedEditor.getModel();
             if (!model) return;
             
             // 
-            decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);
+            decorationsRef.current = modifiedEditor.deltaDecorations(decorationsRef.current || [], []);
             
             // If ai mode is not on don't add the glyphs
             if (!settingsObjectRef.current?.aiModeActive) return;
@@ -146,16 +163,16 @@ export default function EditorMonaco({ monacoEditorRef }) {
             });
             
             // Put them into the editor's decorations 
-            decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], newDecorations);
+            decorationsRef.current = modifiedEditor.deltaDecorations(decorationsRef.current || [], newDecorations);
           };
           // Attach this function to the editor ref so it can be accessed anywher ehte editor ref is
-          editor.updateDecorations = updateDecorations
+          diffEditor.updateDecorations = updateDecorations
           // Initial decoration update
           updateDecorations();
 
           // When glyph is clicked it toggles metadata. This is here so it can be called with the editor ref
           const toggleAiShareForLine = (lineNumber) => {
-            const model = editor.getModel();
+            const model = modifiedEditor.getModel();
             if (!model) return;
 
             const existingLineDecorations = model.getLineDecorations(lineNumber);
@@ -173,14 +190,14 @@ export default function EditorMonaco({ monacoEditorRef }) {
               .filter(d => d.options.description?.startsWith('sf_meta:'));
             const oldDecorationIds = metaDecorations.map(d => d.id);
 
-            editor.deltaDecorations(oldDecorationIds, [newDecoration]);
-            editor.layout();
+            modifiedEditor.deltaDecorations(oldDecorationIds, [newDecoration]);
+            modifiedEditor.layout();
             updateDecorations();
           };
-          editor.toggleAiShareForLine = toggleAiShareForLine
+          modifiedEditor.toggleAiShareForLine = toggleAiShareForLine
           
           // Handle mouse clicks on monaco (to toggle aiShare metadata on click)
-          editor.onMouseDown((e) => {
+          modifiedEditor.onMouseDown((e) => {
             if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
               return;
             }

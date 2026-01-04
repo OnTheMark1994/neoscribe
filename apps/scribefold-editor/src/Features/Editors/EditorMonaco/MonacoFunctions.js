@@ -431,18 +431,23 @@ export function getAIVisibleLinesWithAssertedIds(monacoEditorRef) {
 // Helper for updateDecorations (used in monaco onMount updateDecorations function)
 export const getSectionIcon = (isSection, isHidden, parentChapterHidden) => {
   // Chapter logic
-  if (!isSection) {
+  if (!isSection) 
     return isHidden ? 'ai-hide-icon' : 'ai-eye-icon';
-  }
   
   // Section logic
-  if (parentChapterHidden) {
-    // Chapter is hidden, section is always grey-eye (even if section is shown)
-    return 'ai-eye-icon-grey';
-  } else {
-    // Chapter is shown, section uses its own visibility
-    return isHidden ? 'ai-hide-icon' : 'ai-eye-icon';
-  }
+  if(isHidden)
+    // when hidden it always shows hide icon
+    return 'ai-hide-icon'
+  // If showing
+  else
+    // And the parent is hidden show the icon but grey
+    if(parentChapterHidden)
+      return 'ai-eye-icon-grey'
+    // And parent is showing (so its showing) show the ai show icon
+    else
+      return 'ai-eye-icon'
+  
+
 };
 
 // Helper for updateDecorations (used in monaco onMount updateDecorations function)
