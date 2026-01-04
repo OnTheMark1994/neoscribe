@@ -31,7 +31,8 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
       const handleKeypress = (e) => {
         if(e.key === "Enter")
           monacoEditorRef.current?.updateDecorations()
-        
+          monacoEditorRef.current?.updateAcceptRejectButtons2()
+
       };
       document.addEventListener('keypress', handleKeypress);
       return () => document.removeEventListener('mousedown', handleKeypress);
@@ -210,101 +211,221 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
 
             // This may be called more frequently than update decs, maybe after 500ms of no typing or on other actions like ai chat reponse coming in 
             const updateAcceptRejectButtons = () => {
-            const model = modifiedEditor.getModel();
-            if (!model) return;
 
-            const lineCount = model.getLineCount();
+              const model = modifiedEditor.getModel();
+              if (!model) return;
 
-            // Clear existing view zones and overlay widgets
-            if (monacoEditorRef.current.acceptRejectZoneIds) {
-                modifiedEditor.changeViewZones(accessor => {
-                monacoEditorRef.current.acceptRejectZoneIds.forEach(id => accessor.removeZone(id));
-                });
-            }
-            if (monacoEditorRef.current.acceptRejectOverlayIds) {
-                monacoEditorRef.current.acceptRejectOverlayIds.forEach(id => {
-                modifiedEditor.removeOverlayWidget(id.widget);
-                });
-            }
-            monacoEditorRef.current.acceptRejectZoneIds = [];
-            monacoEditorRef.current.acceptRejectOverlayIds = [];
+              const lineCount = model.getLineCount();
 
-            // For testing: every 4th line (replace with real diff hunk detection later)
-            for (let lineNumber = 4; lineNumber <= lineCount; lineNumber += 4) {
-                // 1. Create a transparent view zone to push content down
-                const zoneDom = document.createElement('div');
-                zoneDom.style.height = '40px'; // Adjust to fit your buttons + padding
-                zoneDom.style.width = '100%';
-                // Optional: add background or border for debugging
-                // zoneDom.style.background = 'rgba(0,0,255,0.1)';
+              // Clear existing view zones and overlay widgets
+              if (monacoEditorRef.current.acceptRejectZoneIds) {
+                  modifiedEditor.changeViewZones(accessor => {
+                  monacoEditorRef.current.acceptRejectZoneIds.forEach(id => accessor.removeZone(id));
+                  });
+              }
+              if (monacoEditorRef.current.acceptRejectOverlayIds) {
+                  monacoEditorRef.current.acceptRejectOverlayIds.forEach(id => {
+                  modifiedEditor.removeOverlayWidget(id.widget);
+                  });
+              }
+              monacoEditorRef.current.acceptRejectZoneIds = [];
+              monacoEditorRef.current.acceptRejectOverlayIds = [];
 
-                const viewZone = {
-                afterLineNumber: lineNumber,
-                heightInPx: 40, // Use px for precise control
-                domNode: zoneDom,
-                // suppressMouseDown: false // Allow clicks to pass if needed, but we handle in overlay
-                };
+              // For testing: every 4th line (replace with real diff hunk detection later)
+              for (let lineNumber = 4; lineNumber <= lineCount; lineNumber += 4) {
+                  // 1. Create a transparent view zone to push content down
+                  const zoneDom = document.createElement('div');
+                  zoneDom.style.height = '40px'; // Adjust to fit your buttons + padding
+                  zoneDom.style.width = '100%';
+                  // Optional: add background or border for debugging
+                  // zoneDom.style.background = 'rgba(0,0,255,0.1)';
 
-                let zoneId;
-                modifiedEditor.changeViewZones(accessor => {
-                zoneId = accessor.addZone(viewZone);
-                });
-                monacoEditorRef.current.acceptRejectZoneIds.push(zoneId);
+                  const viewZone = {
+                  afterLineNumber: lineNumber,
+                  heightInPx: 40, // Use px for precise control
+                  domNode: zoneDom,
+                  // suppressMouseDown: false // Allow clicks to pass if needed, but we handle in overlay
+                  };
 
-                // 2. Create the clickable overlay widget (buttons)
-                const overlayDom = document.createElement('div');
-                overlayDom.className = 'accept-reject-widget-line';
-                overlayDom.innerHTML = `
-                <div class="accept-reject-widget">
-                    <button class="accept-reject-btn reject-btn">Reject</button>
-                    <button class="accept-reject-btn accept-btn">Accept</button>
-                </div>
-                `;
+                  let zoneId;
+                  modifiedEditor.changeViewZones(accessor => {
+                  zoneId = accessor.addZone(viewZone);
+                  });
+                  monacoEditorRef.current.acceptRejectZoneIds.push(zoneId);
 
-                // Click handler - fully interactive!
-                overlayDom.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const button = e.target.closest('.accept-reject-btn');
-                if (!button) return;
+                  // 2. Create the clickable overlay widget (buttons)
+                  const overlayDom = document.createElement('div');
+                  overlayDom.className = 'accept-reject-widget-line';
+                  overlayDom.innerHTML = `
+                  <div class="accept-reject-widget">
+                      <button class="accept-reject-btn reject-btn">Reject</button>
+                      <button class="accept-reject-btn accept-btn">Accept</button>
+                  </div>
+                  `;
 
-                if (button.classList.contains('accept-btn')) {
-                    console.log('Accept clicked for hunk after line', lineNumber);
-                    // TODO: implement accept logic (apply changes to original)
-                } else {
-                    console.log('Reject clicked for hunk after line', lineNumber);
-                    // TODO: implement reject logic (revert changes)
-                }
-                });
+                  // Click handler - fully interactive!
+                  overlayDom.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  const button = e.target.closest('.accept-reject-btn');
+                  if (!button) return;
 
-                const overlayWidget = {
-                getId: () => `accept.reject.overlay.${lineNumber}`,
-                getDomNode: () => overlayDom,
-                getPosition: () => null, // Overlay widgets ignore position - we position manually below
-                allowEditorOverflow: false
-                };
+                  if (button.classList.contains('accept-btn')) {
+                      console.log('Accept clicked for hunk after line', lineNumber);
+                      // TODO: implement accept logic (apply changes to original)
+                  } else {
+                      console.log('Reject clicked for hunk after line', lineNumber);
+                      // TODO: implement reject logic (revert changes)
+                  }
+                  });
 
-                modifiedEditor.addOverlayWidget(overlayWidget);
+                  const overlayWidget = {
+                  getId: () => `accept.reject.overlay.${lineNumber}`,
+                  getDomNode: () => overlayDom,
+                  getPosition: () => null, // Overlay widgets ignore position - we position manually below
+                  allowEditorOverflow: false
+                  };
 
-                // 3. Position the overlay exactly on top of the view zone
-                // This callback fires whenever layout changes (scroll, resize, etc.)
-                viewZone.onDomNodeTop = (top) => {
-                overlayDom.style.position = 'absolute';
-                overlayDom.style.top = `${top}px`;
-                overlayDom.style.left = '0px'; // Or adjust for line numbers gutter
-                overlayDom.style.width = '100%';
-                };
+                  modifiedEditor.addOverlayWidget(overlayWidget);
 
-                // Initial layout
-                modifiedEditor.layoutOverlayWidget(overlayWidget);
+                  // 3. Position the overlay exactly on top of the view zone
+                  // This callback fires whenever layout changes (scroll, resize, etc.)
+                  viewZone.onDomNodeTop = (top) => {
+                  overlayDom.style.position = 'absolute';
+                  overlayDom.style.top = `${top}px`;
+                  overlayDom.style.left = '0px'; // Or adjust for line numbers gutter
+                  overlayDom.style.width = '100%';
+                  };
 
-                monacoEditorRef.current.acceptRejectOverlayIds.push({ line: lineNumber, widget: overlayWidget });
-            }
+                  // Initial layout
+                  modifiedEditor.layoutOverlayWidget(overlayWidget);
 
-            console.log(`Added ${monacoEditorRef.current.acceptRejectZoneIds.length} accept/reject zones + overlays`);
+                  monacoEditorRef.current.acceptRejectOverlayIds.push({ line: lineNumber, widget: overlayWidget });
+              }
+
+              console.log(`Added ${monacoEditorRef.current.acceptRejectZoneIds.length} accept/reject zones + overlays`);
             };
 
-            monacoEditorRef.current.updateAcceptRejectWidgets = updateAcceptRejectButtons;
-            updateAcceptRejectButtons()
+            monacoEditorRef.current.updateAcceptRejectButtons = updateAcceptRejectButtons;
+            // updateAcceptRejectButtons()
+
+            const updateAcceptRejectButtons2 = () => {
+
+              const model = modifiedEditor.getModel();
+              if (!model) return;
+
+              const lineChanges = diffEditor.getLineChanges(); // <-- This is the key!
+
+              if (!lineChanges || lineChanges.length === 0) {
+                console.log('No differences detected');
+                return;
+              }
+
+                // Clear existing view zones and overlay widgets
+              if (monacoEditorRef.current.acceptRejectZoneIds) {
+                  modifiedEditor.changeViewZones(accessor => {
+                  monacoEditorRef.current.acceptRejectZoneIds.forEach(id => accessor.removeZone(id));
+                  });
+              }
+              if (monacoEditorRef.current.acceptRejectOverlayIds) {
+                  monacoEditorRef.current.acceptRejectOverlayIds.forEach(id => {
+                  modifiedEditor.removeOverlayWidget(id.widget);
+                  });
+              }
+              monacoEditorRef.current.acceptRejectZoneIds = [];
+              monacoEditorRef.current.acceptRejectOverlayIds = [];
+
+              // Go through each line and add if necessary
+              lineChanges.forEach(change => {
+                // We place the buttons AFTER the modified hunk
+                // If lines were deleted only (modifiedEndLineNumber === 0), place after originalEndLineNumber
+                let afterLineNumber;
+                if (change.modifiedEndLineNumber === 0) {
+                  // Pure deletion – place after the deleted block in original
+                  afterLineNumber = change.originalEndLineNumber;
+                } else {
+                  // Addition or modification – place after the last modified line
+                  afterLineNumber = change.modifiedEndLineNumber;
+                }
+
+              // 1. Create a transparent view zone to push content down
+                  const zoneDom = document.createElement('div');
+                  zoneDom.style.height = '40px'; // Adjust to fit your buttons + padding
+                  zoneDom.style.width = '100%';
+                  // Optional: add background or border for debugging
+                  // zoneDom.style.background = 'rgba(0,0,255,0.1)';
+
+                  const viewZone = {
+                    afterLineNumber: afterLineNumber,
+                    heightInPx: 40, // Use px for precise control
+                    domNode: zoneDom,
+                    // suppressMouseDown: false // Allow clicks to pass if needed, but we handle in overlay
+                  };
+
+                  let zoneId;
+                  modifiedEditor.changeViewZones(accessor => {
+                  zoneId = accessor.addZone(viewZone);
+                  });
+                  monacoEditorRef.current.acceptRejectZoneIds.push(zoneId);
+
+                  // 2. Create the clickable overlay widget (buttons)
+                  const overlayDom = document.createElement('div');
+                  overlayDom.className = 'accept-reject-widget-line';
+                  overlayDom.innerHTML = `
+                  <div class="accept-reject-widget">
+                      <button class="accept-reject-btn reject-btn">Reject</button>
+                      <button class="accept-reject-btn accept-btn">Accept</button>
+                  </div>
+                  `;
+
+                  // Click handler - fully interactive!
+                  overlayDom.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  const button = e.target.closest('.accept-reject-btn');
+                  if (!button) return;
+
+                  if (button.classList.contains('accept-btn')) {
+                      console.log('Accept clicked for hunk after line', afterLineNumber);
+                      // TODO: implement accept logic (apply changes to original)
+                  } else {
+                      console.log('Reject clicked for hunk after line', afterLineNumber);
+                      // TODO: implement reject logic (revert changes)
+                  }
+                  });
+
+                  const overlayWidget = {
+                    getId: () => `accept.reject.overlay.${afterLineNumber}`,
+                    getDomNode: () => overlayDom,
+                    getPosition: () => null, // Overlay widgets ignore position - we position manually below
+                    allowEditorOverflow: false
+                  };
+
+                  modifiedEditor.addOverlayWidget(overlayWidget);
+
+                  // 3. Position the overlay exactly on top of the view zone
+                  // This callback fires whenever layout changes (scroll, resize, etc.)
+                  viewZone.onDomNodeTop = (top) => {
+                  overlayDom.style.position = 'absolute';
+                  overlayDom.style.top = `${top}px`;
+                  overlayDom.style.left = '0px'; // Or adjust for line numbers gutter
+                  overlayDom.style.width = '100%';
+                  };
+
+                  // Initial layout
+                  modifiedEditor.layoutOverlayWidget(overlayWidget);
+
+                  monacoEditorRef.current.acceptRejectOverlayIds.push({ line: afterLineNumber, widget: overlayWidget });
+
+              })
+
+              const lineCount = model.getLineCount();
+
+            };
+
+            monacoEditorRef.current.updateAcceptRejectButtons2 = updateAcceptRejectButtons2;
+            updateAcceptRejectButtons2()
+
+
+
 
           // When glyph is clicked it toggles metadata. This is here so it can be called with the editor ref
           const toggleAiShareForLine = (lineNumber) => {
