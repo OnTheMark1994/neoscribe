@@ -43,11 +43,12 @@ export default function AiChatBar({ monacoEditorRef }) {
     messageEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [safeMessages.length]);
 
-  // If AI mode is off, do not mount anything.
+  // If AI mode is off, do not mount anything. Changed this to try remove an error, its in another  place
   if(!showChatBar) return null
 
   return (
-    <div className="aiChatBar resizable-x">
+    // <div className={"aiChatBar resizable-x "+(showChatBar?"":"aiChatBarHidden")}>
+    <div className={"aiChatBar resizable-x "}>
       <div className="aiChatBarHeader">
         {/* Brand icon (title is centered independently via CSS absolute positioning) */}
         <img

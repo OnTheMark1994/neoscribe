@@ -427,3 +427,33 @@ export function getAIVisibleLinesWithAssertedIds(monacoEditorRef) {
 
   return result;
 }
+
+// Helper for updateDecorations (used in monaco onMount updateDecorations function)
+export const getSectionIcon = (isSection, isHidden, parentChapterHidden) => {
+  // Chapter logic
+  if (!isSection) {
+    return isHidden ? 'ai-hide-icon' : 'ai-eye-icon';
+  }
+  
+  // Section logic
+  if (parentChapterHidden) {
+    // Chapter is hidden, section is always grey-eye (even if section is shown)
+    return 'ai-eye-icon-grey';
+  } else {
+    // Chapter is shown, section uses its own visibility
+    return isHidden ? 'ai-hide-icon' : 'ai-eye-icon';
+  }
+};
+
+// Helper for updateDecorations (used in monaco onMount updateDecorations function)
+export const getSectionHoverMessage = (isSection, isHidden, parentChapterHidden) => {
+  if (!isSection) {
+    return isHidden ? 'Hidden from AI' : 'Visible to AI';
+  }
+  
+  if (parentChapterHidden) {
+    return 'Hidden because parent chapter hidden';
+  }
+  
+  return isHidden ? 'Hidden from AI' : 'Visible to AI';
+};

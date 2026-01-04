@@ -9,7 +9,7 @@ import { setModified } from '../../../Global/ReduxSlices/EditorSlice';
 import Editor from '@monaco-editor/react';
 import PerformanceTest from './PerformanceTest';
 import './EditorMonaco.css';
-import { getLinesArrayWithAssertedIds, createLineMetadataDecoration, getLineMetadataFromDecorations } from './MonacoFunctions';
+import { getLinesArrayWithAssertedIds, createLineMetadataDecoration, getLineMetadataFromDecorations, getSectionIcon, getSectionHoverMessage } from './MonacoFunctions';
 
 
 export default function EditorMonaco({ monacoEditorRef }) {
@@ -17,7 +17,6 @@ export default function EditorMonaco({ monacoEditorRef }) {
 
   // User preferences that should affect Monaco rendering.
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
-  const proposedChanges = useSelector(state => state.aiSlice.proposedChanges);
   const filepath = useSelector(state => state.editorSlice.filepath);
 
   // Keeping settings object in a ref so the monaco functions can access it 
@@ -25,11 +24,6 @@ export default function EditorMonaco({ monacoEditorRef }) {
   useEffect(() => {
     settingsObjectRef.current = settingsObject
   }, [settingsObject]);
-
-  // The proposed changes just logging for now
-  useEffect(() => {
-    console.log('[EditorMonaco] proposedChanges updated:', proposedChanges);
-  }, [proposedChanges]);
 
   // Re check for ai share icons on enter press (in case a new chapter or section has been added or removed)
   useEffect(() => {
@@ -46,11 +40,9 @@ export default function EditorMonaco({ monacoEditorRef }) {
     monacoEditorRef.current?.updateDecorations()
   },[settingsObject?.aiModeActive])
 
-  const [showPerformanceTest, setShowPerformanceTest] = useState(false);
   const decorationsRef = useRef(null);
 
-
-  // This is for initial file load on start
+  // This is for initial file load on start so the glyphs show in that case
   const firstChangeRef = useRef(true)
   function handleChange(){
     if(!firstChangeRef.current) return
@@ -58,35 +50,28 @@ export default function EditorMonaco({ monacoEditorRef }) {
     monacoEditorRef.current?.updateDecorations()
   }
 
-  // When a new file is loaded (file => open) we updateDecorations
+  // When a new file is loaded (file => open) we updateDecorations we check to render glpyhs 
   useEffect(()=>{
     monacoEditorRef.current?.updateDecorations()
   },[filepath])
 
   return (
     <div className="editorMonacoContainer">
-      {/* {showPerformanceTest && (
-        <PerformanceTest 
-          editorRef={monacoEditorRef} 
-          onClose={() => setShowPerformanceTest(false)}
-        />
-      )} */}
-
-      {/* <button 
-        className="performance-test-toggle"
-        onClick={() => setShowPerformanceTest(!showPerformanceTest)}
-      >
-        {showPerformanceTest ? 'Hide Performance Test' : 'Show Performance Test'}
-      </button> */}
+      {/* <PerformanceTest 
+        editorRef={monacoEditorRef} 
+        onClose={() => setShowPerformanceTest(false)}
+      /> */}
       <Editor
         height="100%"
         defaultLanguage="plaintext"
         defaultValue=""
+
         onMount={(editor, monaco) => {
           if (monacoEditorRef) {
             monacoEditorRef.current = editor;
           }
 
+          // todo: Content change listener? why not just using the onChange function??
           const model = editor.getModel?.();
           if (model) {
             dispatch(setModified(false));
@@ -97,90 +82,81 @@ export default function EditorMonaco({ monacoEditorRef }) {
             });
           }
           
-        // Helper for updateDecorations
-        const getSectionIcon = (isSection, isHidden, parentChapterHidden) => {
-          // Chapter logic
-          if (!isSection) {
-            return isHidden ? 'ai-hide-icon' : 'ai-eye-icon';
-          }
-          
-          // Section logic
-          if (parentChapterHidden) {
-            // Chapter is hidden, section is always grey-eye (even if section is shown)
-            return 'ai-eye-icon-grey';
-          } else {
-            // Chapter is shown, section uses its own visibility
-            return isHidden ? 'ai-hide-icon' : 'ai-eye-icon';
-          }
-        };
+          // This is here so it can be called with the editor ref
+          const updateDecorations = () => {
 
-        // Helper for updateDecorations
-        const getSectionHoverMessage = (isSection, isHidden, parentChapterHidden) => {
-          if (!isSection) {
-            return isHidden ? 'Hidden from AI' : 'Visible to AI';
-          }
-          
-          if (parentChapterHidden) {
-            return 'Hidden because parent chapter hidden';
-          }
-          
-          return isHidden ? 'Hidden from AI' : 'Visible to AI';
-        };
+            // Get the model from the editor (we need it to get the lines etc)
+            const model = editor.getModel();
+            if (!model) return;
+            
+            // 
+            decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);
+            
+            // If ai mode is not on don't add the glyphs
+            if (!settingsObjectRef.current?.aiModeActive) return;
 
-        const updateDecorations = () => {
-          console.log("updateDecorations");
-
-          const model = editor.getModel();
-          if (!model) return;
-          
-          decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);
-          
-          if (!settingsObjectRef.current?.aiModeActive) return;
-
-          const lines = model.getLinesContent();
-          const newDecorations = [];
-          
-          // Track the current chapter's hidden state
-          let currentChapterHidden = false;
-          
-          lines.forEach((line, index) => {
-            const lineNumber = index + 1;
-            const trimmed = line.trim();
+            // Get the lines from the model so we can cycle through them
+            const lines = model.getLinesContent();
+            const newDecorations = [];
             
-            if (!trimmed.startsWith('#chapter') && !trimmed.startsWith('#section')) {
-              return;
-            }
-
-            const lineDecorations = model.getLineDecorations(lineNumber);
-            const metadata = getLineMetadataFromDecorations(lineDecorations) || {};
-            const isHidden = metadata.aiShare === 'hide';
+            // Track the current chapter's hidden state
+            let currentChapterHidden = false;
             
-            const isSection = trimmed.startsWith('#section');
-            
-            if (!isSection) {
-              // Update current chapter state
-              currentChapterHidden = isHidden;
-            }
-            
-            const iconClass = getSectionIcon(isSection, isHidden, currentChapterHidden);
-            const hoverMessage = getSectionHoverMessage(isSection, isHidden, currentChapterHidden);
-            
-            newDecorations.push({
-              range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-              options: {
-                glyphMarginClassName: iconClass,
-                glyphMarginHoverMessage: { value: hoverMessage },
-                stickiness: 1 /* NeverGrowsWhenTypingAtEdges */
+            // Go through each line to see which glyph should be added (based on it and what came before it)
+            lines.forEach((line, index) => {
+              // We use this to get the decorations
+              const lineNumber = index + 1;
+              const trimmed = line.trim();
+              
+              // If its not a chapter or section we don't need to do anythin to it so return
+              if (!trimmed.startsWith('#chapter') && !trimmed.startsWith('#section')) {
+                return;
+              }   
+              
+              // Get the "decorations" (meta data) for this line
+              const lineDecorations = model.getLineDecorations(lineNumber); // getLineDecorations seems to be a monaco default function
+              const metadata = getLineMetadataFromDecorations(lineDecorations) || {};
+              const isHidden = metadata.aiShare === 'hide';
+              
+              // Check to see if its a section (starts with #section)
+              const isSection = trimmed.startsWith('#section');
+              
+              // If its not a section its a chapter, so we set the currentChapterHidden flag for this and further lines
+              if (!isSection) {
+                // Update current chapter state
+                currentChapterHidden = isHidden;
               }
+              
+              // Get the correct icon class and hover message based on variables
+              const iconClass = getSectionIcon(isSection, isHidden, currentChapterHidden);
+              const hoverMessage = getSectionHoverMessage(isSection, isHidden, currentChapterHidden);
+              
+              // Push the decoration onto the array of decorations to add
+              newDecorations.push({
+                range: new monaco.Range(lineNumber, 1, lineNumber, line.length+1),
+                options: {
+                  inlineClassName: isSection ? 'scribefold-section-line':'scribefold-chapter-line',
+                  glyphMarginClassName: iconClass,
+                  glyphMarginHoverMessage: { value: hoverMessage },
+                  stickiness: 1 /* NeverGrowsWhenTypingAtEdges */
+                }
+              });
+              // newDecorations.push({
+              //   range: new monaco.Range(lineNumber, 1, lineNumber, line.length+1),
+              //   options: {
+              //   }
+              // });
             });
-          });
-          
-          decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], newDecorations);
-        };
-
+            
+            // Put them into the editor's decorations 
+            decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], newDecorations);
+          };
           // Attach this function to the editor ref so it can be accessed anywher ehte editor ref is
           editor.updateDecorations = updateDecorations
+          // Initial decoration update
+          updateDecorations();
 
+          // When glyph is clicked it toggles metadata. This is here so it can be called with the editor ref
           const toggleAiShareForLine = (lineNumber) => {
             const model = editor.getModel();
             if (!model) return;
@@ -205,31 +181,16 @@ export default function EditorMonaco({ monacoEditorRef }) {
             updateDecorations();
           };
           editor.toggleAiShareForLine = toggleAiShareForLine
-
-          // Allow RightClickWindow actions to toggle aiShare for a line.
-          // This keeps the source of truth in the Monaco line metadata decoration.
-          if (!editor.__sfEyeToggleHandlerAttached) {
-            editor.__sfEyeToggleHandlerAttached = true;
-            editor.__sfToggleAiShareForLine = toggleAiShareForLine;
-          }
           
-          // Toggle aiShare metadata on click
+          // Handle mouse clicks on monaco (to toggle aiShare metadata on click)
           editor.onMouseDown((e) => {
             if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
-              console.log('[DEBUG] Ignoring non-glyph click');
               return;
             }
 
             if(e.event.rightButton){
                 e.event.preventDefault(); // THIS prevents browser context menu
                 e.event.stopPropagation();
-
-                console.log('Right-click on eye icon:', {
-                  x: e.event.browserEvent.clientX,
-                  y: e.event.browserEvent.clientY,
-                  pageX: e.event.browserEvent.pageX,
-                  pageY: e.event.browserEvent.pageY,
-                });
 
                 const { clientX: x, clientY: y } = e.event.browserEvent;
                 const lineNumber = e.target.position?.lineNumber || null;
@@ -244,11 +205,6 @@ export default function EditorMonaco({ monacoEditorRef }) {
             }
             // On left click toggle
             else{
-              console.log('[DEBUG] Mouse event received', {
-                targetType: e.target.type,
-                position: e.target.position,
-                lineNumber: e.target.position?.lineNumber
-              });
               
   
               const position = e.target.position;
@@ -260,8 +216,6 @@ export default function EditorMonaco({ monacoEditorRef }) {
               const lineNumber = position.lineNumber;
               toggleAiShareForLine(lineNumber);
               
-              console.log('[DEBUG] Editor layout forced, decorations updated');
-
             }
           });
 
@@ -269,15 +223,30 @@ export default function EditorMonaco({ monacoEditorRef }) {
           window.addEventListener('contextmenu', (e) => {
             // if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
             if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
-              console.log('[DEBUG] Ignoring non-glyph click');
               return;
             }
             e.preventDefault(); // THIS stops the browser menu
           
           }, true);
-          // Initial decoration update
-          updateDecorations();
-          
+
+          // Create a language register? trying to change section and chapter font 
+          // monaco.languages.register({ id: 'scribefold' });
+          // monaco.languages.setMonarchTokensProvider('scribefold', {
+          //     tokenizer: {
+          //       root: [
+          //         // Match #chapter at start of line (with optional whitespace)
+          //         [/^\s*#chapter\b/, 'scribefold.chapter'],
+                  
+          //         // Match #section at start of line (with optional whitespace)
+          //         [/^\s*#section\b/, 'scribefold.section'],
+                  
+          //         // Default token
+          //         [/.+/, '']
+          //       ]
+          //     }
+          //   });
+
+          // Folding ranges for the chapter and section (and indent)
           const foldingProvider = monaco.languages.registerFoldingRangeProvider('plaintext', {
             provideFoldingRanges: (model) => {
               // Monaco calls this on-demand (and potentially often) to determine foldable regions.
@@ -485,17 +454,25 @@ export default function EditorMonaco({ monacoEditorRef }) {
               return deduped;
             }
           });
+
           return () => {
             foldingProvider.dispose();
           };
         }}
+        // Creating a theme before mount
         beforeMount={(monaco) => {
           // Create a theme that matches vs-dark but uses a transparent editor background.
           monaco.editor.defineTheme('scribefold-transparent-dark', {
             base: 'vs-dark',
             inherit: true,
-            rules: [],
+            rules: [
+              
+            ],
             colors: {
+              'editor.foreground': "#00000000",
+              'editor.scribefold-section-line.foreground': "rgba(11, 46, 203, 0)",
+              'editor.scribefold-section-line.foreground': "blue",
+
               // Remove the blue focus border and the current-line border/highlight.
               'focusBorder': '#00000000',
               'editor.lineHighlightBorder': '#00000000',

@@ -17,7 +17,7 @@ export default function Windows({ monacoEditorRef }) {
   return (
     <>
       <SettingsWindow/>
-      <RightClickWindow/>
+      {/* <RightClickWindow/> */}
       <SaveBeforeClosingWindow/>
       <HelpWindow/>
       <AiChatMessageDetail/>
