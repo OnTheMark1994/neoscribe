@@ -234,9 +234,11 @@
 
 /* Monaco Glyph Margin - Eye Icons */
 .monaco-editor .glyph-margin {
-  background-size: 14px 14px;
+  background-size: 84px 14px;
   background-position: center center;
   background-repeat: no-repeat;
+  width: 80px !important;
+  /* background-color: rgba(0, 0, 255, 0.415); */
 }
 
 .ai-eye-icon {
@@ -262,10 +264,148 @@
   background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23666%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M17.94%2017.94A10.07%2010.07%200%200%201%2012%2020c-7%200-11-8-11-8a21.5%2021.5%200%200%201%205.06-5.94M9.9%204.24A9.12%209.12%200%200%201%2012%204c7%200%2011%208%2011%208a21.5%2021.5%200%200%201-2.06%203.76M1%201l22%2022%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22/%3E%3C/svg%3E") !important;
 }
 
+.scribefold-accept-glyph{
+  height: 30px;
+  width: 30px;
+  /* background-color: green; */
+  left: -10px;
+  top: 10px;
+  position: absolute;
+  width: 10px;
+  margin-left: 5px;
+}
+.scribefold-accept-glyph::before {
+  content: "✓";
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: green;
+  font-weight: bold;
+  background: rgba(0, 128, 0, 0.2);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 14px;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 999999999999999999;
+}
+.scribefold-accept-glyph::after {
+  content: "✓";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: red;
+  font-weight: bold;
+  background: rgba(0, 128, 0, 0.2);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 14px;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 999999999999999999;
+}
+.scribefold-reject-glyph{
+  height: 30px;
+  width: 30px;
+  background-color: red;
+}
+
 .scribefold-section-line{
   font-weight: bold;
 }
 .scribefold-chapter-line{
   color: navy !important;
   font-weight: bold;
+}
+
+
+/* Override modified left  */
+.editor.modified{
+  left: 0 !important;
+  width: 100% !important;
+}
+.editorMonacoContainer .monaco-editor{
+  
+  /* width: 100% !important; */
+}
+.overflow-guard{
+  /* background-color: orange !important; */
+  width: 100% !important;
+}
+
+.editor-scrollable{
+  /* background-color: blue !important; */
+  width: calc(100% - 40px) !important;
+  width: calc(100% + 20px) !important;
+  width: 100% !important;
+}
+.scroll-decoration{
+  /* background-color: blue !important; */
+  width: 100% !important;
+}
+
+.accept-reject-widget-line{
+  z-index: 999999;
+  padding-left: 40px;
+  margin: 4px 0;
+}
+
+.accept-reject-widget{
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  background-color: rgba(30, 30, 30, 0.9);
+  padding: 4px 4px;
+  display: inline-flex;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+.accept-reject-btn {
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 4px;
+  width: 70px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: all 200ms ease;
+  user-select: none;
+
+  height: 20px;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+}
+
+.accept-btn{
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.reject-btn{
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.accept-btn:hover{
+  background-color: rgba(34, 197, 94, 0.3);
+  border-color: rgba(34, 197, 94, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
+}
+
+.reject-btn:hover{
+  background-color: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
 }
