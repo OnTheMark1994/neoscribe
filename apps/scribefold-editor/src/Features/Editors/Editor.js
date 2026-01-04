@@ -5,7 +5,7 @@ import EditorMonacoDiff from './EditorMonaco/EditorMonacoDiff';
 /*
   EditorMonaco seems just as performat as EdtiroMonacoFoldOptamized so I'll just leave it
  
-  proposed hanges flow
+  proposed changes flow
 
   1: in editor, new proposed changes come in
   2: in diff editor, more proposed changes come in
@@ -69,6 +69,52 @@ import EditorMonacoDiff from './EditorMonaco/EditorMonacoDiff';
   don't store that array of changes
   just show the accept/reject based on the diff between original and modified
   one accept/reject at the end of the number of new lines
+
+
+  need to see how we are curently adding ids before the ai chat call 
+  and how those are put into the editor ines for persistance
+  we will need to pull all of that data if we are going to switch editors
+
+  maybe always show diff editor
+  when not in modify mode it edits original and keeps modified in sync or empty so there are not diffs shown
+  when in modify mode it changes the modified
+  when all modifications are gone (checked in the function that processes to show the buttons)
+  it says switch to non diff mode (still diff editor but onChange affects the original)
+
+  or maybe user edits always change the og, only the ai changes are shown as diff
+  when in normal mode on every keypress we will set modified editor value to the value in original 
+  when in modify mode it will updae the modified editor content 
+  when checking to see if there are any diffs buttons to show and there are none then it switches modes. 
+  grok chat with some code
+
+
+
+  we also want to add the prposed chanevs navigator like the last one
+  it can maybe do a document.getelement to search by id for the corressponding one and that one will be scrolled to
+  idk if code like a useEffect can be put in the accept reject button boxes
+
+
+  should we have the mode state and other thigns related to this in the Editor.js
+  and the diff navigator maybe
+
+add a check somehwere to prevent this error:
+  ERROR
+Illegal value for lineNumber
+
+Error: Illegal value for lineNumber
+    at sl.getLineMaxColumn (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:248:144)
+    at dN.getBottomForLineNumber (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:257:2255)
+    at https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:390:22735
+    at Dt (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:7:111626)
+    at twe.render (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:390:22076)
+    at xv._runFn (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:390:21576)
+    at xv._run (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:8:6289)
+    at xv.endUpdate (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:8:6829)
+    at Hm.finish (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:7:112437)
+    at Dt (https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs/editor.api-CalNCsUg.js:7:111641)
+Error: Illegal value for lineNumber
+
+
 
 */
 export default function Editor({ monacoEditorRef }) {

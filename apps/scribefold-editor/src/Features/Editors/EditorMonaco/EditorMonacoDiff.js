@@ -47,12 +47,24 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
 
   // This is for initial file load on start so the glyphs show in that case
   const firstChangeRef = useRef(true)
+  const changeCalcTimerRef = useRef(true)
   function handleChange(){
+
     // So we know if a save is needed (for onclose unsaved changes alert, * on filename)
     dispatch(setModified(true));
+
+    // This seems unnecessary
+    // if(changeCalcTimerRef.current)
+    //   clearTimeout(changeCalcTimerRef.current)
+    // changeCalcTimerRef.current = setTimeout(()=>{
+    //   monacoEditorRef.current?.updateAcceptRejectButtons2()
+    // },500)
+
+    // updateDecorations only on first load
     if(!firstChangeRef.current) return
     firstChangeRef.current = false
     monacoEditorRef.current?.updateDecorations()
+
   }
 
   // When a new file is loaded (file => open) we updateDecorations we check to render glpyhs 
@@ -61,7 +73,7 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
   },[filepath])
 
 
-  const originalContent = `
+  let originalContent = `
     hello
     #chapter
     chapter stuff
@@ -69,7 +81,7 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
     section stuff
     section stuff 2
   `
-  const modifiedContent = `
+  let modifiedContent = `
     hello
     #chapter
     chapter stuff
@@ -77,6 +89,7 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
     section stuff
     section stuff 2 modified!
   `
+  modifiedContent = originalContent
 
   return (
     <div className="editorMonacoContainer">
@@ -309,7 +322,6 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
             // updateAcceptRejectButtons()
 
             const updateAcceptRejectButtons2 = () => {
-
               const model = modifiedEditor.getModel();
               if (!model) return;
 
@@ -346,6 +358,8 @@ export default function EditorMonacoDiff({ monacoEditorRef }) {
                   // Addition or modification – place after the last modified line
                   afterLineNumber = change.modifiedEndLineNumber;
                 }
+                // If the line number is out of range skip it
+                // if(afterLineNumber >= diffEditor.getLineCount()) return
 
               // 1. Create a transparent view zone to push content down
                   const zoneDom = document.createElement('div');
