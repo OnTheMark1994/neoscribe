@@ -4,7 +4,7 @@ import Window from '../Util/Window';
 import Keyboard from '../Util/Keyboard';
 import { setShowFileEncryptionWindow } from '../../Global/ReduxSlices/WindowSlice';
 import { fileOpened, resetEditor, setModified } from '../../Global/ReduxSlices/EditorSlice';
-import { setMonacoEditorContent } from '../Editors/EditorMonaco/MonacoFunctions';
+import { getEditorText, setEditorText } from '../../Global/EditorRefHelpers';
 import {
   decryptAndOpenEncryptedText,
   encryptAndSaveFile,
@@ -12,7 +12,7 @@ import {
 } from '../../Global/FileIO';
 import './FileEncryptionWindow.css';
 
-export default function FileEncryptionWindow({ monacoEditorRef }) {
+export default function FileEncryptionWindow({ editorRef }) {
   const dispatch = useDispatch();
 
   const open = useSelector(state => state.windowSlice.showFileEncryptionWindow);
@@ -55,7 +55,7 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
 
   function resetEditorToBlankAndClose() {
     dispatch(resetEditor());
-    setMonacoEditorContent(monacoEditorRef, '');
+    setEditorText(editorRef, '');
     dispatch(setModified(false));
     close();
   }
@@ -87,7 +87,7 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
         return;
       }
 
-      setMonacoEditorContent(monacoEditorRef, String(result.content ?? ''));
+      setEditorText(editorRef, String(result.content ?? ''));
       dispatch(setModified(false));
       close();
     } catch (e) {
@@ -106,7 +106,7 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
       return;
     }
 
-    const plaintext = monacoEditorRef?.current?.getValue ? monacoEditorRef.current.getValue() : '';
+    const plaintext = getEditorText(editorRef);
     const shouldOverwriteExistingScb = String(filepath || '').toLowerCase().endsWith('.scb');
 
     try {
@@ -161,7 +161,7 @@ export default function FileEncryptionWindow({ monacoEditorRef }) {
       }
 
       dispatch(fileOpened({ filepath: fp }));
-      setMonacoEditorContent(monacoEditorRef, result.content);
+      setEditorText(editorRef, result.content);
       dispatch(setModified(false));
       close();
     } catch (e) {

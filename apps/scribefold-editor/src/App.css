@@ -46,6 +46,7 @@
   box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
   border-radius: 4px;
   padding: 5px;
+  padding: 0px;
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(10px);

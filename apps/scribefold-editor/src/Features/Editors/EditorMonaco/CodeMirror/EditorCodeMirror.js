@@ -23,25 +23,22 @@
 
 */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import CodeMirror from '@uiw/react-codemirror';
-import { unifiedMergeView } from '@codemirror/merge';
 import { buildExtensions } from './EditorCodeMirrorSetup';
 import './EditorCodeMirror.css';
 
-export default function EditorCodeMirror() {
+export default function EditorCodeMirror({ editorRef }) {
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
+
+  const handleCreateEditor = useCallback((view) => {
+    editorRef.current = view;
+  }, [editorRef]);
 
   const defaultDoc = `#chapter
 chapter content
 #section
-section content
-  indented section content
-  a
-  a
-    indented further
-#section 2
 section content
   indented section content
   a
@@ -71,12 +68,12 @@ newly added section
     ...buildExtensions(undefined, {
       showLineNumbers: settingsObject?.showMonacoLineNumbers,
     }),
-    unifiedMergeView({
-      original: defaultDoc,
-      gutter: true,
-      mergeControls: true,
-      allowInlineDiffs: true,
-    }),
+    // unifiedMergeView({
+    //   original: defaultDoc,
+    //   gutter: true,
+    //   mergeControls: true,
+    //   allowInlineDiffs: true,
+    // }),
   ];
 
   return (
@@ -88,6 +85,7 @@ newly added section
         width="100%"
         style={{ height: '100%', width: '100%' }}
         extensions={extensions}
+        onCreateEditor={handleCreateEditor}
         onChange={() => {}}
       />
     </div>

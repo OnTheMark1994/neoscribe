@@ -12,7 +12,7 @@ import FileEncryptionWindow from './FileEncryptionWindow';
     so this is a very simple comonent just containing others 
 
 */
-export default function Windows({ monacoEditorRef }) {
+export default function Windows({ editorRef }) {
 
   return (
     <>
@@ -21,7 +21,7 @@ export default function Windows({ monacoEditorRef }) {
       <SaveBeforeClosingWindow/>
       <HelpWindow/>
       <AiChatMessageDetail/>
-      <FileEncryptionWindow monacoEditorRef={monacoEditorRef}/>
+      <FileEncryptionWindow editorRef={editorRef}/>
     </>
   );
 }

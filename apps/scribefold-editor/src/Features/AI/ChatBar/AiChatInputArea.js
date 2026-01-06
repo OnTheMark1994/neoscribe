@@ -17,7 +17,7 @@ import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import { addMessage, addProposedChanges } from '../../../Global/ReduxSlices/AiSlice';
 import { setShowSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
-import { getAIVisibleLinesWithAssertedIds, getLinesArrayWithAssertedIds } from '../../Editors/EditorMonaco/MonacoFunctions';
+import { getAIVisibleLinesFromEditor } from '../../../Global/EditorRefHelpers';
 import './AiChatInputArea.css';
 
 /**
@@ -107,7 +107,7 @@ function tryParseAiJsonResponse(text) {
   }
 }
 
-export default function AiChatInputArea({ monacoEditorRef }) {
+export default function AiChatInputArea({ editorRef }) {
   // Redux dispatch for writing messages + opening windows.
   const dispatch = useDispatch();
 
@@ -126,8 +126,7 @@ export default function AiChatInputArea({ monacoEditorRef }) {
     // Don't send empty messages.
     if (!content) return;
 
-    // Create line array (ensures stable ids).
-    const linesArray = getAIVisibleLinesWithAssertedIds(monacoEditorRef)
+    const linesArray = getAIVisibleLinesFromEditor(editorRef)
     console.log("linesArray: ", linesArray)
 
 

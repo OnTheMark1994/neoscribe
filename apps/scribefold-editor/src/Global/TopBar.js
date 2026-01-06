@@ -58,12 +58,12 @@ import './TopBar.css';
 import { updateSetting } from './ReduxSlices/SettingsSlice';
 import { fileOpened, resetEditor, setFilepath, setModified } from './ReduxSlices/EditorSlice';
 import { openFile as openFileIO, saveFile as saveFileIO, saveFileAs as saveFileAsIO } from './FileIO';
-import { setMonacoEditorContent } from '../Features/Editors/EditorMonaco/MonacoFunctions';
+import { getEditorText, setEditorText } from './EditorRefHelpers';
 
 // Detect whether we are running in Electron or browser
 const IS_ELECTRON = Boolean(window.electronAPI);
 
-export default function TopBar({monacoEditorRef}) {
+export default function TopBar({ editorRef }) {
   // Redux dispatch for menu actions.
   const dispatch = useDispatch();
 
@@ -110,10 +110,10 @@ export default function TopBar({monacoEditorRef}) {
     }
 
     dispatch(resetEditor());
-    setMonacoEditorContent(monacoEditorRef, '');
+    setEditorText(editorRef, '');
     dispatch(setModified(false));
     closeMenu();
-  }, [closeMenu, dispatch, modified, monacoEditorRef]);
+  }, [closeMenu, dispatch, modified, editorRef]);
 
   const openFile = useCallback(async () => {
     if(modified){
@@ -145,17 +145,17 @@ export default function TopBar({monacoEditorRef}) {
 
       const content = String(result.content ?? '');
 
-      setMonacoEditorContent(monacoEditorRef, content);
+      setEditorText(editorRef, content);
       dispatch(setModified(false));
     } catch (e) {
       console.error('[TopBar] openFile failed', e);
     }
     closeMenu();
-  }, [closeMenu, dispatch, modified, monacoEditorRef]);
+  }, [closeMenu, dispatch, modified, editorRef]);
 
   const saveFile = useCallback(async () => {
     try {
-      const content = monacoEditorRef?.current?.getValue ? monacoEditorRef.current.getValue() : '';
+      const content = getEditorText(editorRef);
       const result = await saveFileIO({ filePath: filepath || '', fileName, content });
       if(result?.success){
         dispatch(setModified(false));
@@ -165,11 +165,11 @@ export default function TopBar({monacoEditorRef}) {
       console.error('[TopBar] saveFile failed', e);
     }
     closeMenu();
-  }, [closeMenu, dispatch, fileName, filepath, monacoEditorRef]);
+  }, [closeMenu, dispatch, fileName, filepath, editorRef]);
 
   const saveFileAs = useCallback(async () => {
     try {
-      const content = monacoEditorRef?.current?.getValue ? monacoEditorRef.current.getValue() : '';
+      const content = getEditorText(editorRef);
       const result = await saveFileAsIO({ content, suggestedName: fileName, sourceFilePath: filepath || '' });
       if(result?.success){
         dispatch(setModified(false));
@@ -180,7 +180,7 @@ export default function TopBar({monacoEditorRef}) {
       console.error('[TopBar] saveFileAs failed', e);
     }
     closeMenu();
-  }, [closeMenu, dispatch, fileName, filepath, monacoEditorRef]);
+  }, [closeMenu, dispatch, fileName, filepath, editorRef]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {

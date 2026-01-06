@@ -40,9 +40,7 @@ import OpenSignTest from './OpenSignTest';
 */
 export default function App() {
 
-  // This ref will hold the Monaco editor instance once EditorMonaco mounts.
-  // We keep it in App so both the editor and the AI chat "Send" button can access it.
-  const monacoEditorRef = useRef(null)
+  const editorRef = useRef(null)
 
   // We are retreiving this so we can display the correct backgroundImageUri
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject)
@@ -59,13 +57,13 @@ export default function App() {
       <KeypressListeners/>
 
       {/* Contains auth listener and loads initial data like user table data */}
-      <AppInitializer monacoEditorRef={monacoEditorRef}/>
+      <AppInitializer editorRef={editorRef}/>
 
       {/* Left side: top bar + centered page */}
       <div className="pageArea">
 
         {/* The top bar with options like File => Open etc */}
-        <TopBar monacoEditorRef={monacoEditorRef}/>
+        <TopBar editorRef={editorRef}/>
       
         {/* Centers the page area */}
         <div className="pageContainer">
@@ -74,7 +72,7 @@ export default function App() {
           <div className={"page"}>
           
             {/* The actual editor */}
-              <Editor monacoEditorRef={monacoEditorRef}/>
+              <Editor editorRef={editorRef}/>
           
           </div>
 
@@ -83,12 +81,12 @@ export default function App() {
       </div>
 
       {/* Right side: The AI chat bar that shows conditionally */}
-      <AiChatBar monacoEditorRef={monacoEditorRef}/>
+      <AiChatBar editorRef={editorRef}/>
 
       {/* All windows show from here (right click, settings, help etc) */}
-      <Windows monacoEditorRef={monacoEditorRef}/>
+      <Windows editorRef={editorRef}/>
 
-      <KeyboardWindow monacoEditorRef={monacoEditorRef}/>
+      <KeyboardWindow editorRef={editorRef}/>
 
       {/* <OpenSignTest></OpenSignTest> */}
    

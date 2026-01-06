@@ -22,9 +22,9 @@ import { useDispatch } from 'react-redux';
 import { fileOpened, setModified } from './ReduxSlices/EditorSlice';
 import { setShowFileEncryptionWindow } from './ReduxSlices/WindowSlice';
 import { openLastFile } from './FileIO';
-import { setMonacoEditorContent } from '../Features/Editors/EditorMonaco/MonacoFunctions';
+import { setEditorText } from './EditorRefHelpers';
 
-export default function AppInitializer({ monacoEditorRef }) {
+export default function AppInitializer({ editorRef }) {
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function AppInitializer({ monacoEditorRef }) {
           return;
         }
 
-        const didSet = setMonacoEditorContent(monacoEditorRef, content);
+        const didSet = setEditorText(editorRef, content);
         if (!didSet) {
           let attempts = 0;
           intervalId = setInterval(() => {
@@ -62,7 +62,7 @@ export default function AppInitializer({ monacoEditorRef }) {
             }
 
             attempts += 1;
-            const ok = setMonacoEditorContent(monacoEditorRef, content);
+            const ok = setEditorText(editorRef, content);
             if (ok || attempts >= 50) {
               clearInterval(intervalId);
               intervalId = null;
@@ -83,7 +83,7 @@ export default function AppInitializer({ monacoEditorRef }) {
         intervalId = null;
       }
     };
-  }, [dispatch]);
+  }, [dispatch, editorRef]);
 
   return (
     <div>
