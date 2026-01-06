@@ -38,6 +38,11 @@
   cursor: pointer;
 }
 
+/* Remove the dotted focus outline added by CodeMirror's default theme */
+.scribefold-codemirror .cm-editor.cm-focused {
+  outline: none;
+}
+
 /* Use different characters (e.g., + / –) */
 .cm-foldGutter {
   user-select: none;

@@ -87,16 +87,16 @@ class AIShareMarker extends GutterMarker {
     if (this.state === 'explicitly-hidden') {
       img.src = AiHideIcon;
       img.alt = 'Explicitly hidden from AI';
-      img.title = 'Click to share with AI';
+      img.title = 'Hidden';
     } else if (this.state === 'inherited-hidden') {
       img.src = AiShowGreyIcon;
       img.alt = 'Hidden (parent chapter is hidden)';
-      img.title = 'Click to change AI share state';
+      img.title = '(parent is hidden)';
     } else {
       // 'shared'
       img.src = AiShowIcon;
       img.alt = 'Shared with AI';
-      img.title = 'Click to hide from AI';
+      img.title = 'Shown';
     }
 
     img.style.width = '16px';
@@ -130,7 +130,6 @@ function toggleAIShareMetadata(view, lineStartPos) {
 
   view.dispatch({
     changes: { from: line.from, to: line.to, insert: newText },
-    selection: view.state.selection,
   });
 }
 
