@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import EditorMonaco from './EditorMonaco/EditorMonaco';
 import EditorMonacoDiff from './EditorMonaco/EditorMonacoDiff';
+import EditorMonacoDiff2 from './EditorMonaco/EditorMonacoDiff2';
+import EditorCodeMirror from './EditorMonaco/CodeMirror/EditorCodeMirror';
 /*
   EditorMonaco seems just as performat as EdtiroMonacoFoldOptamized so I'll just leave it
  
@@ -150,7 +152,10 @@ export default function Editor({ monacoEditorRef }) {
   return (
     <>
       {/* <EditorMonaco monacoEditorRef={monacoEditorRef}/> */}
-      <EditorMonacoDiff monacoEditorRef={monacoEditorRef}/>
+      {/* <EditorMonacoDiff monacoEditorRef={monacoEditorRef}/> */}
+      {/* <EditorCodeMirror editorRef={editorRef}></EditorCodeMirror> */}
+      <EditorCodeMirror ></EditorCodeMirror>
+      {/* <EditorMonacoDiff2 monacoEditorRef={monacoEditorRef}/> */}
     </>
   );
 }

@@ -10,91 +10,10 @@ import Editor from '@monaco-editor/react';
 import PerformanceTest from './PerformanceTest';
 import './EditorMonaco.css';
 import { getLinesArrayWithAssertedIds, createLineMetadataDecoration, getLineMetadataFromDecorations, getSectionIcon, getSectionHoverMessage } from './MonacoFunctions';
-import { DiffEditor } from '@monaco-editor/react';
 
 
-export default function EditorMonacoDiff({ monacoEditorRef }) {
+export default function EditorMonacoDiff2({ monacoEditorRef }) {
   const dispatch = useDispatch();
-
-  // User preferences that should affect Monaco rendering.
-  const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
-  const filepath = useSelector(state => state.editorSlice.filepath);
-
-  // Keeping settings object in a ref so the monaco functions can access it 
-  const settingsObjectRef = useRef()
-  useEffect(() => {
-    settingsObjectRef.current = settingsObject
-  }, [settingsObject]);
-
-
-  // This solves a diff editor bug that changes the layout when a glyph is pressed
-  const setLayoutRef = useRef()
-  function layoutThing(){
-    if(setLayoutRef.current) return
-
-    if( monacoEditorRef.current?.getModifiedEditor()){
-      console.log("ccccccccccccccccccalling layout")
-      monacoEditorRef.current?.getModifiedEditor()?.layout()
-    }else
-    setTimeout(() => {
-      layoutThing()
-    }, 200);
-
-  }
-  useEffect(()=>{
-    layoutThing()
-  },[])
-
-  // Re check for ai share icons on enter press (in case a new chapter or section has been added or removed)
-  useEffect(() => {
-      const handleKeypress = (e) => {
-        if(e.key === "Enter")
-          monacoEditorRef.current?.updateDecorations()
-          monacoEditorRef.current?.updateAcceptRejectButtons2()
-
-      };
-      document.addEventListener('keypress', handleKeypress);
-      return () => document.removeEventListener('mousedown', handleKeypress);
-  }, []);
-
-  // Show/hide AI icons when settings.aiModeActive changes
-  useEffect(()=>{
-    monacoEditorRef.current?.updateDecorations()
-  },[settingsObject?.aiModeActive])
-
-  const decorationsRef = useRef(null);
-
-  // This is for initial file load on start so the glyphs show in that case
-  const firstChangeRef = useRef(true)
-  const changeCalcTimerRef = useRef(true)
-  function handleChange(){
-
-    // So we know if a save is needed (for onclose unsaved changes alert, * on filename)
-    dispatch(setModified(true));
-
-    // This seems unnecessary
-    // if(changeCalcTimerRef.current)
-    //   clearTimeout(changeCalcTimerRef.current)
-    // changeCalcTimerRef.current = setTimeout(()=>{
-    //   monacoEditorRef.current?.updateAcceptRejectButtons2()
-    // },500)
-
-    // updateDecorations only on first load
-    if(!firstChangeRef.current) return
-    firstChangeRef.current = false
-
-    setTimeout(() => {
-          monacoEditorRef.current?.updateDecorations()
-
-    }, 500);
-
-  }
-
-  // When a new file is loaded (file => open) we updateDecorations we check to render glpyhs 
-  useEffect(()=>{
-    monacoEditorRef.current?.updateDecorations()
-  },[filepath])
-
 
   let originalContent = `
 hello
@@ -112,7 +31,48 @@ hello
   section stuff
   section stuff 2 modified!
   `
-  modifiedContent = originalContent
+
+  // User preferences that should affect Monaco rendering.
+  const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
+  const filepath = useSelector(state => state.editorSlice.filepath);
+
+  // Keeping settings object in a ref so the monaco functions can access it 
+  const settingsObjectRef = useRef()
+  useEffect(() => {
+    settingsObjectRef.current = settingsObject
+  }, [settingsObject]);
+
+  // Re check for ai share icons on enter press (in case a new chapter or section has been added or removed)
+  useEffect(() => {
+      const handleKeypress = (e) => {
+        if(e.key === "Enter")
+          monacoEditorRef.current?.updateDecorations()
+      };
+      document.addEventListener('keypress', handleKeypress);
+      return () => document.removeEventListener('mousedown', handleKeypress);
+  }, []);
+
+  // Show/hide AI icons when settings.aiModeActive changes
+  useEffect(()=>{
+    monacoEditorRef.current?.updateDecorations()
+  },[settingsObject?.aiModeActive])
+
+  const decorationsRef = useRef(null);
+
+  // This is for initial file load on start so the glyphs show in that case
+  const firstChangeRef = useRef(true)
+  function handleChange(){
+    // So we know if a save is needed (for onclose unsaved changes alert, * on filename)
+    dispatch(setModified(true));
+    if(!firstChangeRef.current) return
+    firstChangeRef.current = false
+    monacoEditorRef.current?.updateDecorations()
+  }
+
+  // When a new file is loaded (file => open) we updateDecorations we check to render glpyhs 
+  useEffect(()=>{
+    monacoEditorRef.current?.updateDecorations()
+  },[filepath])
 
   return (
     <div className="editorMonacoContainer">
@@ -120,52 +80,41 @@ hello
         editorRef={monacoEditorRef} 
         onClose={() => setShowPerformanceTest(false)}
       /> */}
-      <DiffEditor
+      <Editor
         height="100%"
         defaultLanguage="plaintext"
-        defaultValue=""
+        defaultValue={modifiedContent}
 
-        original={originalContent}
-        modified={modifiedContent}
+        onMount={(editor, monaco) => {
+          if (monacoEditorRef) {
+            monacoEditorRef.current = editor;
+          }
 
-        onMount={(diffEditor, monaco) => {
-            const modifiedEditor = diffEditor.getModifiedEditor();
-            if (monacoEditorRef) {
-                monacoEditorRef.current = diffEditor;
-            }
-            
-           const originalEditor = diffEditor.getOriginalEditor();
-            originalEditor.updateOptions({ glyphMargin: true });
-            modifiedEditor.updateOptions({ glyphMargin: true });
-    
+        const updateDiffHighlights = () => {
+            const originalModel = monaco.editor.createModel(originalContent, 'plaintext');
+            const modifiedModel = editor.getModel();
 
-            const checkIfLineHasAIChanges = (lineNumber) => {
-            // Get diff information from Monaco's diff editor
-            const diff = modifiedEditor.getModel()?.getAllDecorations();
-            
-            // Look for diff decorations on this line
-            const lineDecorations = diff?.filter(d => 
-                d.range.startLineNumber <= lineNumber && 
-                d.range.endLineNumber >= lineNumber
-            );
-            
-            // Check if any decoration indicates AI change
-            return lineDecorations?.some(d => 
-                d.options.className?.includes('diff-modified') || 
-                d.options.className?.includes('diff-added') ||
-                d.options.className?.includes('diff-removed')
-            ) || false;
-            };
+            const diff = monaco.editor.computeDiff(originalModel, modifiedModel, { ignoreTrimWhitespace: false });
+            console.log("diff:", diff)
+        
+        }
+        updateDiffHighlights()
 
+          // todo: Content change listener? why not just using the onChange function??
+          const model = editor.getModel?.();
+          if (model) {
+            dispatch(setModified(false));
+          }
+          
           // This is here so it can be called with the editor ref
           const updateDecorations = () => {
 
             // Get the model from the editor (we need it to get the lines etc)
-            const model = modifiedEditor.getModel();
+            const model = editor.getModel();
             if (!model) return;
             
             // 
-            decorationsRef.current = modifiedEditor.deltaDecorations(decorationsRef.current || [], []);
+            decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], []);
             
             // If ai mode is not on don't add the glyphs
             if (!settingsObjectRef.current?.aiModeActive) return;
@@ -183,19 +132,6 @@ hello
               const lineNumber = index + 1;
               const trimmed = line.trim();
               
-                // Testing using glyphs for accept/reject changes
-                // newDecorations.push({
-                //     range: new monaco.Range(lineNumber, 2, lineNumber, 2),
-                //     options: {
-                //     //   inlineClassName: 'scribefold-chapter-line',
-                //     glyphMarginClassName: "scribefold-accept-glyph",
-                //     //   glyphMarginHoverMessage: { value: hoverMessage },
-                //     stickiness: 1 /* NeverGrowsWhenTypingAtEdges */
-                //     }
-                // });
-
-                // For the chapter and section glyphs:
-
               // If its not a chapter or section we don't need to do anythin to it so return
               if (!trimmed.startsWith('#chapter') && !trimmed.startsWith('#section')) {
                 return;
@@ -237,241 +173,16 @@ hello
             });
             
             // Put them into the editor's decorations 
-            decorationsRef.current = modifiedEditor.deltaDecorations(decorationsRef.current || [], newDecorations);
+            decorationsRef.current = editor.deltaDecorations(decorationsRef.current || [], newDecorations);
           };
           // Attach this function to the editor ref so it can be accessed anywher ehte editor ref is
-          monacoEditorRef.current.updateDecorations = updateDecorations
+          editor.updateDecorations = updateDecorations
           // Initial decoration update
           updateDecorations();
 
-
-            // TODO: Do we need these? 
-            monacoEditorRef.current.acceptRejectWidgetIds = [];
-            monacoEditorRef.current.acceptRejectZoneIds = [];
-            monacoEditorRef.current.acceptRejectOverlayIds = [];
-
-            // This may be called more frequently than update decs, maybe after 500ms of no typing or on other actions like ai chat reponse coming in 
-            const updateAcceptRejectButtons = () => {
-
-              const model = modifiedEditor.getModel();
-              if (!model) return;
-
-              const lineCount = model.getLineCount();
-
-              // Clear existing view zones and overlay widgets
-              if (monacoEditorRef.current.acceptRejectZoneIds) {
-                  modifiedEditor.changeViewZones(accessor => {
-                  monacoEditorRef.current.acceptRejectZoneIds.forEach(id => accessor.removeZone(id));
-                  });
-              }
-              if (monacoEditorRef.current.acceptRejectOverlayIds) {
-                  monacoEditorRef.current.acceptRejectOverlayIds.forEach(id => {
-                  modifiedEditor.removeOverlayWidget(id.widget);
-                  });
-              }
-              monacoEditorRef.current.acceptRejectZoneIds = [];
-              monacoEditorRef.current.acceptRejectOverlayIds = [];
-
-              // For testing: every 4th line (replace with real diff hunk detection later)
-              for (let lineNumber = 4; lineNumber <= lineCount; lineNumber += 4) {
-                  // 1. Create a transparent view zone to push content down
-                  const zoneDom = document.createElement('div');
-                  zoneDom.style.height = '40px'; // Adjust to fit your buttons + padding
-                  zoneDom.style.width = '100%';
-                  // Optional: add background or border for debugging
-                  // zoneDom.style.background = 'rgba(0,0,255,0.1)';
-
-                  const viewZone = {
-                  afterLineNumber: lineNumber,
-                  heightInPx: 40, // Use px for precise control
-                  domNode: zoneDom,
-                  // suppressMouseDown: false // Allow clicks to pass if needed, but we handle in overlay
-                  };
-
-                  let zoneId;
-                  modifiedEditor.changeViewZones(accessor => {
-                  zoneId = accessor.addZone(viewZone);
-                  });
-                  monacoEditorRef.current.acceptRejectZoneIds.push(zoneId);
-
-                  // 2. Create the clickable overlay widget (buttons)
-                  const overlayDom = document.createElement('div');
-                  overlayDom.className = 'accept-reject-widget-line';
-                  overlayDom.innerHTML = `
-                  <div class="accept-reject-widget">
-                      <button class="accept-reject-btn reject-btn">Reject</button>
-                      <button class="accept-reject-btn accept-btn">Accept</button>
-                  </div>
-                  `;
-
-                  // Click handler - fully interactive!
-                  overlayDom.addEventListener('click', (e) => {
-                  e.stopPropagation();
-                  const button = e.target.closest('.accept-reject-btn');
-                  if (!button) return;
-
-                  if (button.classList.contains('accept-btn')) {
-                      console.log('Accept clicked for hunk after line', lineNumber);
-                      // TODO: implement accept logic (apply changes to original)
-                  } else {
-                      console.log('Reject clicked for hunk after line', lineNumber);
-                      // TODO: implement reject logic (revert changes)
-                  }
-                  });
-
-                  const overlayWidget = {
-                  getId: () => `accept.reject.overlay.${lineNumber}`,
-                  getDomNode: () => overlayDom,
-                  getPosition: () => null, // Overlay widgets ignore position - we position manually below
-                  allowEditorOverflow: false
-                  };
-
-                  modifiedEditor.addOverlayWidget(overlayWidget);
-
-                  // 3. Position the overlay exactly on top of the view zone
-                  // This callback fires whenever layout changes (scroll, resize, etc.)
-                  viewZone.onDomNodeTop = (top) => {
-                  overlayDom.style.position = 'absolute';
-                  overlayDom.style.top = `${top}px`;
-                  overlayDom.style.left = '0px'; // Or adjust for line numbers gutter
-                  overlayDom.style.width = '100%';
-                  };
-
-                  // Initial layout
-                  modifiedEditor.layoutOverlayWidget(overlayWidget);
-
-                  monacoEditorRef.current.acceptRejectOverlayIds.push({ line: lineNumber, widget: overlayWidget });
-              }
-
-              console.log(`Added ${monacoEditorRef.current.acceptRejectZoneIds.length} accept/reject zones + overlays`);
-            };
-
-            monacoEditorRef.current.updateAcceptRejectButtons = updateAcceptRejectButtons;
-            // updateAcceptRejectButtons()
-
-            const updateAcceptRejectButtons2 = () => {
-              const model = modifiedEditor.getModel();
-              if (!model) return;
-
-              const lineChanges = diffEditor.getLineChanges(); // <-- This is the key!
-
-              if (!lineChanges || lineChanges.length === 0) {
-                console.log('No differences detected');
-                return;
-              }
-
-                // Clear existing view zones and overlay widgets
-              if (monacoEditorRef.current.acceptRejectZoneIds) {
-                  modifiedEditor.changeViewZones(accessor => {
-                  monacoEditorRef.current.acceptRejectZoneIds.forEach(id => accessor.removeZone(id));
-                  });
-              }
-              if (monacoEditorRef.current.acceptRejectOverlayIds) {
-                  monacoEditorRef.current.acceptRejectOverlayIds.forEach(id => {
-                  modifiedEditor.removeOverlayWidget(id.widget);
-                  });
-              }
-              monacoEditorRef.current.acceptRejectZoneIds = [];
-              monacoEditorRef.current.acceptRejectOverlayIds = [];
-
-              // Go through each line and add if necessary
-              lineChanges.forEach(change => {
-                // We place the buttons AFTER the modified hunk
-                // If lines were deleted only (modifiedEndLineNumber === 0), place after originalEndLineNumber
-                let afterLineNumber;
-                if (change.modifiedEndLineNumber === 0) {
-                  // Pure deletion – place after the deleted block in original
-                  afterLineNumber = change.originalEndLineNumber;
-                } else {
-                  // Addition or modification – place after the last modified line
-                  afterLineNumber = change.modifiedEndLineNumber;
-                }
-                // If the line number is out of range skip it
-                // if(afterLineNumber >= diffEditor.getLineCount()) return
-
-              // 1. Create a transparent view zone to push content down
-                  const zoneDom = document.createElement('div');
-                  zoneDom.style.height = '40px'; // Adjust to fit your buttons + padding
-                  zoneDom.style.width = '100%';
-                  // Optional: add background or border for debugging
-                  // zoneDom.style.background = 'rgba(0,0,255,0.1)';
-
-                  const viewZone = {
-                    afterLineNumber: afterLineNumber,
-                    heightInPx: 40, // Use px for precise control
-                    domNode: zoneDom,
-                    // suppressMouseDown: false // Allow clicks to pass if needed, but we handle in overlay
-                  };
-
-                  let zoneId;
-                  modifiedEditor.changeViewZones(accessor => {
-                  zoneId = accessor.addZone(viewZone);
-                  });
-                  monacoEditorRef.current.acceptRejectZoneIds.push(zoneId);
-
-                  // 2. Create the clickable overlay widget (buttons)
-                  const overlayDom = document.createElement('div');
-                  overlayDom.className = 'accept-reject-widget-line';
-                  overlayDom.innerHTML = `
-                  <div class="accept-reject-widget">
-                      <button class="accept-reject-btn reject-btn">Reject</button>
-                      <button class="accept-reject-btn accept-btn">Accept</button>
-                  </div>
-                  `;
-
-                  // Click handler - fully interactive!
-                  overlayDom.addEventListener('click', (e) => {
-                  e.stopPropagation();
-                  const button = e.target.closest('.accept-reject-btn');
-                  if (!button) return;
-
-                  if (button.classList.contains('accept-btn')) {
-                      console.log('Accept clicked for hunk after line', afterLineNumber);
-                      // TODO: implement accept logic (apply changes to original)
-                  } else {
-                      console.log('Reject clicked for hunk after line', afterLineNumber);
-                      // TODO: implement reject logic (revert changes)
-                  }
-                  });
-
-                  const overlayWidget = {
-                    getId: () => `accept.reject.overlay.${afterLineNumber}`,
-                    getDomNode: () => overlayDom,
-                    getPosition: () => null, // Overlay widgets ignore position - we position manually below
-                    allowEditorOverflow: false
-                  };
-
-                  modifiedEditor.addOverlayWidget(overlayWidget);
-
-                  // 3. Position the overlay exactly on top of the view zone
-                  // This callback fires whenever layout changes (scroll, resize, etc.)
-                  viewZone.onDomNodeTop = (top) => {
-                  overlayDom.style.position = 'absolute';
-                  overlayDom.style.top = `${top}px`;
-                  overlayDom.style.left = '0px'; // Or adjust for line numbers gutter
-                  overlayDom.style.width = '100%';
-                  };
-
-                  // Initial layout
-                  modifiedEditor.layoutOverlayWidget(overlayWidget);
-
-                  monacoEditorRef.current.acceptRejectOverlayIds.push({ line: afterLineNumber, widget: overlayWidget });
-
-              })
-
-              const lineCount = model.getLineCount();
-
-            };
-
-            monacoEditorRef.current.updateAcceptRejectButtons2 = updateAcceptRejectButtons2;
-            updateAcceptRejectButtons2()
-
-
-
-
           // When glyph is clicked it toggles metadata. This is here so it can be called with the editor ref
           const toggleAiShareForLine = (lineNumber) => {
-            const model = modifiedEditor.getModel();
+            const model = editor.getModel();
             if (!model) return;
 
             const existingLineDecorations = model.getLineDecorations(lineNumber);
@@ -489,14 +200,14 @@ hello
               .filter(d => d.options.description?.startsWith('sf_meta:'));
             const oldDecorationIds = metaDecorations.map(d => d.id);
 
-            modifiedEditor.deltaDecorations(oldDecorationIds, [newDecoration]);
-            modifiedEditor.layout();
+            editor.deltaDecorations(oldDecorationIds, [newDecoration]);
+            editor.layout();
             updateDecorations();
           };
-          modifiedEditor.toggleAiShareForLine = toggleAiShareForLine
+          editor.toggleAiShareForLine = toggleAiShareForLine
           
           // Handle mouse clicks on monaco (to toggle aiShare metadata on click)
-          modifiedEditor.onMouseDown((e) => {
+          editor.onMouseDown((e) => {
             if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
               return;
             }
@@ -813,14 +524,11 @@ hello
         }}
         theme="scribefold-transparent-dark"
         onChange={handleChange}
+
         options={{
           // Line number gutter.
           lineNumbers: settingsObject?.showMonacoLineNumbers ? 'on' : 'off',
-          lineNumbersMinChars: 0,
-
-          showFoldingControls: 'always',
-renderSideBySide: false,     // <-- CRITICAL: forces inline/single-editor diff view
-
+          
           // Disable autocomplete / suggestion popups (word suggestions, etc).
           // This is a writing editor, not a code editor.
           quickSuggestions: false,
@@ -857,7 +565,7 @@ renderSideBySide: false,     // <-- CRITICAL: forces inline/single-editor diff v
 
           fontSize: 14,
           wordWrap: 'on',
-          // automaticLayout: true,
+          automaticLayout: true,
         }}
       />
     </div>
