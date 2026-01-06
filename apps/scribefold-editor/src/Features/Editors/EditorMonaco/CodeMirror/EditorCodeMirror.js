@@ -26,6 +26,7 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
 import CodeMirror from '@uiw/react-codemirror';
+import { unifiedMergeView } from '@codemirror/merge';
 import { buildExtensions } from './EditorCodeMirrorSetup';
 import './EditorCodeMirror.css';
 
@@ -47,16 +48,42 @@ section content
   a
     indented further`;
 
+  const modifiedDoc = `#chapter
+chapter content (edited)
+#section
+section content
+  indented section content
+  a
+    a (changed)
+    indented further
+#section 2
+section content
+  NEW extra line here
+  indented section content
+  a
+#section 3
+newly added section
+  a
+  a
+    indented further`;
 
-  const extensions = buildExtensions(undefined, {
-    showLineNumbers: settingsObject?.showMonacoLineNumbers,
-  });
+  const extensions = [
+    ...buildExtensions(undefined, {
+      showLineNumbers: settingsObject?.showMonacoLineNumbers,
+    }),
+    unifiedMergeView({
+      original: defaultDoc,
+      gutter: true,
+      mergeControls: true,
+      allowInlineDiffs: true,
+    }),
+  ];
 
   return (
     <div className="scribefold-codemirror">
       <CodeMirror
         basicSetup={false}
-        value={defaultDoc}
+        value={modifiedDoc}
         height="100%"
         width="100%"
         style={{ height: '100%', width: '100%' }}

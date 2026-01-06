@@ -25,5 +25,8 @@
     "monorepo"
   ],
   "author": "Scribefold-AI 2025",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@codemirror/merge": "^6.11.2"
+  }
 }
