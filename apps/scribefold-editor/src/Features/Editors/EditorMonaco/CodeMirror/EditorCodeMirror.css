@@ -1,0 +1,44 @@
+.scribefold-codemirror {
+  width: 100%;
+  height: 100%;
+}
+
+.scribefold-codemirror .cm-theme-light,
+.scribefold-codemirror .cm-theme-dark,
+.scribefold-codemirror .cm-editor,
+.scribefold-codemirror .cm-scroller {
+  height: 100%;
+}
+
+.scribefold-codemirror .cm-editor,
+.scribefold-codemirror .cm-theme-light,
+.scribefold-codemirror .cm-theme-dark {
+  width: 100%;
+}
+
+.scribefold-codemirror .cm-editor {
+  background: transparent;
+  height: 100%;
+}
+
+.scribefold-codemirror .cm-scroller {
+  background: transparent;
+}
+
+.scribefold-codemirror .cm-gutters {
+  background: transparent;
+  border-right: none;
+}
+
+.scribefold-codemirror .cm-gutterElement {
+  color: white;
+}
+
+.scribefold-codemirror .cm-foldGutter .cm-gutterElement {
+  cursor: pointer;
+}
+
+/* Use different characters (e.g., + / –) */
+.cm-foldGutter {
+  user-select: none;
+}
