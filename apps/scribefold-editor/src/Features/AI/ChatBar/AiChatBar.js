@@ -23,7 +23,7 @@ import AiChatInputArea from './AiChatInputArea';
 import AiChatMessage from './AiChatMessage';
 import AiChatTokenDisplay from './AiChatTokenDisplay';
 import './AiChatBar.css';
-export default function AiChatBar({ editorRef }) {
+export default function AiChatBar({ editorRef, originalDocRef }) {
 
   // Determines whether we render the chat bar at all.
   const showChatBar = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
@@ -86,7 +86,7 @@ export default function AiChatBar({ editorRef }) {
       </div>
 
       {/* Prompt input + send + settings entry point. */}
-      <AiChatInputArea editorRef={editorRef}/>
+      <AiChatInputArea editorRef={editorRef} originalDocRef={originalDocRef}/>
     </div>
   );
 }

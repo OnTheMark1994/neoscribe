@@ -17,7 +17,9 @@ import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import { addMessage, addProposedChanges } from '../../../Global/ReduxSlices/AiSlice';
 import { setShowSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
+import { toggleShowDiffView, setShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
 import { getAIVisibleLinesFromEditor } from '../../../Global/EditorRefHelpers';
+import { lineIdState } from '../../Editors/EditorMonaco/CodeMirror/EditorCodeMirrorSetup';
 import './AiChatInputArea.css';
 
 /**
@@ -107,7 +109,7 @@ function tryParseAiJsonResponse(text) {
   }
 }
 
-export default function AiChatInputArea({ editorRef }) {
+export default function AiChatInputArea({ editorRef, originalDocRef }) {
   // Redux dispatch for writing messages + opening windows.
   const dispatch = useDispatch();
 
@@ -124,23 +126,22 @@ export default function AiChatInputArea({ editorRef }) {
     // Read/trim the textarea value.
     const content = String(inputRef.current?.value ?? '').trim();
     // Don't send empty messages.
-    if (!content) return;
+    if (!content) {
+      console.log("No prompt text, returning.")
+      return
+    };
 
-    const linesArray = getAIVisibleLinesFromEditor(editorRef)
-    console.log("linesArray: ", linesArray)
+    // Log full CodeMirror document text for debugging (directly from CodeMirror).
+    const view = editorRef?.current;
+    const fullEditorText = view?.state?.doc ? view.state.doc.toString() : '';
+    console.log('CodeMirror editor content:', fullEditorText);
 
+    const linesArray = getAIVisibleLinesFromEditor(editorRef);
+    console.log("Filtered lines to share with AI:", linesArray);
 
-    // Compile the lines of the text into an array in the format that the api expects it
-    const documentLinesForAi = Array.isArray(linesArray)
-      ? linesArray.map(line => ({
-        id: line?.lineId,
-        text: String(line?.content ?? ''),
-        aiShare: line?.aiShare,
-      }))
-      : [];
 
     // The prompt request and also the lines of text
-    const userMessageForAi = `Request: ${content} \n\n Document:\n${JSON.stringify(documentLinesForAi, null, 2)}`;
+    const userMessageForAi = `Request: ${content} \n\n Document:\n${JSON.stringify(linesArray, null, 2)}`;
 
     // Append the user's message into the shared chat history.
     const userMessageId = `local_${Date.now()}`; // I don't think we need to be adding message ids but I'll leave it for now
@@ -181,12 +182,9 @@ export default function AiChatInputArea({ editorRef }) {
       
       // Try to parse the resonse 
       const parsedResult = tryParseAiJsonResponse(responseText);
+      console.log("parsedResult: ", parsedResult)
 
-      if(Array.isArray(parsedResult?.changes) && parsedResult.changes.length > 0){
-        dispatch(addProposedChanges(parsedResult.changes));
-      }
-
-      // Fall back to the response text if the aprse failed 
+      // Fall back to the response text if the parse failed 
       const assistantContent = parsedResult.message || responseText;
 
       // Add message to message array for display also clears "thinking"` placeholders.
@@ -202,6 +200,16 @@ export default function AiChatInputArea({ editorRef }) {
           parsedResponse: parsedResult.parsed,
         },
       }));
+
+      // If there are no usable proposed changes, stop here.
+      if (!Array.isArray(parsedResult?.changes) || parsedResult.changes.length === 0) {
+        console.log('[AI Chat] No proposed changes found in response');
+        return;
+      }
+
+      // Let a dedicated helper apply the changes to the editor and open diff view.
+      processProposedChanges(editorRef, originalDocRef, parsedResult.changes);
+
     } catch (error) {
       console.error('[AI Chat] DeepSeek request failed:', error);
 
@@ -218,6 +226,130 @@ export default function AiChatInputArea({ editorRef }) {
 
     // Clear the input after sending.
     if (inputRef.current) inputRef.current.value = '';
+  }
+
+  function processProposedChanges(editorRef, originalRef, proposedChanges) {
+    const view = editorRef?.current;
+    if (!view?.state?.doc) {
+      return;
+    }
+
+    // Get the line id map so we can make changes in the rightr places based on the proposed changes 
+    const doc = view.state.doc;
+    const lineIdMap = view.state.field(lineIdState);
+
+    // get the original text and put it in a ref so the diff can compare it to the modified version
+    const originalText = doc.toString();
+    originalRef.current = originalText;
+
+    // Build a simple array of { lineId, text } in document order.
+    const originalLines = [];
+    for (let i = 1; i <= doc.lines; i++) {
+      const line = doc.line(i);
+      const lineId = lineIdMap.get(line.from) || `line_${i}`;
+      originalLines.push({ lineId, text: line.text });
+    }
+
+    // Normalize changes: delete/modify/insert based on lineID.
+    const deleteSet = new Set();
+    const modifyMap = new Map();
+    const insertMap = new Map(); // lineId -> array of strings to insert after that line
+
+    for (const rawChange of proposedChanges) {
+      if (!rawChange) continue;
+
+      const type = String(rawChange.type || '').toLowerCase();
+      const lineID = rawChange.lineID ?? rawChange.lineId;
+      if (!lineID) continue;
+
+      if (type === 'delete') {
+        deleteSet.add(lineID);
+      } else if (type === 'modify') {
+        const newText = rawChange.proposedText ?? rawChange.content ?? rawChange.newContent;
+        if (typeof newText === 'string') {
+          modifyMap.set(lineID, newText);
+        }
+      } else if (type === 'insert') {
+        const linesToInsert = Array.isArray(rawChange.linesToInsert)
+          ? rawChange.linesToInsert
+          : [];
+        if (linesToInsert.length === 0) continue;
+
+        const existing = insertMap.get(lineID) || [];
+        insertMap.set(lineID, existing.concat(linesToInsert.map(String)));
+      }
+    }
+
+    const resultLines = [];
+
+    for (const line of originalLines) {
+      const { lineId, text } = line;
+
+      if (deleteSet.has(lineId)) {
+        continue;
+      }
+
+      const modifiedText = modifyMap.has(lineId) ? modifyMap.get(lineId) : text;
+      resultLines.push(modifiedText);
+
+      const insertsForLine = insertMap.get(lineId);
+      if (Array.isArray(insertsForLine) && insertsForLine.length > 0) {
+        for (const insertText of insertsForLine) {
+          resultLines.push(insertText);
+        }
+      }
+    }
+
+    const resultText = resultLines.join('\n');
+
+    // Focused logging to verify processing correctness.
+    console.log('[AI Apply] Original lines:', JSON.stringify(originalLines, null, 2));
+    console.log('[AI Apply] Proposed changes:', JSON.stringify(proposedChanges, null, 2));
+    console.log('[AI Apply] Result lines:', JSON.stringify(resultLines, null, 2));
+
+    // Apply the new text directly to the editor.
+    view.dispatch({
+      changes: {
+        from: 0,
+        to: doc.length,
+        insert: resultText,
+      },
+    });
+
+    // Store changes for Redux consumers and open the diff view.
+    dispatch(addProposedChanges(proposedChanges));
+    dispatch(setShowDiffView(true));
+  }
+
+  function debugDiffView() {
+    console.log('[Debug] Starting debug diff view process');
+    
+    const view = editorRef?.current;
+    const currentText = view?.state?.doc ? view.state.doc.toString() : '';
+    console.log('[Debug] Current editor text:', currentText);
+    
+    originalDocRef.current = currentText;
+    console.log('[Debug] Saved to originalDocRef:', originalDocRef.current);
+    
+    const lines = currentText.split('\n');
+    if (lines.length > 0) {
+      lines[0] = lines[0] + ' Added';
+    }
+    const modifiedText = lines.join('\n');
+    console.log('[Debug] Modified text:', modifiedText);
+    
+    if (view?.state?.doc) {
+      view.dispatch({
+        changes: {
+          from: 0,
+          to: view.state.doc.length,
+          insert: modifiedText,
+        },
+      });
+    }
+
+    console.log('[Debug] Toggling diff view to true');
+    dispatch(toggleShowDiffView());
   }
 
   // For the Alt + Enter keypress send 
@@ -239,6 +371,9 @@ export default function AiChatInputArea({ editorRef }) {
     return () => el.removeEventListener('keydown', onKeyDown);
   }, []);
 
+
+
+
   return (
     <div className="aiChatInputArea">
 
@@ -251,6 +386,16 @@ export default function AiChatInputArea({ editorRef }) {
 
       {/* Buttons */}
       <div className="aiChatInputButtons">
+
+        {/* Debug Diff View Button */}
+        <button
+          className="aiChatSettingsButton"
+          type="button"
+          onClick={debugDiffView}
+          style={{ backgroundColor: '#FF9800' }}
+        >
+          🐛 Debug Diff
+        </button>
 
         {/* AI Settings Button */}
         <button

@@ -1,5 +1,6 @@
 import { foldGutter, foldService } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
+import { StateField, Facet } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
 import AiShowIcon from '../scribefold-ai-eye.png';           // Full color: actively shared
 import AiShowGreyIcon from '../scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
@@ -74,6 +75,44 @@ const customOutlineFolding = (state, lineStart, lineEnd) => {
 
 // Only one invisible marker: explicitly hidden
 const AI_HIDDEN_MARKER = '\u200C'; // zero-width non-joiner
+
+// Helper to generate unique line IDs
+function generateLineId() {
+  return `line_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// StateField to track stable line IDs
+// Maps line positions to unique IDs that persist across edits
+const lineIdState = StateField.define({
+  create(state) {
+    const map = new Map();
+    const doc = state.doc;
+    
+    // Generate IDs for all existing lines
+    for (let i = 1; i <= doc.lines; i++) {
+      const line = doc.line(i);
+      map.set(line.from, generateLineId());
+    }
+    
+    return map;
+  },
+  
+  update(value, transaction) {
+    if (!transaction.docChanged) return value;
+
+    const newValue = new Map();
+    const doc = transaction.state.doc;
+
+    // Single pass: keep existing IDs, generate new ones for new lines
+    for (let i = 1; i <= doc.lines; i++) {
+      const line = doc.line(i);
+      const existingId = value.get(line.from);
+      newValue.set(line.from, existingId || generateLineId());
+    }
+
+    return newValue;
+  }
+});
 
 class AIShareMarker extends GutterMarker {
   constructor(state) {
@@ -190,9 +229,11 @@ const aiShareGutter = gutter({
   }
 });
 
+export { lineIdState };
 export function buildExtensions(onChange, options = {}) {
   const showLineNumbers = !!options.showLineNumbers;
   return [
+    lineIdState,
     aiShareGutter,
     foldGutter({
       markerDOM: (open) => {

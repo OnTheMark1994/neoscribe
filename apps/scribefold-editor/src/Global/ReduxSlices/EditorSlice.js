@@ -9,6 +9,7 @@ import { createSlice } from '@reduxjs/toolkit';
 const initialState = {
   filepath: '',
   modified: false,
+  showDiffView: false,
 };
 
 const editorSlice = createSlice({
@@ -30,9 +31,15 @@ const editorSlice = createSlice({
       state.filepath = filepath ?? '';
       state.modified = false;
     },
+    toggleShowDiffView(state) {
+      state.showDiffView = !state.showDiffView;
+    },
+    setShowDiffView(state, action) {
+      state.showDiffView = !!action.payload;
+    },
   },
 });
 
-export const { setFilepath, setModified, resetEditor, fileOpened } = editorSlice.actions;
+export const { setFilepath, setModified, resetEditor, fileOpened, toggleShowDiffView, setShowDiffView } = editorSlice.actions;
 
 export default editorSlice.reducer;

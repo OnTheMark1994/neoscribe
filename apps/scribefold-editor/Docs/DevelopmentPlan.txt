@@ -130,6 +130,23 @@ Phases:
         gets response, prases it, puts it into redux (done)
             just logs it for now (done)
 
+    code mirror
+        changes indicator *
+        mostly done
+
+    connecting code mirror and ai chat responses
+        logging just shown parts with ids
+        getting response based on that
+        logging it
+        showing it in the diff view
+        returning to non diff view when all are accepted/rejected
+        diff navigator
+            searches for all elements that have the css accept/reject button area class 
+                and loops thorugh them
+                changing css and scrolling them into view
+                mabye call same function when accept/reject is clicked   
+
+
     3 days 
     connecting monaco and the ai response
         data pulls

@@ -41,6 +41,7 @@ import OpenSignTest from './OpenSignTest';
 export default function App() {
 
   const editorRef = useRef(null)
+  const originalDocRef = useRef('')
 
   // We are retreiving this so we can display the correct backgroundImageUri
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject)
@@ -72,7 +73,7 @@ export default function App() {
           <div className={"page"}>
           
             {/* The actual editor */}
-              <Editor editorRef={editorRef}/>
+              <Editor editorRef={editorRef} originalDocRef={originalDocRef}/>
           
           </div>
 
@@ -81,7 +82,7 @@ export default function App() {
       </div>
 
       {/* Right side: The AI chat bar that shows conditionally */}
-      <AiChatBar editorRef={editorRef}/>
+      <AiChatBar editorRef={editorRef} originalDocRef={originalDocRef}/>
 
       {/* All windows show from here (right click, settings, help etc) */}
       <Windows editorRef={editorRef}/>

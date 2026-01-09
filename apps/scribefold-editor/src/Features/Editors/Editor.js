@@ -122,7 +122,7 @@ Error: Illegal value for lineNumber
 monaco-editor modified-in-monaco-diff-editor no-user-select  showUnused showDeprecated vs-dark
 class="monaco-editor modified-in-monaco-diff-editor no-user-select  showUnused showDeprecated vs-dark"
 */
-export default function Editor({ editorRef }) {
+export default function Editor({ editorRef, originalDocRef }) {
 
   // Getting the proposed changes from redux (they come from the ai chat) 
   const proposedChanges = useSelector(state => state.aiSlice.proposedChanges);
@@ -154,7 +154,7 @@ export default function Editor({ editorRef }) {
       {/* <EditorMonaco monacoEditorRef={monacoEditorRef}/> */}
       {/* <EditorMonacoDiff monacoEditorRef={monacoEditorRef}/> */}
       {/* <EditorCodeMirror editorRef={editorRef}></EditorCodeMirror> */}
-      <EditorCodeMirror editorRef={editorRef} ></EditorCodeMirror>
+      <EditorCodeMirror editorRef={editorRef} originalDocRef={originalDocRef}></EditorCodeMirror>
       {/* <EditorMonacoDiff2 monacoEditorRef={monacoEditorRef}/> */}
     </>
   );
