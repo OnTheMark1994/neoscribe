@@ -78,9 +78,10 @@
 
 import React, { useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { toggleShowDiffView } from '../../../../Global/ReduxSlices/EditorSlice';
+import { toggleShowDiffView, setShowDiffView } from '../../../../Global/ReduxSlices/EditorSlice';
 import CodeMirror from '@uiw/react-codemirror';
-import { unifiedMergeView } from '@codemirror/merge';
+import { getOriginalDoc, unifiedMergeView } from '@codemirror/merge';
+import { EditorView } from '@codemirror/view';
 import { buildExtensions } from './EditorCodeMirrorSetup';
 import './EditorCodeMirror.css';
 
@@ -88,6 +89,33 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
   const dispatch = useDispatch();
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const showDiffView = useSelector(state => state.editorSlice.showDiffView);
+
+  // Listener to detect accept/reject actions in the merge view and exit diff mode
+  const acceptRevertListener = EditorView.updateListener.of((update) => {
+    if (!update.transactions || update.transactions.length === 0) return;
+
+    const hasAcceptOrRevert = update.transactions.some(tr =>
+      tr.isUserEvent('accept') || tr.isUserEvent('revert')
+    );
+
+    if (!hasAcceptOrRevert) return;
+
+    console.log('[Diff] Accept/Revert user event detected');
+
+    const currentContent = update.state.doc.toString();
+    const originalArray = getOriginalDoc(update.state)
+    const original = originalArray.toString();
+    // get from editorRef.view value? 
+
+    console.log("original: ", original);
+    console.log("currentContent: ", currentContent);
+    console.log('[Diff] Checking if all changes are resolved. current === original ?', currentContent === original);
+
+    if (currentContent === original) {
+      console.log('[Diff] All changes resolved, exiting diff mode');
+      dispatch(setShowDiffView(false));
+    }
+  });
 
   const handleCreateEditor = useCallback((view) => {
     editorRef.current = view;
@@ -121,11 +149,11 @@ newly added section
   a
     indented further`;
 
-
   const extensions = [
     ...buildExtensions(undefined, {
       showLineNumbers: settingsObject?.showMonacoLineNumbers,
     }),
+    acceptRevertListener,
     ...(showDiffView ? [
       unifiedMergeView({
         original: originalDocRef.current,
