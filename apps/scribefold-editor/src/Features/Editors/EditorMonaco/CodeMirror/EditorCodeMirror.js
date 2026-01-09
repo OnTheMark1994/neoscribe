@@ -92,6 +92,7 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
 
   // Listener to detect accept/reject actions in the merge view and exit diff mode
   const acceptRevertListener = EditorView.updateListener.of((update) => {
+    console.log("update: ", update)
     if (!update.transactions || update.transactions.length === 0) return;
 
     const hasAcceptOrRevert = update.transactions.some(tr =>

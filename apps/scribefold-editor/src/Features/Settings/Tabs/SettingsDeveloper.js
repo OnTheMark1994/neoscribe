@@ -5,6 +5,7 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateSetting } from '../../../Global/ReduxSlices/SettingsSlice';
+import { toggleShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
 import ToggleSwitch from '../../Util/ToggleSwitch';
 import '../SettingsTabs.css';
 
@@ -12,6 +13,7 @@ export default function SettingsDeveloper() {
   const dispatch = useDispatch();
 
   const devMode = useSelector(state => state.settingsSlice.settingsObject?.devMode);
+  const showDiffView = useSelector(state => state.editorSlice.showDiffView);
   const authUser = useSelector(state => state.userSlice.authUser);
   const userData = useSelector(state => state.userSlice.userData) || {};
 
@@ -50,6 +52,17 @@ export default function SettingsDeveloper() {
               <div className="settingsRowLabelSub">Helps confirm userData shape from backend.</div>
             </div>
             <div className="settingsInlineValue">{Object.keys(userData || {}).join(', ') || '—'}</div>
+          </div>
+
+          <div className="settingsRow">
+            <div className="settingsRowLabel">
+              <div className="settingsRowLabelTitle">Toggle diff view</div>
+              <div className="settingsRowLabelSub">Manually toggle diff view mode for debugging.</div>
+            </div>
+            <ToggleSwitch
+              on={Boolean(showDiffView)}
+              onClick={() => dispatch(toggleShowDiffView())}
+            />
           </div>
         </div>
       ) : null}

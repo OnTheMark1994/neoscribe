@@ -4,6 +4,7 @@ import EditorMonaco from './EditorMonaco/EditorMonaco';
 import EditorMonacoDiff from './EditorMonaco/EditorMonacoDiff';
 import EditorMonacoDiff2 from './EditorMonaco/EditorMonacoDiff2';
 import EditorCodeMirror from './EditorMonaco/CodeMirror/EditorCodeMirror';
+import ChangeNavigator from '../AI/Components/ChangeNavigator';
 /*
   EditorMonaco seems just as performat as EdtiroMonacoFoldOptamized so I'll just leave it
  
@@ -125,37 +126,17 @@ class="monaco-editor modified-in-monaco-diff-editor no-user-select  showUnused s
 export default function Editor({ editorRef, originalDocRef }) {
 
   // Getting the proposed changes from redux (they come from the ai chat) 
-  const proposedChanges = useSelector(state => state.aiSlice.proposedChanges);
+  const showDiffView = useSelector(state => state.editorSlice.showDiffView);
 
   // Maybe we keep a ref up to date with the monaco editor values (current) and use that to set the values
 
-  // Just logging prposed changes for now
-  useEffect(() => {
-    // If there are proposed changes
-    if(proposedChanges && proposedChanges.length > 0){
-      // Show the diff editor, set its values (after its showging somehow)
-    }else{
-      // Show just the editor? 
-    }
-    console.log('[EditorMonaco] proposedChanges updated:', proposedChanges);
-    const currentVersion = ""// get from editor or diffeditor modified
-    const withProposedChanges = buildProposedChangesVersion(currentVersion, proposedChanges)
-  }, [proposedChanges]);
-
-  // Takes the current version from editor or diffeditor modified and the proposed changes array, uses line ids to create a new modified version
-  function buildProposedChangesVersion(currentVersion, proposedChanges){
-
-  }
 
   // Todo: display an editor type based on proposed changes
 
   return (
     <>
-      {/* <EditorMonaco monacoEditorRef={monacoEditorRef}/> */}
-      {/* <EditorMonacoDiff monacoEditorRef={monacoEditorRef}/> */}
-      {/* <EditorCodeMirror editorRef={editorRef}></EditorCodeMirror> */}
       <EditorCodeMirror editorRef={editorRef} originalDocRef={originalDocRef}></EditorCodeMirror>
-      {/* <EditorMonacoDiff2 monacoEditorRef={monacoEditorRef}/> */}
+      {showDiffView && <ChangeNavigator/>}
     </>
   );
 }
