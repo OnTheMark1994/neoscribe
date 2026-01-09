@@ -100,19 +100,11 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
 
     if (!hasAcceptOrRevert) return;
 
-    console.log('[Diff] Accept/Revert user event detected');
-
     const currentContent = update.state.doc.toString();
     const originalArray = getOriginalDoc(update.state)
     const original = originalArray.toString();
-    // get from editorRef.view value? 
-
-    console.log("original: ", original);
-    console.log("currentContent: ", currentContent);
-    console.log('[Diff] Checking if all changes are resolved. current === original ?', currentContent === original);
 
     if (currentContent === original) {
-      console.log('[Diff] All changes resolved, exiting diff mode');
       dispatch(setShowDiffView(false));
     }
   });
@@ -165,38 +157,17 @@ newly added section
   ];
 
   return (
-    <>
-      <button 
-        onClick={() => dispatch(toggleShowDiffView())}
-        style={{
-          position: 'absolute',
-          top: '10px',
-          right: '10px',
-          zIndex: 1000,
-          padding: '8px 16px',
-          backgroundColor: showDiffView ? '#4CAF50' : '#2196F3',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: 'bold',
-        }}
-      >
-        {showDiffView ? 'Normal View' : 'Diff View'}
-      </button>
-      <div className="scribefold-codemirror">
-        <CodeMirror
-          basicSetup={false}
-          value={modifiedDoc}
-          height="100%"
-          width="100%"
-          style={{ height: '100%', width: '100%' }}
-          extensions={extensions}
-          onCreateEditor={handleCreateEditor}
-          onChange={() => {}}
-        />
-      </div>
-    </>
+    <div className="scribefold-codemirror">
+      <CodeMirror
+        basicSetup={false}
+        value={modifiedDoc}
+        height="100%"
+        width="100%"
+        style={{ height: '100%', width: '100%' }}
+        extensions={extensions}
+        onCreateEditor={handleCreateEditor}
+        onChange={() => {}}
+      />
+    </div>
   );
 }

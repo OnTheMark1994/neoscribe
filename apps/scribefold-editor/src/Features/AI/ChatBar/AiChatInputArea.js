@@ -122,7 +122,6 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
   // New behavior: Accept `monacoEditorRef` so Send can pull Monaco lines and assert per-line ids
   // via helper functions in `MonacoFunctions.js`.
   async function send() {
-    console.log("send function")
     // Read/trim the textarea value.
     const content = String(inputRef.current?.value ?? '').trim();
     // Don't send empty messages.
@@ -131,13 +130,14 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
       return
     };
 
+    // Clear the input immediately.
+    if (inputRef.current) inputRef.current.value = '';
+
     // Log full CodeMirror document text for debugging (directly from CodeMirror).
     const view = editorRef?.current;
     const fullEditorText = view?.state?.doc ? view.state.doc.toString() : '';
-    console.log('CodeMirror editor content:', fullEditorText);
 
     const linesArray = getAIVisibleLinesFromEditor(editorRef);
-    console.log("Filtered lines to share with AI:", linesArray);
 
 
     // The prompt request and also the lines of text
@@ -182,7 +182,6 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
       
       // Try to parse the resonse 
       const parsedResult = tryParseAiJsonResponse(responseText);
-      console.log("parsedResult: ", parsedResult)
 
       // Fall back to the response text if the parse failed 
       const assistantContent = parsedResult.message || responseText;
@@ -223,9 +222,6 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
         debug: error?.debugInfo || null,
       }));
     }
-
-    // Clear the input after sending.
-    if (inputRef.current) inputRef.current.value = '';
   }
 
   function processProposedChanges(editorRef, originalRef, proposedChanges) {
@@ -302,11 +298,6 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
 
     const resultText = resultLines.join('\n');
 
-    // Focused logging to verify processing correctness.
-    console.log('[AI Apply] Original lines:', JSON.stringify(originalLines, null, 2));
-    console.log('[AI Apply] Proposed changes:', JSON.stringify(proposedChanges, null, 2));
-    console.log('[AI Apply] Result lines:', JSON.stringify(resultLines, null, 2));
-
     // Apply the new text directly to the editor.
     view.dispatch({
       changes: {
@@ -319,37 +310,6 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
     // Store changes for Redux consumers and open the diff view.
     dispatch(addProposedChanges(proposedChanges));
     dispatch(setShowDiffView(true));
-  }
-
-  function debugDiffView() {
-    console.log('[Debug] Starting debug diff view process');
-    
-    const view = editorRef?.current;
-    const currentText = view?.state?.doc ? view.state.doc.toString() : '';
-    console.log('[Debug] Current editor text:', currentText);
-    
-    originalDocRef.current = currentText;
-    console.log('[Debug] Saved to originalDocRef:', originalDocRef.current);
-    
-    const lines = currentText.split('\n');
-    if (lines.length > 0) {
-      lines[0] = lines[0] + ' Added';
-    }
-    const modifiedText = lines.join('\n');
-    console.log('[Debug] Modified text:', modifiedText);
-    
-    if (view?.state?.doc) {
-      view.dispatch({
-        changes: {
-          from: 0,
-          to: view.state.doc.length,
-          insert: modifiedText,
-        },
-      });
-    }
-
-    console.log('[Debug] Toggling diff view to true');
-    dispatch(toggleShowDiffView());
   }
 
   // For the Alt + Enter keypress send 
@@ -386,16 +346,6 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
 
       {/* Buttons */}
       <div className="aiChatInputButtons">
-
-        {/* Debug Diff View Button */}
-        <button
-          className="aiChatSettingsButton"
-          type="button"
-          onClick={debugDiffView}
-          style={{ backgroundColor: '#FF9800' }}
-        >
-          🐛 Debug Diff
-        </button>
 
         {/* AI Settings Button */}
         <button
