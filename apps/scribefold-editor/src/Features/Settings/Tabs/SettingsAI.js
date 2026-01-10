@@ -12,6 +12,7 @@ import { updateSetting } from '../../../Global/ReduxSlices/SettingsSlice';
 export default function SettingsAI() {
   const dispatch = useDispatch();
   const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
+  const autoJumpToNextChunk = useSelector(state => state.settingsSlice.settingsObject?.autoJumpToNextChunk);
 
   return (
     <div>
@@ -23,7 +24,30 @@ export default function SettingsAI() {
             <div className="settingsRowLabelTitle">Enable AI Chat bar</div>
             <div className="settingsRowLabelSub">Shows the AI sidebar and related AI UI.</div>
           </div>
-          <ToggleSwitch on={Boolean(aiModeActive)} onClick={() => dispatch(updateSetting("aiModeActive", true))} />
+          <ToggleSwitch
+            on={Boolean(aiModeActive)}
+            onClick={() =>
+              dispatch(updateSetting({ key: 'aiModeActive', value: !aiModeActive }))
+            }
+          />
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Auto-jump to next chunk</div>
+            <div className="settingsRowLabelSub">Automatically jump to the next chunk after accepting or rejecting a change.</div>
+          </div>
+          <ToggleSwitch
+            on={Boolean(autoJumpToNextChunk)}
+            onClick={() =>
+              dispatch(
+                updateSetting({
+                  key: 'autoJumpToNextChunk',
+                  value: !autoJumpToNextChunk,
+                })
+              )
+            }
+          />
         </div>
 
         <div className="settingsRow">

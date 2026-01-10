@@ -136,7 +136,7 @@ export default function Editor({ editorRef, originalDocRef }) {
   return (
     <>
       <EditorCodeMirror editorRef={editorRef} originalDocRef={originalDocRef}></EditorCodeMirror>
-      {showDiffView && <ChangeNavigator/>}
+      {/* {showDiffView && <ChangeNavigator/>} */}
     </>
   );
 }

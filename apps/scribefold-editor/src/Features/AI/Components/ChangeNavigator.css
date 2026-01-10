@@ -1,17 +1,18 @@
 /* Diff Navigation Bar at Bottom */
 .diff-navigation-bar {
-  position: fixed;
-  bottom: 0;
+  position: absolute;
+  bottom: 5px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 24px;
-  background-color: rgba(44, 44, 44, 0.95);
+  padding: 6px;
+  background-color: rgba(44, 44, 44, 0.8);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px 8px 0 0;
+  border-radius: 8px;
   z-index: 1000;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
 }

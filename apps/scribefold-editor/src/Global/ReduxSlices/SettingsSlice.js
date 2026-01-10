@@ -14,6 +14,10 @@
   rest to default action
     sets local storage and the global state to the default json as defined here in a constant 
 
+
+mod the things a described in the ( areas
+
+
 */
 
  import { createSlice } from '@reduxjs/toolkit';
@@ -27,13 +31,14 @@
  const SETTINGS_STORAGE_KEY = 'scribefold-editor-settingsObject';
 
  const defaultSettingsObject = {
-    backgroundImageUri: '/theme-images/spacedreams.jpg',      // The image that shows as the background of the entire application 
-    devMode: true, 
+    backgroundImageUri: '/theme-images/spacedreams.jpg',      // The image that shows as the background of the entire application
+    devMode: true,
     showArrayLineNumbers: true,
     showMonacoLineNumbers: true,
     monacoStickyTopBar: true,
     showPreviewBar: true,
     aiModeActive: true,
+    autoJumpToNextChunk: true,
   };
 
  // Saves the settings object to localStorage.
@@ -48,6 +53,8 @@
 
  // Loads the settings object from localStorage.
  // If it doesn't exist (or is invalid), we seed localStorage with our defaults and return defaults.
+ // When new settings are added to defaultSettingsObject, we merge them on top of any
+ // previously saved settings so that new keys get sensible defaults.
  function loadSettingsObjectFromLocalStorage() {
     try {
       // Pull the data from localstorage
@@ -67,8 +74,11 @@
         return defaultSettingsObject;
       }
 
-      // return the parsed json
-      return parsed;
+      // Merge defaults with stored values so newly added settings
+      // (like autoJumpToNextChunk) get their default values.
+      const merged = { ...defaultSettingsObject, ...parsed };
+      saveSettingsObjectToLocalStorage(merged);
+      return merged;
     } catch (error) {
       // If JSON parsing fails (or localStorage is blocked), fall back to defaults.
       // We also try to seed defaults to localStorage so a later refresh can recover.

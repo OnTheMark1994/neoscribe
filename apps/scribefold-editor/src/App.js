@@ -9,6 +9,7 @@ import AiChatBar from './Features/AI/ChatBar/AiChatBar';
 import Windows from './Features/Windows/Windows';
 import KeyboardWindow from './Features/Windows/KeyboardWindow';
 import OpenSignTest from './OpenSignTest';
+import ChangeNavigator from './Features/AI/Components/ChangeNavigator';
 
 /*
   This component will contain: 
@@ -42,6 +43,7 @@ export default function App() {
 
   const editorRef = useRef(null)
   const originalDocRef = useRef('')
+  const showDiffView = useSelector(state => state.editorSlice.showDiffView);
 
   // We are retreiving this so we can display the correct backgroundImageUri
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject)
@@ -76,6 +78,7 @@ export default function App() {
               <Editor editorRef={editorRef} originalDocRef={originalDocRef}/>
           
           </div>
+      {showDiffView && <ChangeNavigator/>}
 
         </div>
 

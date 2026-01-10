@@ -40,6 +40,13 @@ const editorSlice = createSlice({
   },
 });
 
-export const { setFilepath, setModified, resetEditor, fileOpened, toggleShowDiffView, setShowDiffView } = editorSlice.actions;
+export const { 
+  setFilepath, 
+  setModified, 
+  resetEditor, 
+  fileOpened, 
+  toggleShowDiffView, 
+  setShowDiffView 
+} = editorSlice.actions;
 
 export default editorSlice.reducer;

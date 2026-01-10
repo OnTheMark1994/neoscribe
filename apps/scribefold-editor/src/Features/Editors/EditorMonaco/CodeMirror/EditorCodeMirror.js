@@ -74,6 +74,8 @@
               Test Prompt:
               Please make modifications, additions, and removals of lines at places of your choosing
 
+              please mod the file per the ( comments 
+
 */
 
 import React, { useCallback, useRef } from 'react';
@@ -92,7 +94,6 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
 
   // Listener to detect accept/reject actions in the merge view and exit diff mode
   const acceptRevertListener = EditorView.updateListener.of((update) => {
-    console.log("update: ", update)
     if (!update.transactions || update.transactions.length === 0) return;
 
     const hasAcceptOrRevert = update.transactions.some(tr =>
@@ -123,24 +124,49 @@ section content
   a
     indented further`;
 
-  const modifiedDoc = `#chapter
-chapter content (edited)
+  const modifiedDoc = `#chapter abc
 #section
-section content
-  indented section content
-  a
-    a (changed)
-    indented further
-#section 2
-section content
-  NEW extra line here
-  indented section content
-  a
-#section 3
-newly added section
-  a
-  a
-    indented further`;
+hello
+    hello (mod this one)
+    now hidden
+    hello (add to this)
+        hello
+        #chapter (inserta section after this) 
+        #section 
+        hidden content  (mod this one)
+#chapter abc
+#section
+hello
+    hello
+  ac;laja;idj (delete this line)
+    now hidden
+    hello
+        hello
+        #chapter (mod this one)
+        #section 
+        hidden content  (mod this one)
+#chapter abc
+#section
+hello
+    hello (mod this one)
+    now hidden
+    hello (add to this)
+        hello
+        #chapter (inserta section after this) 
+        #section 
+        hidden content  (mod this one)
+#chapter abc
+#section
+hello
+    hello
+  ac;laja;idj (delete this line)
+    now hidden
+    hello
+        hello
+        #chapter (mod this one)
+        #section 
+        hidden content  (mod this one)
+`;
 
   const extensions = [
     ...buildExtensions(undefined, {

@@ -342,6 +342,7 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
         className="aiChatInput"
         ref={inputRef}
         placeholder="Type your prompt here... (Alt+Enter to send)"
+        defaultValue="plese mod the file per the ( comments"
       />
 
       {/* Buttons */}
