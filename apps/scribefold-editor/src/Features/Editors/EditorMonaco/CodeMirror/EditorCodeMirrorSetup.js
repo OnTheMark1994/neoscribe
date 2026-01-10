@@ -230,11 +230,11 @@ const aiShareGutter = gutter({
 });
 
 export { lineIdState };
-export function buildExtensions(onChange, options = {}) {
+export function buildExtensions(onChange, aiModeActive, options = {}) {
   const showLineNumbers = !!options.showLineNumbers;
   return [
     lineIdState,
-    aiShareGutter,
+    ...(aiModeActive ? [aiShareGutter] : []),
     foldGutter({
       markerDOM: (open) => {
         const span = document.createElement('span');
