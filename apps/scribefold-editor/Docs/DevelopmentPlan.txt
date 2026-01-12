@@ -74,43 +74,6 @@ Phases:
                 components change settingsObject (done) 
                 they display based on the selected tab (done)
                 tab component UIs           (done)
-			
-    1 day
-    monaco basic (done)
-        embed editor            (done)
-        basic ui display        (done) 
-        view reflects settings  (done)
-
-    3 days
-    monaco additional (done, some non-essentials pushed to later)
-        currently: 
-        nice to have:
-            right click menu (can just remove for now)
-            ai mode change has an error (because monaco doesn't like to resize?) (prob just in dev mode so can ignore for now)
-            #c and #s for chapters and sections shorthand
-            scb file contains the metadata for folded and ai hide strings as wel as encryption
-            export formatted exports with the chapters and sections centered and with larger fornt and settings like canter text, cchapter and section show and format, text format, etc. 
-            in preview scroll view chapters show as big bold text and sections slightly smaller but still big and blue like how #region plugin is
-            customizable font size, color, headers sizes and colors, hilight color
-        font color (done)
-        only shown lines show to ai (done)
-        need to add update when new #chapter or #section (done)
-        chapter and section folding (done)
-        glyphs for ai-hide options
-            glyphs show (done)
-            update glyph calculation so the nested ones show as there but grey when active but parent is hidden (done)
-            glyphs show on start, ai mode change, (done)
-            update images (done)
-            they change when clicked (done)
-            that data is used to create the lines array sent to the ai endpoint (filtering out the hidden ones) (done)
-            glyphs show correct icons, images etc  (done)
-            right click menu works to set ai show decoration (later)
-                so need to add right click menu options like in other version
-                then wire it up to change monaco editor line decoration content 
-            glyphs show and hide from ai active setting (needs refactor, maybe move some functions to external file)
-        index values (done)
-            test by having a function that pulls it and logs with the indexs (done)
-                modify and pull again to see if they persist (done)
 
     2 days
     file IO  (done)
@@ -130,11 +93,12 @@ Phases:
         gets response, prases it, puts it into redux (done)
             just logs it for now (done)
 
-    code mirror
-        changes indicator *
-        mostly done
+    code mirror (mostly done)
+        ctrl f
+        spell check
 
-    connecting code mirror and ai chat responses
+
+    connecting code mirror and ai chat responses (done)
         logging just shown parts with ids
         getting response based on that
         logging it
@@ -146,35 +110,15 @@ Phases:
                 changing css and scrolling them into view
                 mabye call same function when accept/reject is clicked   
 
-
-    3 days 
-    connecting monaco and the ai response
-        data pulls
-            before send pulling text from monaco and sending it (done)
-            after send pulling from monaco and combining
-        diff view
-            shows both 
-            allows editing
-            pulls from modified for new sends and combines while diff is open
-            content stays when switching from diff to normal (or is just always in diff)
-        navigator component 
-            shows when there are propsed changes 
-            modifiex redux state for the sleected line
-            accept /  reject all buttons 
-        accept reject buttons
-            insert buttons boxes them in best place
-                view zones vs widgets vs some other way idk
-            button press accepts or rejects the ine
-            jumping to selected one with bottom diff and jump
-                need to add those components
-
-    3 days
-    array editor (optional/conditional)
-        this is working in the other app so if monaco doesn't work thers a backup
-        but monaco is much better and it should work
+    1 week
+    general use, bug resolution, tweaks
+        settings categories
+        help text
+        little bugs like next/prev wrapping etc
 
     1 week
     server functionality 
+        tokens, accounts, free tokens, stripe webhooks, etc 
         plan out how this should work
             are we going to have supabase auth object in the client?
             where do we crete the new row and see if we should add tokens
@@ -221,13 +165,28 @@ Phases:
                     and terms etc in an info window
                 calculation of what the percentage times subscriptions amounts are
                 graph of how many by date for each thing with recharts (downloads, subscriptions, etc)
-
-
+            reminder they can do this in a few places
+            auto adding to accounts what they got in referrals
+            get the percentages
+                need a sub for that
+                it adds up to being worth it to have it
+    
     1 week
     general use and bug resolution
     
-    1 week
+    cleanup 
+        settings tabs orgaization
+
+    2 days
+    the desktop on start reminder      
+
+    2 weeks (maybe longer)
     prompt preface and story type sliders
+        so figuring out what makes a story interesting and emotinally engaging
+        and having sliders for differnet types
+        "training the ai" with propmpt prefaces 
+
+
 
     phase 1:
         Prototype

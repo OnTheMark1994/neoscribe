@@ -6,6 +6,7 @@ import AppInitializer from './Global/AppInitializer';
 import KeypressListeners from './Global/KeypressListeners';
 import Editor from './Features/Editors/Editor';
 import AiChatBar from './Features/AI/ChatBar/AiChatBar';
+import AiChatToggle from './Features/AI/AiChatToggle';
 import Windows from './Features/Windows/Windows';
 import KeyboardWindow from './Features/Windows/KeyboardWindow';
 import OpenSignTest from './OpenSignTest';
@@ -86,6 +87,9 @@ export default function App() {
 
       {/* Right side: The AI chat bar that shows conditionally */}
       <AiChatBar editorRef={editorRef} originalDocRef={originalDocRef}/>
+
+      {/* Toggle button that appears when AI chat is hidden */}
+      <AiChatToggle/>
 
       {/* All windows show from here (right click, settings, help etc) */}
       <Windows editorRef={editorRef}/>

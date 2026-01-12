@@ -120,7 +120,7 @@
 }
 /* Maybe add a custom one or hide it later */
 .cm-foldPlaceholder{
-  background-color: rgba(87, 87, 107, 0.655) !important;
+  background-color: rgba(121, 121, 142, 0.25) !important;
   border: none !important;
   width: 20px;
   text-align: center;
