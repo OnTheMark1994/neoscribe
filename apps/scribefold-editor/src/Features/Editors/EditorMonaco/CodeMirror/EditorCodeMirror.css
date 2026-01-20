@@ -1,0 +1,129 @@
+.scribefold-codemirror {
+  width: 100%;
+  height: 100%;
+}
+
+.scribefold-codemirror .cm-theme-light,
+.scribefold-codemirror .cm-theme-dark,
+.scribefold-codemirror .cm-editor,
+.scribefold-codemirror .cm-scroller {
+  height: 100%;
+}
+
+.scribefold-codemirror .cm-editor,
+.scribefold-codemirror .cm-theme-light,
+.scribefold-codemirror .cm-theme-dark {
+  width: 100%;
+}
+
+.scribefold-codemirror .cm-editor {
+  background: transparent;
+  height: 100%;
+}
+
+.scribefold-codemirror .cm-scroller {
+  background: transparent;
+}
+
+.scribefold-codemirror .cm-gutters {
+  background: transparent;
+  border-right: none;
+}
+
+.scribefold-codemirror .cm-gutterElement {
+  color: white;
+}
+
+.scribefold-codemirror .cm-foldGutter .cm-gutterElement {
+  cursor: pointer;
+}
+
+/* Remove the dotted focus outline added by CodeMirror's default theme */
+.scribefold-codemirror .cm-editor.cm-focused {
+  outline: none;
+}
+
+/* Use different characters (e.g., + / –) */
+.cm-foldGutter {
+  user-select: none;
+}
+
+/* Merge (diff) UI styling (@codemirror/merge unifiedMergeView) */
+.cm-chunkButtons{
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  padding: 1px 2px;
+  padding: 1px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  height: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+.scribefold-codemirror button[name="accept"],
+.scribefold-codemirror button[name="reject"] {
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: 250ms;
+  box-sizing: border-box;
+  height: 15px;
+  margin: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  vertical-align: top;
+}
+
+.scribefold-codemirror button[name="accept"] {
+  background: rgba(46, 204, 113, 0.12) !important;
+  border-color: rgba(46, 204, 113, 0.4);
+}
+
+.scribefold-codemirror button[name="reject"] {
+  background: rgba(231, 76, 60, 0.12) !important;
+  border-color: rgba(231, 76, 60, 0.4);
+}
+
+.scribefold-codemirror button[name="accept"]:hover {
+  background: rgba(46, 204, 113, 0.6) !important;
+  border-color: rgba(46, 204, 113, 0.8);
+}
+
+.scribefold-codemirror button[name="reject"]:hover {
+  background: rgba(235, 109, 95, 0.6) !important;
+  border-color: rgba(231, 76, 60, 0.8);
+}
+
+/* .cm-deletedChunk{
+  background-color: blue !important;
+} */
+.cm-changedLine{
+  background-color: rgba(0, 154, 0, 0.2) !important;
+  /* border: 1px solid black; */
+}
+.cm-deletedChunk{
+  background-color: rgba(154, 0, 0, 0.2) !important;
+  /* border: 1px solid black; */
+}
+.cm-inlineChangedLine{
+  background-color: rgba(82, 0, 154, 0.2) !important;
+  /* border: 1px solid black; */
+}
+.cm-changedText{
+  background: none !important;
+}
+/* Maybe add a custom one or hide it later */
+.cm-foldPlaceholder{
+  background-color: rgba(121, 121, 142, 0.25) !important;
+  border: none !important;
+  width: 20px;
+  text-align: center;
+  margin: 4px;
+  margin-bottom: 10px;
+}

@@ -5,7 +5,7 @@ import { fetchUserAccount, fetchUserTokens, normalizeUserTokenData, devBurnToken
 import AccountAuthSection from './AccountAuthSection';
 import RefreshButton from '../UI/RefreshButton';
 import TokenUsageLog from './TokenUsageLog';
-import { selectAnonId, selectAuthId, selectDeviceId, selectUserData, setAuthId as setReduxAuthId } from '../../store/userSlice';
+import { selectAnonId, selectAuthUser, selectDeviceId, selectUserData } from '../../store/userSlice';
 import { setBackgroundImage, selectShowPreviewBar, selectShowMonacoLineNumbers, selectMonacoStickyTopBar, selectShowArrayLineNumbers, setShowPreviewBar, setShowMonacoLineNumbers, setMonacoStickyTopBar, updateSetting } from '../../store/settingsSlice';
 import { selectViewType, setViewType } from '../../store/editorSlice';
 import { setBackground } from '../../utils/backgroundHelper';
@@ -13,7 +13,7 @@ import { setBackground } from '../../utils/backgroundHelper';
 /**
  * Settings - Settings management UI (refactored per v2 plan)
  * 
- * Now reads anonId, authId, deviceId, userData from Redux.
+ * Now reads anonId, authUser, deviceId, userData from Redux.
  * Only onClose and initialTab are passed as props.
  */
 function Settings({ onClose, initialTab = 'general' }) {
@@ -21,7 +21,7 @@ function Settings({ onClose, initialTab = 'general' }) {
   
   // Read from Redux
   const anonId = useSelector(selectAnonId);
-  const authIdFromRedux = useSelector(selectAuthId);
+  const authUser = useSelector(selectAuthUser);
   const deviceId = useSelector(selectDeviceId);
   const userAccount = useSelector(selectUserData);
   const [activeTab, setActiveTab] = useState(initialTab || 'general');
@@ -30,7 +30,6 @@ function Settings({ onClose, initialTab = 'general' }) {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [aiService, setAiService] = useState('deepseek-server');
   const [apiKeys, setApiKeys] = useState({});
-  const [authId, setAuthId] = useState(null);
   const [developerMode, setDeveloperMode] = useState(false);
   const [tokenCount, setTokenCount] = useState(0);
   const [tokenStats, setTokenStats] = useState(null);
@@ -59,9 +58,6 @@ function Settings({ onClose, initialTab = 'general' }) {
 
     const savedApiKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
     setApiKeys(savedApiKeys);
-
-    const savedAuthId = localStorage.getItem('authId');
-    setAuthId(authIdFromRedux || savedAuthId);
 
     const savedDeveloperMode = localStorage.getItem('developerMode');
     setDeveloperMode(savedDeveloperMode === null ? false : savedDeveloperMode === 'true');
@@ -238,7 +234,7 @@ function Settings({ onClose, initialTab = 'general' }) {
 
       // Load authoritative token stats from /api/user/tokens so this matches AISidebar and web portal
       try {
-        const tokenData = await fetchUserTokens(anonId, authId);
+        const tokenData = await fetchUserTokens(anonId, authUser ? authUser.id : null);
         const normalizedTokens = normalizeUserTokenData(tokenData || {});
         setTokenStats(normalizedTokens);
         setTokenCount(normalizedTokens.availableTokens > 0 ? normalizedTokens.availableTokens : 0);
@@ -272,14 +268,12 @@ function Settings({ onClose, initialTab = 'general' }) {
   const handleDeveloperResetIds = () => {
     // Developer-only: clear all locally stored IDs and account data so next launch mimics a first-time user
     try {
-      localStorage.removeItem('authId');
       localStorage.removeItem('userEmail');
       localStorage.removeItem('userPassword');
     } catch (e) {
       // ignore storage errors
     }
 
-    setAuthId(null);
     setAccountData(null);
     setTokenStats(null);
     setTokenCount(0);
@@ -289,7 +283,7 @@ function Settings({ onClose, initialTab = 'general' }) {
       window.electronAPI.resetAnonId();
     }
 
-    // Notify main window so primary App instance can clear authId immediately
+    // Notify main window so primary App instance can clear authId immediately (kept for backward compatibility)
     if (window.electronAPI && window.electronAPI.settingsSaved) {
       window.electronAPI.settingsSaved({ authId: null });
     }
@@ -299,20 +293,20 @@ function Settings({ onClose, initialTab = 'general' }) {
 
   const handleDeveloperBurnTokens = async () => {
     console.log("in handleDeveloperBurnTokens")
-    if (!anonId && !authId) {
+    if (!anonId && !authUser) {
       return;
     }
 
     console.log('[SETTINGS] -14k tokens button pressed', {
       anonId,
-      authId,
+      authId: authUser ? authUser.id : null,
       amount: 14000,
       tokenStats,
       tokenCount,
     });
 
     try {
-      const result = await devBurnTokens(anonId, authId, 14000);
+      const result = await devBurnTokens(anonId, authUser ? authUser.id : null, 14000);
       console.log('[SETTINGS] -14k tokens endpoint response', result);
       const newAvailable =
         result && typeof result.availableTokens === 'number'
@@ -704,21 +698,8 @@ function Settings({ onClose, initialTab = 'general' }) {
 
             <AccountAuthSection
               anonId={anonId}
-              authId={authId}
               deviceId={deviceId}
               onAccountUpdated={(result) => {
-                if (result && result.authUser && result.authUser.id) {
-                  const newAuthId = result.authUser.id;
-                  setAuthId(newAuthId);
-
-                  // Keep Redux authId in sync so other components (like AISidebar) see the change
-                  dispatch(setReduxAuthId(newAuthId));
-
-                  // Notify main window so primary App instance can update authId immediately
-                  if (window.electronAPI && window.electronAPI.settingsSaved) {
-                    window.electronAPI.settingsSaved({ authId: newAuthId });
-                  }
-                }
                 if (result && result.user) {
                   setAccountData(result.user);
                   const normalized = normalizeUserTokenData(result.user || {});
@@ -728,20 +709,6 @@ function Settings({ onClose, initialTab = 'general' }) {
                   loadAccountData();
                 }
               }}
-              onAuthCleared={() => {
-                setAuthId(null);
-                localStorage.removeItem('authId');
-
-                // Notify main window so primary App instance can clear authId
-                if (window.electronAPI && window.electronAPI.settingsSaved) {
-                  window.electronAPI.settingsSaved({ authId: null });
-                }
-
-                // Also clear Redux authId so web/electron UI stays in sync
-                dispatch(setReduxAuthId(null));
-              }}
-              initialEmail={accountEmail}
-              initialPassword={accountPassword}
               subscriptionType={tierName}
               nextBillingDate={nextBillingDate}
             />
@@ -755,7 +722,7 @@ function Settings({ onClose, initialTab = 'general' }) {
 
                 <div className="stat-item auth-id-box">
                   <span className="stat-label">👤 Auth ID</span>
-                  <span className="stat-value">{authId || 'Not logged in'}</span>
+                  <span className="stat-value">{authUser && authUser.id ? authUser.id : 'Not logged in'}</span>
                 </div>
               </>
             )}
@@ -800,7 +767,7 @@ function Settings({ onClose, initialTab = 'general' }) {
               </span>
             </div>
 
-            <TokenUsageLog anonId={anonId} authId={authId} />
+            <TokenUsageLog anonId={anonId} authId={authUser ? authUser.id : null} />
           </div>
 
           {accountError && (

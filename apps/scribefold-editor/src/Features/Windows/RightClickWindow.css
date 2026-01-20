@@ -1,0 +1,28 @@
+.RightClickWindow{
+    position: absolute;
+    background-color: "grey";
+    height: 300px;
+    width: 300px;
+    z-index: 100000000000;
+}
+
+.rightClickWindow {
+  position: fixed;
+  background-color: #333;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 8px;
+  min-width: 150px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
+}
+
+.rightClickOption {
+  padding: 6px 12px;
+  color: white;
+  cursor: pointer;
+}
+
+.rightClickOption:hover {
+  background-color: #444;
+}

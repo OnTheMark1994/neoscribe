@@ -1,0 +1,269 @@
+Overal plan and timeline for the development of the application.
+
+Then and Now
+
+    Previously
+        did not create a plan
+        did not lay out file structure, data flows, user stories etc before
+        did not set timelines
+
+        so always pushing as fast as I can
+        cutting cornders and moving on to next thing as soon as current on at minimum viable 
+        unsustainably spending time on it until burning out
+
+        put everything else on pause to fosuc on it entirely 
+        and it was so long all at once it could not be completed before other thigns piled up and needed to stop
+        if didn't complete the entire thing it was a failure
+
+        trying to do the whole thing at once in one big bite
+        can't eat an entire steak in one bite
+        but you can break it into many piecs and finish it fine
+
+    Better:
+        create a plan for phases
+        create a timeline for each phase
+        do not progress past that so it stays sustainable
+            when you are done with the weeks work you do other things that need to be done and to balance life so you can carry on
+        if you spend the number of weeks on it you predict you will have the finished product at the time you expect
+
+
+
+        Each phase has a part that is complete
+        typing out the user interactions stream of consciousness
+        while doing that typing out the components with their displays and state interactions
+        and in the 3rd window have the file structure 
+        create files based on files strucutre
+        put psudocode notes at the top of each
+        fill them in (ai can do this becaues its by your plan and you can do in small increments looking it over for spaghetti)
+
+Phases: 
+
+    ScribeFold AI Development Plan
+    Starting 2026-1-1
+    10 weeks of work
+    2 weeks of vacation time used as needed
+    12 weeks total (3 months)
+    +1 month of prototype time (already done)
+    so 4 months total on the development 
+    then 4 months post development to make use of it  
+    So 8 months total for the end result
+
+    1 day
+    UI (done) 
+        main area ui        (done)
+            background      (done)
+            page            (done)
+            ai side bar     (done)
+        topbar              (done)
+        ai chat area layout (done)
+
+    1 day 
+    settings and windows (done)
+        f11 mode                    (done)
+        ai mode on / off            (done)
+        windows slice               (done)
+            just showing windows    (done)
+            settings window opens   (done)
+            help button shows help window (done)
+        settings ui
+            tabs
+                tabs UI                     (done) 
+                tabs change what shows      (done)
+                components for each         (done)
+                UI for each component       (done)
+                components change settingsObject (done) 
+                they display based on the selected tab (done)
+                tab component UIs           (done)
+
+    2 days
+    file IO  (done)
+        load file (done)
+        save file (done)
+        save as (done)
+        reopen file on close/reopen (done)
+        works in desktop and browser  (done)
+            may be different top menu options in browser
+            may need the explanation window to download file instead of save on browser
+        
+    2 days 
+    ai chat area  (done)
+        sends to api (done)
+            after gathering from the editor ref (done)
+            just getting a response, no user token updates now (done)
+        gets response, prases it, puts it into redux (done)
+            just logs it for now (done)
+
+    code mirror (mostly done)
+        ctrl f
+        spell check
+
+
+    connecting code mirror and ai chat responses (done)
+        logging just shown parts with ids
+        getting response based on that
+        logging it
+        showing it in the diff view
+        returning to non diff view when all are accepted/rejected
+        diff navigator
+            searches for all elements that have the css accept/reject button area class 
+                and loops thorugh them
+                changing css and scrolling them into view
+                mabye call same function when accept/reject is clicked   
+
+    1 week
+    general use, bug resolution, tweaks
+        settings categories
+        help text
+        little bugs like next/prev wrapping etc
+
+    1 week
+    server functionality 
+        tokens, accounts, free tokens, stripe webhooks, etc 
+        plan out how this should work
+            are we going to have supabase auth object in the client?
+            where do we crete the new row and see if we should add tokens
+                that should happen on the server
+                so should we create the account on the server and return a auth token that signes them in
+                    can we even do that  
+                or create the account on client so they are logged in automatically and then call an endpoint to create the user row
+                    checking the token grants table and deciding what to add from there
+                and what about combining user rows?
+                    need to detail how this should work in each situation
+                        user can use web anon, use desktop anon, create account on web, crate on desktop, log out, log back it, create account on web portal
+                            we want each combination to work as expected
+                            so typing out flows for that while creating a plan so how they work 
+                                user auth + user table interaction flows 
+                                which endpoints we will have
+                                what each one will do 
+                                how to handle the different cases
+                the token usage part too
+                    free grant tokens
+                        the free grant table
+                        email confirmations token granting
+                    adding tokens from subscription,
+                        recurring web hooks  
+                    probably doing all of that on the server just sending it an id from the auth object or device/anon id otherwise
+        user id and user row creation
+            start on web, start on desktop, create account, login, log out, log in on new device, etc  
+        token flow 
+            initial tokens
+            subscription tokens
+            token use
+
+    1 week
+    referrals feature
+        Tracking
+            when user downloads application referral id is tracked somehow
+            maybe from their ip on download, and then if they use from that ip for first time around the same time with granted credits we can link that account to that ref id
+            and then if they subscribe we will know where the referral came from
+        Dashboard
+            have referral accounts
+            show 
+                number of downloads
+                number and percent that then subscribed
+                percentage they get
+                    and terms etc in an info window
+                calculation of what the percentage times subscriptions amounts are
+                graph of how many by date for each thing with recharts (downloads, subscriptions, etc)
+            reminder they can do this in a few places
+            auto adding to accounts what they got in referrals
+            get the percentages
+                need a sub for that
+                it adds up to being worth it to have it
+    
+    1 week
+    general use and bug resolution
+    
+    cleanup 
+        settings tabs orgaization
+
+    2 days
+    the desktop on start reminder      
+
+    2 weeks (maybe longer)
+    prompt preface and story type sliders
+        so figuring out what makes a story interesting and emotinally engaging
+        and having sliders for differnet types
+        "training the ai" with propmpt prefaces 
+
+
+
+    phase 1:
+        Prototype
+        (1 month) 2025-11-14 to 2025-12-14 (done)
+        Tasks:
+            creata a basic prototype 
+            vibe coding, manualy, expreiments, docs etc
+            this is meant to be a general layout and fact finding expreiments
+            so we know what features we want and what tools are best
+            it gives the understanding necessary to create the plan
+
+    phase 2:
+        Planning 
+        (2 weeks) 2025-12-4 to 2025-12-31
+        Tasks: 
+            Define UI 
+                Basic visual structure of the app 
+                maybe make the files and have a comment at the top describing each one
+                then can add the desription of the state and flows in the file 
+            Usage stories
+                What the user will do and what will happen
+            Folder and file structure
+            Data structures / database / api endpoints
+            This is hard to do on its own without building anything 
+
+    phase 3: 
+        UI (2 weeks) 2026-1-1 to 2026-1-14
+        Tasks:
+            Create basic UI and file structure
+                Can tell ai to create folders and files as per instruction 
+                    in phases
+                    making it look the same as the last version but in new files
+                    keep very simple and watch carefully
+            Wire up basic menu ui redux state
+                Ex: Settigns slice then settings menu showing when it should, showing correct tabs and tab UI etc
+
+    phase 3:
+        implement data flows (2 weeks) 2026-1-14 to 2026-1-30
+        create, load, display data as per the plan 
+        creating or updating the api endpoints to recieve and give correct data
+
+    Phase 4:
+        testing, bug resolutions, updating plan (2 weeks) 2026-2-1 to 2026-2-30
+        test the applicaiton, resolve bugs
+
+Notes:
+    As we go thorugh creating the plan 
+    update the plan, file structure, database, data flows etc
+
+
+
+
+
+
+
+Monaco prompt:
+please tell me how to install monaco into a react electron web app. 
+I also want to modify it in these ways:
+sticky top bar on/off based on settings
+same with the preview scrollbar
+and line numbers in the gutters
+custom language for folding on #section and #chapter tags with the section being inside of a chapter so if the parent chapter is folded the sections in it are hidden
+
+I want to add ids to the lines
+so I can pull the data from the editor
+send it to an endpoint
+get a response and then use the ids to add the content to the correct lines even if their number or order changes
+and then have those two versions show as a dif in the monaco view
+and of course adding new ids as new lines are added
+and to stay very performant doing O(1) or low complexity operations
+
+I want to have a custom glyph in the gutter that when clicked changes something correlated with that line so the glyph image changes (like a toggle)
+and I want that change to be visible in the function that pulls the data and sends it to the api described previously
+
+so it will be monaco
+1: with custom css styles (transparent background etc)
+2: conditional sticky top, gutter index values, and preview slider on the left (all based on a settingsObject json)
+3: ability to have unique ids on each line that persist as the same for at least the entire session (does't have to persist on refresh or program load unless its easy to do so)
+4: ability to have the data pulled from it for processing by an api with line numbers and a custom show or hide attribute that tells the function which lines to send to the api
+5: ability to show diff of the original content and the content created when the api responds

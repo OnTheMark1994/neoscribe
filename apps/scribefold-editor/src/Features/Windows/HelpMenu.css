@@ -1,0 +1,46 @@
+.helpMenu {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.helpMenuTop {
+  flex-shrink: 0;
+}
+
+.helpMenu .foldableSection {
+  flex-shrink: 0;
+}
+
+.helpMenuTop {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.helpMenuTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  margin-bottom: 4px;
+}
+
+.helpMenuSubtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.helpMenuSectionText {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.helpMenuSectionText p {
+  margin: 0 0 10px 0;
+}
+
+.helpMenuSectionText p:last-child {
+  margin-bottom: 0;
+}

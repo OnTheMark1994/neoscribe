@@ -20,33 +20,33 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: apps/desktop-app/package-lock.json
+          cache-dependency-path: apps/scribefold-editor/package-lock.json
           
       - name: Install dependencies
-        working-directory: apps/desktop-app
+        working-directory: apps/scribefold-editor
         run: npm ci
         
       - name: Build React app
-        working-directory: apps/desktop-app
+        working-directory: apps/scribefold-editor
         run: npm run react-build
         
       - name: Build Electron app (Windows)
         if: matrix.os == 'windows-latest'
-        working-directory: apps/desktop-app
+        working-directory: apps/scribefold-editor
         run: npm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Build Electron app (macOS)
         if: matrix.os == 'macos-latest'
-        working-directory: apps/desktop-app
+        working-directory: apps/scribefold-editor
         run: npm run build:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Build Electron app (Linux)
         if: matrix.os == 'ubuntu-latest'
-        working-directory: apps/desktop-app
+        working-directory: apps/scribefold-editor
         run: npm run build:linux
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,21 +56,21 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: apps/desktop-app/release/*.exe
+          path: apps/scribefold-editor/release/*.exe
           
       - name: Upload artifacts (macOS)
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: macos-installer
-          path: apps/desktop-app/release/*.dmg
+          path: apps/scribefold-editor/release/*.dmg
           
       - name: Upload artifacts (Linux)
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: linux-installer
-          path: apps/desktop-app/release/*.AppImage
+          path: apps/scribefold-editor/release/*.AppImage
 
   # Create GitHub Release after all builds complete
   create-release:

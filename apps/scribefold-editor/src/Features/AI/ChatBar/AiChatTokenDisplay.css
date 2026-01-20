@@ -1,0 +1,53 @@
+/*
+  Token display area for AI chat sidebar.
+  Shows available tokens + estimated usage per prompt.
+*/
+
+.aiChatTokenRow {
+  padding: 5px 20px;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.aiChatTokenLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 5px;
+}
+
+.aiChatTokenLineLeft {
+  display: flex;
+  align-items: center;
+}
+
+.aiChatTokenLineLeftSub {
+  font-size: 11px;
+  color: #999999;
+}
+
+.aiChatTokenLineRight {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.aiChatTokenLabel {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.aiChatTokenValue {
+  font-size: 16px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.aiChatTokenEstimate {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4CAF50;
+  font-family: 'Consolas', 'Monaco', monospace;
+}

@@ -313,6 +313,57 @@ h1 {
   font-weight: 500;
 }
 
+/* Extra spacing variant for auth info message when used under forms */
+.auth-info-message-extra-margin {
+  margin-top: 12px;
+}
+
+/* Signed-in email line under label */
+.auth-signed-in-email {
+  display: block;
+  margin-top: 4px;
+}
+
+/* Auth success/error status message under signed-in block */
+.auth-status-message {
+  text-align: center;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  color: #4CAF50;
+}
+
+/* Account portal button wrapper and content */
+.account-portal-container {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.account-portal-button {
+  padding: 10px 15px;
+  background-color: #4a6da7;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.account-portal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.account-portal-label {
+  font-size: 14px;
+}
+
+.account-portal-subtitle {
+  font-size: 12px;
+  color: #d0d7eb;
+  margin-top: 2px;
+}
+
 .anon-id-box {
   background-color: rgba(76, 175, 80, 0.1);
   padding: 15px;
@@ -433,4 +484,30 @@ button {
   font-size: 12px;
   color: #888;
   margin-top: 4px;
+}
+
+/* Download info modal */
+.download-info-body {
+  color: #e0e0e0;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.download-info-text {
+  margin-bottom: 12px;
+}
+
+.download-info-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.download-info-desktop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }

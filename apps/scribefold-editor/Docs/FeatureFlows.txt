@@ -1,0 +1,272 @@
+This helps define what user interactions will be like
+used to create initial app structure and data flows
+then to create test cases
+
+What the application will do:
+
+    1: Allow the user to edit written content.
+    2: Orgaize content into foldable chapters and sections.
+    3: Use an ai chatbot to add to their work.
+
+High level details
+
+    This will work on desktop and in browser.
+    We will have a front-end app (desktop and browser same codebase), web portal (seperate file structure), and an api server.
+    Tech Stack: 
+        React, Redux, Electron, Supabase, Express, Render.com
+
+Flows / Features
+
+    Opening application:
+        user opens the application,
+        they see a window with a background, page in the middle, and they can edit the page with text.
+        They can open an ai chat that will show as a bar on the left.
+        There is a topnav over section with the page in it but not over the ai chat bar.  
+
+        Main UI
+            There is a full height and width container with a background images set by settings
+            There is an editor are on the left that fills all of the screen not filled by the ai chat area
+            at the top of the editor area and with its width there is a top menu bar
+            in the middle of that there is a semi transparent page component
+            in that page is the editor
+
+            the ai chat bar is on the right of the screen
+            at the top is the logo, centered title "AI Chat"
+            below that a row with the estimaged tokens per prompt, tokens the user has, and a refresh button
+            below that is the messages are which is a scrollable area with the messages in it
+            in developer mode there is a + button at the top right that opens a message details window with foldable sections for parts of the message
+                message, mressage response, raw message (from user with json body and all info), raw response, parsed response
+                a copy report button at top right of window that copies all of this information to text clipboard with a title for each part
+
+            The top nav has file, view, help buttons
+                this shows from the left edge of the screen to the right edge of the editor area (not over the ai chat area)
+                file:
+                    new, open, save, save as, settings
+                view
+                    radio options for edior array, editor monaco, ai chat bar toggle
+                help
+                    just opens help window    
+
+    Editing
+        there are 2 editors, EditorArray and EditorMonaco
+        they display in the page part of the left side of the screen
+        we can switch which one we are using with the topnav and the settings menu. 
+        this component is very simple and mostly just determines which editor is showing. 
+
+        EditorArray:
+            there are an array of lines displayed in the page
+            the user can click to put their cursor in one of them
+            they can type into it
+            they can press enter to create a new line
+            when the ai puts proposed changes in redux those display in between the lines
+
+            EditorArray Details: 
+
+                Enter Split
+                    when pressing enter it takes the part after the cursor and puts it onto the next line
+                    so "this te<cursor here>xt" and on enter press we have 2 lines "this te" and then another line with "xt"
+
+                find
+                    ctrl f pulls up a search bar with an input and up down arrows
+                    it hilights all occurances, and extra hilights the selected one
+                    it moves the scroll area up and down to show the ones that is selected with the arrows
+
+                Spellcheck
+                    uses auto spellcheker in browser
+                    hilights undre word when spelled wrong
+                    right click suggestions
+                    when user clicks a suggestion it updats the word to that
+                    spellcheck can be turned off in the settings
+
+                Chapters and Sections
+                    Recognizes #chapter and #section
+                    When that is true it makes that area foldable
+                    There is margin left based on how deep it is, base level or chapter, then if its in a chapter, then if its in a section in a chapter
+                    there is a circle button to the left of the chapter or sectoin to open or close it and that makes it folded or not
+                    there is an eye glyph on the top left of the chapter or section that shows if its being sent to the ai or not
+                    user can right click on the +- button to 
+                        send to ai 
+                        send title only
+                        hide from ai 
+                        send all sections to ai (within that chapter)
+                        hide all sections (within that chapter)
+                        fold
+                        open 
+                        fold all sections (within that chapter)
+                        open all sections (within that chapter)
+                        these are organized into sectoins like
+                        fold/hide based on its current state
+                        sections (actions to take on all sections in the chapter)
+                        ai sharing(options related to ai hiding or showing that one)
+                    structure and layout
+                        these right click menus are react components, same in web and desktop
+                        top and left are set from mouse click
+                        component is put in the component that puts it in the same view as the top and left calculation
+                            for example if its calculated from the whole window x and y it will be placed in the component that has the whole backgound in it
+                                so the left and top will be relative to that div and it will show in the correct place
+
+                Saving details in document
+                    meta data is saved in the lines of the document only when saving or loading, and is removed in loading
+                    lines array is created from loaded content and then cycled through to create a visible lines array
+                    it is saved as tags with the format "line content #tags#ai-share=<tag>#folded=true..."
+                        when loading it uses that to create the attributes in the object of the lines array, and removed from the text
+                            these attributes determine how the lines show, what ai share glyph icon is shown, if it shows the components in it, etc
+                        when saving the lines array is parsed into a text string and the tags are added for each line so it loads with the next save
+                    we can also save things like cursor position, scroll position, etc in metadata in the text file so it restores on load
+                    
+                    options:
+                        lines are put into a json data structure where the lines in a line (like sectoins and content in a chapter) are put into an array in that json
+                            will have to recompute this structure on evey change of the structure
+                            each line has its own open closed state       
+                        visible lines array
+                            all lines are cycled through and it is calculated if they should be visible or not
+                            visible ones are put into a visible lines array
+                            that whole array is cycled through and all of them are displayed with a depth based on their level (calculated while bulding visble line array)
+                        Nice:
+                            it would be nice if it worked like Monaco and was very fast even with a file with 10k lines but I don't know what would make that happen
+
+        EditorMonaco
+
+            pros:
+                This has a lot of built in functionalty
+                    the ctrl f search bar
+                    it can have spellcheck built in
+                    it can have custom foldable sections with language specification
+                    fast loading of files, newline, editing lines, tab multi line, etc
+                    feels much more like a complete editor
+            cons:
+                less customizeable
+                buggy
+                    sometiems section and chapter open close arrows are not showing
+                ai response
+                    can't reliable get it to show the respones and accept/reject in a good way 
+                        probably just user error though
+
+
+
+            we need to
+                define custom folding 
+                set custom styling so it is transparent, remove all tooktips or hover menus meant for coding, it should just be an editor
+                add custom gutter glyphs for ai sharing 
+
+    Ai chat:
+        They can type into the message area in the ai chat bar
+        they press send
+        it shows in a message chain and that the ai is thinking
+        the ai api responds with a message  
+        they see the message in the chat area and the proposed changes in the edior area
+        they can click accept or reject for any individual one
+        there is a box at the bottom to scroll through the proposed changes, accept all, or reject all. 
+
+        ai share hide
+            if sharing that row we send that data to the ai when prompting it, if not it is hidden
+            we can share all content, the title only, or none
+            if a chapter is hidden all of the sections in it are hidden too
+            if a chapter is showing (default) the sections in it are shown or hidden depending on their settings
+            eye glyph
+                a shared chapter has a blue eye png gylyph shown next to it
+                a hidden chapter has a grey eye icon with a / thorugh it
+                a sectoin that is showing but the chapter it is in is hidden still shows the eye glyph png but it is a differnt png that is grey instead of blue and on hover it has a tooltip saying "Parent Hidden"
+            This works similary in Monaco and Array mode, but the glyphhs are positioned slightly differently as per the way they can be given that stucture
+
+        Details:
+            as they cycle through the proposed changes with the proposed cahnes navigator the window jumps to the selected one and hilights it.
+            If its in a folded sectopm it opens that section with a helper function. 
+
+    TopBar
+
+    Settings
+
+
+
+Stories
+
+user opens application on desktop for the first time
+they get 15k or some number of free intro tokens to use
+they see editor area nad change area
+they type into the array editor
+press enter
+type anohter line
+press ctrls 
+it opens a save as window
+they see a save as button
+they type in a file name
+they press save
+it savs the file
+they type some more
+it shows a little * at the top of the screen in the title bar next to the file name
+they press ctrls and it saves to that file and the * dissapears
+they close the application
+they open it again
+that same file loads automatically
+they edit it some more (but don't save)
+they go into the ai chat area box and type somehtign in then prss send
+the message shows and it says thinking... in a message below it
+then tha becaome a message from the ai chat that says I added some content
+the developer user can press the + button at the top right of the message
+it opens a window that shows all of the dat, they can open foldable sections to see each part of it
+in the editor area there are suggested edit lines
+there is a proposed cahnge navigator at the bottom
+they can press the up and arrows ion the suggested edit navigator and it hilights and scrolls to one of the suggested edits
+they can click accept and it adds that line in that place and shows as a normal line now
+there is a switch in the buttons area that says jump and when on accepting or jrecectin goes to the next one, when off it just accepts or rejects and does not scroll
+they click reject on one and it just dissapears and scrolls to nex
+theny turn jump off and click reject and it stays in the same place
+they go to the next one and jump is off because its a global settings in the settings object, so it does not jump when they accept that one
+they then go to the bottom and press accept all and it accepts all changes
+they then go to the ai chat and ask for more changes
+they all show
+they as k the chat for more and it adds more
+the editor shows all of the proposed changes (they are added together in a ai proposed changes state that shows all of them)
+they can accept and reject from the whole array of propsed changes from both messages from the ai
+They press the x button 
+a message comes up asking them if they are sure, they can save and close, cancel (not close), or disgard changes and close
+they click save and close and it closes
+they then reopen the app again and the file opens with all of their changes
+they press file new or ctrl n
+it shows an empty file with just one array line at the top with the cursor blinking in it
+they they type a bit
+they add a couple chapter and with some sectinos in each
+they clicke the +- button to close some of the sectoins and one of the chapters
+they show the first shapter (default and hide one fo the sectoins in it
+they hide the sectond chapter
+they send the chat ai a message
+along with the message the shown parts of the cnotent are sent to the api and then sent to the ai api through our api
+only the shared parts are sent so only shared parts ahve proposed changes
+they accept or reject them
+they then open the settings
+they change if the line index numbers show and it updates the settigns object and makes them hide
+they press hide ai in the ai tab of settings
+the ai sidebar hides and the other part of the screen is not 100%
+they click viecw full screen and it goes into f11 mode, the top bar dissapears with an animation and only shows when the mous hovers over that area
+they close the settings and prompt tha ai again
+they use up all of their tokens so that message works but on the nxt one they get a message saying to create an accoutnf o x free tokens 
+there is a button ther to go to account settings
+they click it and it opens right to the settigns with accoutn tab already open
+tthey go to account and create an account
+they verify their email, get more tokens, click a button to go to their account in th eweb portal
+they get more free tokens
+they use them up 
+the log out 
+they create a new accoun with a new email
+it does not give them tokens because it can see ther eis a record matching their device id and also an auth id in the table so we know they got a free grant with an accout made from that device
+they log out
+it shows not logged in and the tokens they got are not there anymore (they were all linked to the account with device id and auth)
+they log back in to the auth account from the first time
+they ahve whatever tokesn that auth id had
+they prompt the ai 
+it says out of tokens and has a button to go ot accout settings or the wb portal with auto login
+they clik go ot web portal
+they sign up for a subscriptoin
+they get tokens added to their account via a webhook on the server connected to stripe
+they go back to their desktop app
+they now have tokens showing (it updates somehow automatiacally and they can also press the refresh button)
+they now use the tokens by promptaing the ai thorugh the api and our api serer code reduces the tokens accordingly 
+they have a file now wiht 10k line
+they save it and open it
+on open it loads fast (like with monaco)
+
+
+
+
+

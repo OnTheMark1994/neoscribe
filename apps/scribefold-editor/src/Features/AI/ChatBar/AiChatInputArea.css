@@ -1,0 +1,88 @@
+.aiChatInputArea {
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.aiChatInputButtons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.aiChatInput {
+  width: 100%;
+  min-height: 80px;
+  max-height: 200px;
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #ffffff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.aiChatInput::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.aiChatInput:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.aiChatSendButton {
+  flex: 1;
+  padding: 10px 24px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.aiChatSendButton:hover {
+  background-color: #45a049;
+}
+
+.aiChatSendButton:active {
+  transform: scale(0.98);
+}
+
+.aiChatSendButton:disabled {
+  background-color: rgba(76, 175, 80, 0.4);
+  cursor: not-allowed;
+}
+
+.aiChatSettingsButton {
+  flex: 1;
+  padding: 10px 16px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.aiChatSettingsButton:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.aiChatSettingsButton:active {
+  transform: scale(0.98);
+}

@@ -11,6 +11,32 @@ This is just the basic to get it working at minimum to be useable at all
 should put them in order of necessity 
 then do in logical batches
 
+the codebase is spaghetti mess, its terrible
+create dosuments showing what not to do
+create a plan of how it should be
+and show what it should be
+and how to create a similar plan in the future
+app initializer was rediculous dumb spaghetti. 
+Should make a plan tha is lke an exxample of how it should work and build on that slowly, if left to its own devices it will not archatect well at all. 
+So go thorugh and define that in a text document about hw it should run, then see how much you can get out of the ai per prompt in that direction. 
+
+Settings:
+User Data:
+We shoudl ahve an initializer that has a useEffect
+whenever the device id, or the auth object, or anon id change it loads the user data via an api call and puts it in redux
+this same redux values is set everywhere
+on load start we can set a loadingUserData=true redux call
+and load end it can have a loadingUserData=false redux call
+this way the user data will always be in state, we don't ahve to call the api all over the place and risk errors if the api changes and we only update some palces, or if we need to find the api call, etc
+curretnly the user data says loading forever in the accoutn settings so this flow is broken
+this shold include all user data like token counts etc (aside from email and pass as required by the account web portal auto open link which can actually be pulled from a specific api in the accounts page because it contains sensitive data that the main user data api will not send)
+:
+Ok settings should have one laod on start form localStorage and its put into settingsObject
+and when a settings is updated an action is called to upate settingsObject and the localStorage for next load
+it should be that simple, no individusl localstorage or splitting it into many variables
+just use its values with settingsObject?.<attribute> whereever its needed 
+
+
 had to do a reject all for some changes, not sure how much was in it, may need to redo a lot of them. 
 
 1 Editor line focus 

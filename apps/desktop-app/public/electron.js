@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const isDev = require('electron-is-dev');
 const { machineIdSync } = require('node-machine-id');
 
+// Shared app icon (used for window, taskbar, and desktop)
+const editorIconPath = path.join(__dirname, '../../scribefold-editor/public/icon.ico');
+
 // NOTE: GPU acceleration is ENABLED for performance
 // Only disable cache in dev mode to ensure fresh reloads
 if (isDev) {
@@ -80,7 +83,7 @@ function createWindow() {
     height: 800,
     show: false,
     backgroundColor: '#2c2c2c',
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: editorIconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -393,7 +396,7 @@ function showSettingsWindow(hash = '#settings') {
     modal: false,
     show: false,
     backgroundColor: '#2c2c2c',
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: editorIconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

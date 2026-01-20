@@ -21,11 +21,11 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: |
-          cd apps/desktop-app
+          cd apps/scribefold-editor
           npm ci
       - name: Verify version matches tag
         run: |
-          $PKG_VERSION = node -p "require('./apps/desktop-app/package.json').version"
+          $PKG_VERSION = node -p "require('./apps/scribefold-editor/package.json').version"
           $GIT_TAG = "${{ github.ref_name }}"
           echo "Package version: $PKG_VERSION"
           echo "Git tag: $GIT_TAG"
@@ -39,13 +39,13 @@ jobs:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd apps/desktop-app
+          cd apps/scribefold-editor
           npm run build:win
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: apps/desktop-app/release/*.exe
+          path: apps/scribefold-editor/release/*.exe
 
   build-macos:
     needs: build-windows  # Run after Windows
@@ -58,11 +58,11 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: |
-          cd apps/desktop-app
+          cd apps/scribefold-editor
           npm ci
       - name: Verify version matches tag
         run: |
-          PKG_VERSION=$(node -p "require('./apps/desktop-app/package.json').version")
+          PKG_VERSION=$(node -p "require('./apps/scribefold-editor/package.json').version")
           GIT_TAG="${{ github.ref_name }}"
           echo "Package version: $PKG_VERSION"
           echo "Git tag: $GIT_TAG"
@@ -76,13 +76,13 @@ jobs:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd apps/desktop-app
+          cd apps/scribefold-editor
           npm run build:mac
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
-          path: apps/desktop-app/release/*.dmg
+          path: apps/scribefold-editor/release/*.dmg
 
   build-linux:
     needs: build-macos  # Run after macOS
@@ -95,11 +95,11 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: |
-          cd apps/desktop-app
+          cd apps/scribefold-editor
           npm ci
       - name: Verify version matches tag
         run: |
-          PKG_VERSION=$(node -p "require('./apps/desktop-app/package.json').version")
+          PKG_VERSION=$(node -p "require('./apps/scribefold-editor/package.json').version")
           GIT_TAG="${{ github.ref_name }}"
           echo "Package version: $PKG_VERSION"
           echo "Git tag: $GIT_TAG"
@@ -113,13 +113,13 @@ jobs:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd apps/desktop-app
+          cd apps/scribefold-editor
           npm run build:linux
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-appimage
-          path: apps/desktop-app/release/*.AppImage
+          path: apps/scribefold-editor/release/*.AppImage
 
   create-release:
     needs: [build-windows, build-macos, build-linux]  # Require all builds to succeed

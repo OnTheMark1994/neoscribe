@@ -1,0 +1,18 @@
+.windowDraggableTopBar {
+  cursor: grab;
+}
+
+.windowDraggableTopBar:active {
+  cursor: grabbing;
+}
+
+.windowDraggableContainer {
+  resize: none;
+}
+
+.windowDraggableRoot {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9000;
+}

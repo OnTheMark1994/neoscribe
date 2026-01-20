@@ -1,0 +1,157 @@
+.settingsSection {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.settingsSectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  margin-bottom: 12px;
+}
+
+.settingsAccountGreenMessage {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #ffffff;
+  text-align: center;
+  line-height: 1.5;
+  background-color: rgba(76, 175, 80, 0.4);
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.settingsFieldLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  margin-bottom: 6px;
+}
+
+.settingsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settingsRow:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.settingsRowLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settingsRowLabelTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.settingsRowLabelSub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.60);
+}
+
+.settingsInlineValue {
+  font-size: 12px;
+  font-family: Consolas, 'Monaco', monospace;
+  color: rgba(255, 255, 255, 0.75);
+  word-break: break-all;
+  text-align: right;
+}
+
+.settingsButton {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.settingsButton:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.settingsAccountAuthButton {
+  /* Keep the same overall size/shape as the old settings buttons, but with the desktop-app green */
+  border: none;
+  background: #4CAF50;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.22s ease, box-shadow 0.22s ease, transform 0.12s ease;
+}
+
+.settingsAccountAuthButton:hover {
+  /* Instead of getting darker (desktop-app), we get slightly lighter + add a subtle gold glow */
+  background: #50d054;
+  color: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 5px 2px rgba(255, 217, 0, 0.1), 0 0 16px rgba(255, 215, 0, 0.22);
+}
+
+.settingsInput {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+}
+
+.settingsInput:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.settingsButtonRow {
+  display: flex;
+  gap: 10px;
+}
+
+.settingsButtonRow .settingsButton {
+  flex: 1;
+}
+
+.settingsNote {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.settingsPillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settingsPill {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.settingsPillSelected {
+  border-color: rgba(76, 175, 80, 0.55);
+  background: rgba(76, 175, 80, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+}

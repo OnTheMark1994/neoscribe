@@ -1,0 +1,105 @@
+.aiChatMessage {
+  position: relative;
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.aiChatMessage_user {
+  background-color: rgba(33, 150, 243, 0.2);
+  color: #fff;
+  margin-left: 20px;
+}
+
+.aiChatMessage_assistant {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #fff;
+  margin-right: 20px;
+}
+
+.aiChatMessage_assistant.aiChatMessage_thinking {
+  background: #1c2630;
+  border-left: 3px solid #4CAF50;
+}
+
+.aiChatMessage_assistant.aiChatMessage_thinking .aiChatMessageContent {
+  display: flex;
+  align-items: center;
+}
+
+.aiChatTypingIndicator {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.aiChatTypingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #4CAF50;
+  opacity: 0.2;
+  animation: aiChatTypingBlink 1.2s infinite ease-in-out;
+}
+
+.aiChatTypingDot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.aiChatTypingDot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes aiChatTypingBlink {
+  0% { opacity: 0.2; transform: translateY(0); }
+  20% { opacity: 1; transform: translateY(-2px); }
+  40% { opacity: 0.2; transform: translateY(0); }
+  100% { opacity: 0.2; transform: translateY(0); }
+}
+
+.aiChatMessageMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.aiChatMessageRole {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.aiChatMessageContent {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.aiChatMessageDetailButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #4CAF50;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.aiChatMessageDetailButton:hover {
+  background-color: rgba(76, 175, 80, 0.2);
+  border-color: #4CAF50;
+  transform: scale(1.1);
+}

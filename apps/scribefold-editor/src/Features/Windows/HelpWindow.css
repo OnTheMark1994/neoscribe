@@ -1,0 +1,9 @@
+.helpWindow {
+  width: min(90vw, 1000px);
+  height: 85vh;
+  resize: none;
+}
+
+.helpWindow .helpMenu {
+  width: 100%;
+}

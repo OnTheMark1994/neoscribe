@@ -1,165 +1,90 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 /**
- * settingsSlice - Centralized settings state synced with localStorage
+ * settingsSlice - Application settings and preferences
  * 
- * Purpose: Single source of truth for all persistent user settings.
- * Components read from Redux; changes are synced to localStorage.
- * This eliminates scattered localStorage reads across components.
+ * Purpose: Centralize all application settings with automatic localStorage persistence
  * 
- * Design: Each setting has a setter that also persists to localStorage.
- * On app init, loadAllSettings populates state from localStorage.
+ * Flow:
+ * 1. Settings are loaded from localStorage on app startup (in AppInitializer)
+ * 2. When settings change via updateSetting, they're automatically saved to localStorage
+ * 3. All components access settings via settingsObject?.attribute pattern
+ * 
+ * Note: Settings are persisted across sessions via localStorage
  */
 
-// Helper to safely read from localStorage
-const getStorageItem = (key, defaultValue) => {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved === null) return defaultValue;
-    if (typeof defaultValue === 'boolean') {
-      return saved === 'true';
-    }
-    if (typeof defaultValue === 'object') {
-      return JSON.parse(saved);
-    }
-    return saved;
-  } catch (e) {
-    return defaultValue;
-  }
-};
-
-// Helper to safely write to localStorage
-const setStorageItem = (key, value) => {
-  try {
-    if (typeof value === 'boolean') {
-      localStorage.setItem(key, value ? 'true' : 'false');
-    } else if (typeof value === 'object') {
-      localStorage.setItem(key, JSON.stringify(value));
-    } else if (value === null || value === undefined) {
-      localStorage.removeItem(key);
-    } else {
-      localStorage.setItem(key, value);
-    }
-  } catch (e) {
-    // Ignore storage errors
-  }
-};
-
 const initialState = {
-  isAIEnabled: true,              // AI sidebar enabled
-  developerMode: false,           // Developer mode enabled (default OFF)
-  backgroundImage: 'spacedreams.jpg',  // Background theme path
-  showPreviewBar: false,          // Monaco minimap visible (default OFF)
-  showMonacoLineNumbers: false,   // Monaco line numbers visible (default OFF)
-  monacoStickyTopBar: false,      // Monaco sticky top bar (default OFF)
-  showArrayLineNumbers: false,    // Array editor line numbers visible (default OFF)
-  editorViewMode: 'array',        // Default editor view mode
-  aiService: 'deepseek-server',   // Selected AI service
-  apiKeys: {},                    // API keys by service
+  settingsObject: {}, // All settings key-value pairs
+  loading: false,     // Loading state for settings operations
+  error: null,        // Error state for settings operations
 };
 
 const settingsSlice = createSlice({
   name: 'settings',
   initialState,
   reducers: {
-    setIsAIEnabled(state, action) {
-      state.isAIEnabled = !!action.payload;
-      setStorageItem('aiEnabled', state.isAIEnabled);
+    // Bulk set settings object (used on initial load)
+    setSettingsObject(state, action) {
+      state.settingsObject = action.payload || {};
     },
-    setDeveloperMode(state, action) {
-      state.developerMode = !!action.payload;
-      setStorageItem('developerMode', state.developerMode);
-    },
-    setBackgroundImage(state, action) {
-      state.backgroundImage = action.payload || '';
-      setStorageItem('backgroundImage', state.backgroundImage);
-    },
-    setShowPreviewBar(state, action) {
-      state.showPreviewBar = !!action.payload;
-      setStorageItem('showPreviewBar', state.showPreviewBar);
-    },
-    setShowMonacoLineNumbers(state, action) {
-      state.showMonacoLineNumbers = !!action.payload;
-      setStorageItem('showMonacoLineNumbers', state.showMonacoLineNumbers);
-    },
-    setMonacoStickyTopBar(state, action) {
-      state.monacoStickyTopBar = !!action.payload;
-      setStorageItem('monacoStickyTopBar', state.monacoStickyTopBar);
-    },
-    setEditorViewMode(state, action) {
-      const mode = action.payload;
-      if (mode === 'array' || mode === 'monaco' || mode === 'textarea') {
-        state.editorViewMode = mode;
-        setStorageItem('editorViewMode', mode);
-      }
-    },
-    setAiService(state, action) {
-      state.aiService = action.payload || 'deepseek-server';
-      setStorageItem('aiService', state.aiService);
-    },
-    setApiKeys(state, action) {
-      state.apiKeys = action.payload || {};
-      setStorageItem('apiKeys', state.apiKeys);
-    },
-    updateApiKey(state, action) {
-      const { service, key } = action.payload;
-      state.apiKeys = { ...state.apiKeys, [service]: key };
-      setStorageItem('apiKeys', state.apiKeys);
-    },
-    // Load all settings from localStorage on app init
-    loadAllSettings(state) {
-      state.isAIEnabled = getStorageItem('aiEnabled', true);
-      state.developerMode = getStorageItem('developerMode', false);
-      state.backgroundImage = getStorageItem('backgroundImage', 'spacedreams.jpg');
-      state.showPreviewBar = getStorageItem('showPreviewBar', false);
-      state.showMonacoLineNumbers = getStorageItem('showMonacoLineNumbers', false);
-      state.monacoStickyTopBar = getStorageItem('monacoStickyTopBar', false);
-      state.showArrayLineNumbers = getStorageItem('showArrayLineNumbers', false);
-      
-      // Handle editorViewMode with migration from 'fold' to 'array'
-      let savedViewMode = getStorageItem('editorViewMode', 'array');
-      if (savedViewMode === 'fold') savedViewMode = 'array';
-      state.editorViewMode = savedViewMode;
-      
-      state.aiService = getStorageItem('aiService', 'deepseek-server');
-      state.apiKeys = getStorageItem('apiKeys', {});
-    },
-    // Generic setter for updating any setting
+    
+    // Update a single setting and persist to localStorage
+    // Called when user changes any setting in the UI
     updateSetting(state, action) {
-      const { key, value } = action.payload;
-      if (key in state) {
-        state[key] = value;
-        setStorageItem(key === 'isAIEnabled' ? 'aiEnabled' : key, value);
+      const { settingName, value } = action.payload;
+      console.log("in updateSetting: ", settingsName, value)
+      if (settingName) {
+
+        // 1. Update Redux state immediately for UI responsiveness
+        state.settingsObject[settingName] = value;
+        
+        // 2. Persist to localStorage for session persistence
+        try {
+          const currentSettings = JSON.parse(localStorage.getItem("settingsObject") || "{}");
+          currentSettings[settingName] = value;
+          localStorage.setItem("settingsObject", JSON.stringify(currentSettings));
+        } catch (error) {
+          console.error("Error updating settings in localStorage:", error);
+        }
       }
+    },
+    
+    // Load settings from localStorage (called in AppInitializer on app startup)
+    loadSettings(state) {
+      try {
+        const savedSettings = JSON.parse(localStorage.getItem("settingsObject") || "{}");
+        state.settingsObject = savedSettings;
+      } catch (error) {
+        console.error("Error loading settings from localStorage:", error);
+        state.settingsObject = {};
+      }
+    },
+    
+    // Controls loading state for settings operations
+    setSettingsLoading(state, action) {
+      state.loading = !!action.payload;
+    },
+    
+    // Sets error state for settings operations
+    setSettingsError(state, action) {
+      state.error = action.payload || null;
+    },
+    
+    // Clear all settings (rarely used - for resetting app)
+    clearSettings(state) {
+      state.settingsObject = {};
+      localStorage.removeItem("settingsObject");
     },
   },
 });
 
 export const {
-  setIsAIEnabled,
-  setDeveloperMode,
-  setBackgroundImage,
-  setShowPreviewBar,
-  setShowMonacoLineNumbers,
-  setMonacoStickyTopBar,
-  setEditorViewMode,
-  setAiService,
-  setApiKeys,
-  updateApiKey,
-  loadAllSettings,
+  setSettingsObject,
   updateSetting,
+  loadSettings,
+  setSettingsLoading,
+  setSettingsError,
+  clearSettings,
 } = settingsSlice.actions;
-
-// Selectors
-export const selectIsAIEnabled = (state) => state.settings.isAIEnabled;
-export const selectDeveloperMode = (state) => state.settings.developerMode;
-export const selectBackgroundImage = (state) => state.settings.backgroundImage;
-export const selectShowPreviewBar = (state) => state.settings.showPreviewBar;
-export const selectShowMonacoLineNumbers = (state) => state.settings.showMonacoLineNumbers;
-export const selectMonacoStickyTopBar = (state) => state.settings.monacoStickyTopBar;
-export const selectShowArrayLineNumbers = (state) => state.settings.showArrayLineNumbers;
-export const selectEditorViewMode = (state) => state.settings.editorViewMode;
-export const selectAiService = (state) => state.settings.aiService;
-export const selectApiKeys = (state) => state.settings.apiKeys;
 
 export default settingsSlice.reducer;
