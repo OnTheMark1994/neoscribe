@@ -38,13 +38,19 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
+    "react-build": "react-scripts build",
     "electron-dev": "concurrently \"npm run start\" \"wait-on http://localhost:3000 && electron .\"",
     "electron": "npm run electron-dev",
-    "electron:build": "react-scripts build && electron ."
+    "electron:build": "react-scripts build && electron .",
+    "electron-pack": "npm run react-build && electron-builder",
+    "build:win": "npm run react-build && electron-builder --win",
+    "build:mac": "npm run react-build && electron-builder --mac",
+    "build:linux": "npm run react-build && electron-builder --linux"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
+    "electron-builder": "^24.13.3",
     "wait-on": "^9.0.3"
   },
   "eslintConfig": {
@@ -64,5 +70,40 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "build": {
+    "appId": "com.scribefoldai.app",
+    "productName": "ScribeFold AI",
+    "directories": {
+      "buildResources": "public",
+      "output": "release"
+    },
+    "files": [
+      "build/**/*",
+      "public/electron.js",
+      "public/preload.js",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icon.icns",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "linux": {
+      "icon": "public/scribefold-ai-icon-256.png",
+      "target": "AppImage",
+      "category": "Utility",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "AbeApple",
+      "repo": "scribefold-ai-monorepo"
+    }
   }
 }

@@ -10,6 +10,29 @@
 //   and so server.js stays focused on request/response control flow.
 // - We use an env var for the DeepSeek key so secrets are never committed.
 
+/*
+
+  user signs up and confirms email: free tokens
+    when not signed in on browser there is a box in the chat area with email and password that says "create & verify" 
+    with a little text below saying get x free tokens by clicking link in your email
+  user downloads on new device: free tokens
+    actually would be way simpler to just have the email one
+  sign in with google (can add later tho)
+
+  user creates account
+  email sent
+  message says please confirm email
+  they click the link in the email
+  it brings them to web portal conform email and they get a message showing they got the tokesn
+  they refresh (or auto update in app (desktop and web) would be better)
+  they see their tokens
+  they can then use the tokens (used in the api calls)
+
+
+
+
+*/
+
 require('dotenv').config();
 
 const express = require('express');
