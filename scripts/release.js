@@ -2,7 +2,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const path = require('path');
 
-const DESKTOP_PKG_PATH = './apps/desktop-app/package.json';
+const DESKTOP_PKG_PATH = './apps/scribefold-editor/package.json';
 const LOG_FILE = './release.log';
 
 function log(message) {

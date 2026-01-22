@@ -116,10 +116,31 @@ Phases:
         help text
         little bugs like next/prev wrapping etc
 
+    2 days
+    deployment environment
+    render.com 
+        api (done)
+            create web service from apps/scribefold-api with same settins as other api (done)
+            test in url (running)
+        web build
+            create static site with apps/scribefold-editor 
+        web portal
+            ensure it points to the correct web build 
+                test
+                    api (running)
+                    web build 
+            downloads 
+                from yaml and script 
+                windows, linux, mac  
+        web build 
+            working in web, linked from the web portal 
+        
+
     1 week
     server functionality 
         tokens, accounts, free tokens, stripe webhooks, etc 
         plan out how this should work
+            probably most simple with just email confirm 
             are we going to have supabase auth object in the client?
             where do we crete the new row and see if we should add tokens
                 that should happen on the server
