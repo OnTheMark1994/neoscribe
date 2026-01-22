@@ -1,10 +1,13 @@
 /*
- 
- 
-  */
+  SettingsAccount
+
+  Account settings page with login/create account and logout functionality.
+*/
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { triggerReloadUserData } from '../../../Global/ReduxSlices/UserSlice';
+import { supabase } from '../../../Global/SupabaseClient';
+import AiChatLoginBox from '../../AI/ChatBar/AiChatLoginBox';
 import RefreshButton from '../../Util/RefreshButton';
 import '../SettingsTabs.css';
 
@@ -14,72 +17,86 @@ function formatMaybeNumber(value) {
 
 export default function SettingsAccount() {
   const dispatch = useDispatch();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [logoutStatus, setLogoutStatus] = useState('');
 
   const authUser = useSelector(state => state.userSlice.authUser);
   const userData = useSelector(state => state.userSlice.userData) || {};
   const userDataLoading = useSelector(state => state.userSlice.userDataLoading);
+  const accountCreatedMessage = useSelector(state => state.userSlice.accountCreatedMessage);
 
   const tokensRemaining = userData?.tokens ?? userData?.token_balance;
   const anonId = userData?.anonId ?? userData?.anon_id;
   const deviceId = userData?.deviceId ?? userData?.device_id;
   const authId = authUser?.id ?? userData?.authId ?? userData?.auth_id;
 
+  const handleLogout = async () => {
+    setLogoutStatus('Logging out...');
+    
+    try {
+      if (!supabase) {
+        setLogoutStatus('Supabase client not configured');
+        return;
+      }
+
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        setLogoutStatus(`Error: ${error.message}`);
+        return;
+      }
+
+      setLogoutStatus('Logged out successfully');
+      
+      // Clear status after 2 seconds
+      setTimeout(() => setLogoutStatus(''), 2000);
+    } catch (error) {
+      setLogoutStatus(`Error: ${error.message || 'Failed to logout'}`);
+    }
+  };
+
   return (
     <div>
-      <div className="settingsSection">
-        <div className="settingsSectionTitle">Login / Create Account</div>
-
-        <div className="settingsAccountGreenMessage">
-          Create a free one click account for additional free tokens and to see subscription options.
-        </div>
-
-        <div className="settingsFieldLabel">Email</div>
-        <input
-          className="settingsInput"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-        />
-
-        <div className="settingsFieldLabel" style={{ marginTop: '10px' }}>Password</div>
-        <input
-          className="settingsInput"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-        />
-
-        <div className="settingsButtonRow" style={{ marginTop: '12px' }}>
-          <button
-            type="button"
-            className="settingsButton settingsAccountAuthButton"
-            disabled
-            title="Auth not wired yet"
-          >
-            Create Account
-          </button>
-          <button
-            type="button"
-            className="settingsButton settingsAccountAuthButton"
-            disabled
-            title="Auth not wired yet"
-          >
-            Login
-          </button>
-        </div>
-
-        <div className="settingsNote">
-          Auth wiring is pending in the editor app. Once you point me to the auth module/API, I can connect these buttons.
-        </div>
-      </div>
-
+      {/* Login / Create Account Section */}
+      
       <div className="settingsSection">
         <div className="settingsSectionTitle">Account</div>
+
+          {/* If there is no auth user or a accountCreatedMessage show the new account stuff */}
+          {!authUser || accountCreatedMessage ?
+            <AiChatLoginBox />
+            :
+            // Else show the auth info and logout button
+            <div className="settingsRow">
+              <div className="settingsRowLabel">
+                <div className="settingsRowLabelTitle">Logged in as</div>
+                <div className="settingsRowLabelSub">{authUser?.email || 'Unknown'}</div>
+              </div>
+              <button
+                type="button"
+                className="settingsButton"
+                onClick={handleLogout}
+                disabled={logoutStatus === 'Logging out...'}
+              >
+                {logoutStatus || 'Logout'}
+              </button>
+
+              {/* For telling user they logged out? */}
+              {logoutStatus && (
+                <div className={`settingsNote ${
+                  logoutStatus.includes('Error') ? 'settingsNoteError' : 'settingsNoteSuccess'
+                }`}>
+                  {logoutStatus}
+                </div>
+              )}
+            </div>
+          }
+
+      </div>
+    
+
+      {/* Account Data Section */}
+      <div className="settingsSection">
+        <div className="settingsSectionTitle">Account Data</div>
 
         <div className="settingsRow">
           <div className="settingsRowLabel">
@@ -102,6 +119,7 @@ export default function SettingsAccount() {
         </div>
       </div>
 
+      {/* Identifiers Section */}
       <div className="settingsSection">
         <div className="settingsSectionTitle">Identifiers</div>
 

@@ -23,6 +23,8 @@ import { fileOpened, setModified } from './ReduxSlices/EditorSlice';
 import { setShowFileEncryptionWindow } from './ReduxSlices/WindowSlice';
 import { openLastFile } from './FileIO';
 import { setEditorText } from './EditorRefHelpers';
+import { setAuthUser } from './ReduxSlices/UserSlice';
+import { supabase } from './SupabaseClient';
 
 export default function AppInitializer({ editorRef }) {
   const dispatch = useDispatch();
@@ -30,6 +32,38 @@ export default function AppInitializer({ editorRef }) {
   useEffect(() => {
     let cancelled = false;
     let intervalId = null;
+    let authSubscription = null;
+
+    // Initialize Supabase auth listener to persist sessions and sync to Redux
+    async function initAuth() {
+      try {
+        if (!supabase) {
+          console.warn('[AppInitializer] Supabase client not available');
+          return;
+        }
+
+        // Set initial session user
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!cancelled) {
+          dispatch(setAuthUser(session?.user ?? null));
+        }
+
+        // Subscribe to auth state changes
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, newSession) => {
+          if (cancelled) return;
+          dispatch(setAuthUser(newSession?.user ?? null));
+        });
+
+        authSubscription = subscription;
+      } catch (e) {
+        // Non-fatal: editor still works in anonymous mode
+        console.warn('[AppInitializer] Supabase auth init failed:', e?.message || e);
+      }
+    }
 
     async function loadLastFile() {
       try {
@@ -75,12 +109,17 @@ export default function AppInitializer({ editorRef }) {
       }
     }
 
+    initAuth();
     loadLastFile();
     return () => {
       cancelled = true;
       if (intervalId) {
         clearInterval(intervalId);
         intervalId = null;
+      }
+      if (authSubscription) {
+        try { authSubscription.unsubscribe(); } catch (_) {}
+        authSubscription = null;
       }
     };
   }, [dispatch, editorRef]);

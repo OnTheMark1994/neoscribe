@@ -37,6 +37,8 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
+const jwt = require('jsonwebtoken');
 
 const { PROMPT_PREFACE } = require('./constants');
 
@@ -44,6 +46,23 @@ const app = express();
 // Default to 8080 because the editor currently targets http://localhost:8080.
 // You can override via PORT in the environment if needed.
 const PORT = process.env.PORT || 8080;
+
+// Supabase client configuration
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.warn('⚠ Supabase not configured. Auth endpoints will be disabled.');
+}
+
+const supabase = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
+
+// Email confirmation settings
+const EMAIL_CONFIRM_SECRET = process.env.EMAIL_CONFIRM_SECRET || 'fallback-secret-change-me';
+const EMAIL_CONFIRM_EXPIRY = '24h';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
 
 // Allow local dev clients (React app) to call this server.
 app.use(cors());
@@ -102,6 +121,188 @@ async function callDeepSeekChatCompletions({ messages, model = 'deepseek-chat', 
 
   return response.json();
 }
+
+/**
+ * Generate a signed JWT token for email confirmation
+ * Contains email and password so the web-portal can auto-login the user after confirmation
+ */
+function generateConfirmationToken(userId, email, password) {
+  return jwt.sign(
+    { userId, email, password },
+    EMAIL_CONFIRM_SECRET,
+    { expiresIn: EMAIL_CONFIRM_EXPIRY }
+  );
+}
+
+/**
+ * Verify and decode a confirmation token
+ */
+function verifyConfirmationToken(token) {
+  try {
+    const decoded = jwt.verify(token, EMAIL_CONFIRM_SECRET);
+    return decoded;
+  } catch (err) {
+    console.error('[verifyConfirmationToken] Invalid or expired token:', err.message);
+    return null;
+  }
+}
+
+/**
+ * POST /auth/create-account
+ *
+ * Creates a Supabase auth user and signs them in.
+ *
+ * Input: { email, password }
+ * Output: { success, message, user, session }
+ */
+app.post('/auth/create-account', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and password are required'
+      });
+    }
+
+    console.log('[create-account] Creating account for email:', email);
+
+    // Create Supabase auth user
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm for testing
+    });
+
+    if (authError) {
+      console.error('❌ Failed to create auth user:', authError);
+      
+      let errorMessage = authError.message || 'Failed to create auth user';
+      
+      if (authError.name === 'AuthRetryableFetchError' || authError.message?.includes('fetch failed')) {
+        errorMessage = 'Cannot connect to Supabase. Please check your SUPABASE_URL and network connection.';
+      }
+      
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+        details: authError
+      });
+    }
+
+    // Sign in to get session
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      console.error('❌ Failed to sign in after account creation:', signInError);
+      // Account created but sign in failed - return user anyway
+      return res.json({
+        success: true,
+        message: 'Account created but sign in failed. Please try logging in manually.',
+        messageType: 'warning',
+        user: authData.user,
+        session: null
+      });
+    }
+
+    console.log('✓ Create-account completed');
+
+    return res.json({
+      success: true,
+      message: 'Account created! Please check your email to collect 15,000 free tokens the click refresh here.',
+      messageType: 'success',
+      user: signInData.user,
+      session: signInData.session
+    });
+  } catch (error) {
+    console.error('Error in /auth/create-account:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create account',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /auth/login
+ *
+ * Logs in an existing user using Supabase auth.
+ *
+ * Input: { email, password }
+ * Output: { success, message, user? }
+ */
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and password are required'
+      });
+    }
+
+    console.log('[login] Logging in email:', email);
+
+    // Sign in with Supabase auth
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('❌ Failed to login:', error);
+      
+      let errorMessage = error.message || 'Invalid email or password';
+      
+      if (error.name === 'AuthRetryableFetchError' || error.message?.includes('fetch failed')) {
+        errorMessage = 'Cannot connect to Supabase. Please check your SUPABASE_URL and network connection.';
+      }
+      
+      return res.status(401).json({
+        success: false,
+        error: errorMessage,
+        details: error
+      });
+    }
+
+    console.log('✓ Login successful for user:', data.user?.id);
+
+    return res.json({
+      success: true,
+      message: 'Login successful',
+      messageType: 'success',
+      user: data.user,
+      session: data.session
+    });
+  } catch (error) {
+    console.error('Error in /auth/login:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to login',
+      details: error.message
+    });
+  }
+});
 
 /**
  * POST /chat
@@ -173,8 +374,10 @@ app.post('/chat', async (req, res) => {
 
 const server = app.listen(PORT, () => {
   console.log(`scribefold-api listening on http://localhost:${PORT}`);
-  console.log(`GET  /    -> health (returns ok)`);
-  console.log(`POST /chat -> DeepSeek proxy (requires DEEPSEEK_API_KEY env var)`);
+  console.log(`GET  /            -> health (returns ok)`);
+  console.log(`POST /chat        -> DeepSeek proxy (requires DEEPSEEK_API_KEY env var)`);
+  console.log(`POST /auth/create-account -> Create account`);
+  console.log(`POST /auth/login   -> Login with email and password`);
 });
 
 // If the process can't bind the port (already in use, permissions, etc), show a clear error.

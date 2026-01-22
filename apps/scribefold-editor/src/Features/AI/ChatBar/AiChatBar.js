@@ -24,6 +24,7 @@ import AiChatMessage from './AiChatMessage';
 import AiChatTokenDisplay from './AiChatTokenDisplay';
 import AiChatLoginBox from './AiChatLoginBox';
 import './AiChatBar.css';
+
 export default function AiChatBar({ editorRef, originalDocRef }) {
 
   // Determines whether we render the chat bar at all.
@@ -32,8 +33,11 @@ export default function AiChatBar({ editorRef, originalDocRef }) {
   // The full chat history (user + assistant + placeholder thinking messages).
   const messages = useSelector(state => state.aiSlice.messages)
 
-  // Auth user state - determines if we show login box or regular chat
+  // Auth user state - from Redux (synced by AppInitializer)
   const authUser = useSelector(state => state.userSlice.authUser);
+
+  // Account created message object { message, messageType }
+  const accountCreatedMessage = useSelector(state => state.userSlice.accountCreatedMessage);
 
   // Used to scroll to the bottom when new messages are appended.
   const messageEndRef = useRef(null);
@@ -70,8 +74,8 @@ export default function AiChatBar({ editorRef, originalDocRef }) {
       <AiChatTokenDisplay/>
 
       <div className="aiChatMessages">
-        {!authUser ? (
-          // Show login box when no user is logged in
+        {!authUser || accountCreatedMessage ? (
+          // Show login box when no user is logged in OR account created message is showing
           <AiChatLoginBox />
         ) : safeMessages.length === 0 ? (
           // Empty state shown before any messages are sent (when user is logged in).

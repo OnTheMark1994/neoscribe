@@ -10,14 +10,27 @@
     - Shows "Get 15,000 free credits sent to your email" text
 */
 import React, { useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { supabase } from '../../../Global/SupabaseClient';
+import { setAccountCreatedMessage, triggerReloadUserData } from '../../../Global/ReduxSlices/UserSlice';
 import './AiChatLoginBox.css';
+
+const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL || 'http://localhost:8080';
 
 export default function AiChatLoginBox() {
   const dispatch = useDispatch();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [status, setStatus] = useState(''); // For error/success messages
+  const [status, setStatus] = useState('');
+  const [statusType, setStatusType] = useState('');
+  
+  // Redux state - single object for account created message
+  const accountCreatedMessage = useSelector(state => state.userSlice.accountCreatedMessage);
+
+  // Debug logging
+  console.log('[AiChatLoginBox] Supabase client:', supabase ? 'AVAILABLE' : 'NULL');
+  console.log('[AiChatLoginBox] REACT_APP_SUPABASE_URL:', process.env.REACT_APP_SUPABASE_URL ? 'SET' : 'MISSING');
+  console.log('[AiChatLoginBox] REACT_APP_SUPABASE_ANON_KEY:', process.env.REACT_APP_SUPABASE_ANON_KEY ? 'SET' : 'MISSING');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -28,8 +41,29 @@ export default function AiChatLoginBox() {
     }
     
     setStatus('Logging in...');
-    // TODO: Implement login logic
-    console.log('Login clicked:', { email, password });
+    
+    try {
+      if (!supabase) {
+        setStatus('Supabase client not configured');
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setStatus(`Error: ${error.message}`);
+        return;
+      }
+
+      setStatus('Login successful!');
+      setEmail('');
+      setPassword('');
+    } catch (error) {
+      setStatus(`Error: ${error.message || 'Failed to connect to server'}`);
+    }
   };
 
   const handleCreateAccount = async (e) => {
@@ -41,9 +75,84 @@ export default function AiChatLoginBox() {
     }
     
     setStatus('Creating account...');
-    // TODO: Implement create account logic
-    console.log('Create account clicked:', { email, password });
+    
+    try {
+      if (!supabase) {
+        setStatus('Supabase client not configured');
+        return;
+      }
+
+      // Call API server to create Supabase auth user
+      const response = await fetch(`${API_BASE_URL}/auth/create-account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setStatus(`Error: ${data.error || 'Failed to create account'}`);
+        return;
+      }
+
+      // Sign in with Supabase client (persistent session)
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setStatus(`Error: ${signInError.message}`);
+        return;
+      }
+
+      setStatus(data.message || 'Account created successfully!');
+      setStatusType(data.messageType || 'success');
+      
+      dispatch(setAccountCreatedMessage({
+        message: data.message || 'Account created successfully!',
+        messageType: data.messageType || 'success'
+      }));
+      
+      setEmail('');
+      setPassword('');
+    } catch (error) {
+      setStatus(`Error: ${error.message || 'Failed to connect to server'}`);
+      setStatusType('error');
+    }
   };
+
+  const handleDismiss = () => {
+    dispatch(setAccountCreatedMessage(null));
+  };
+
+  const handleRefresh = () => {
+    dispatch(triggerReloadUserData());
+    // setTimeout(() => {}, 2000);
+  };
+
+  // Account created message
+  if (accountCreatedMessage) {
+    const { message, messageType } = accountCreatedMessage;
+    return (
+      <div className="aiChatLoginBox">
+        {message && (
+          <div className={`aiChatLoginStatus ${
+            messageType === 'error' ? 'aiChatLoginStatusError' :
+            messageType === 'success' ? 'aiChatLoginStatusSuccess' :
+            'aiChatLoginStatusWarning'
+          }`}>
+            {message}
+          </div>
+        )}
+        <div className="aiChatLoginBoxButtons">
+          <button className="aiChatLoginButton" onClick={handleRefresh}>Refresh</button>
+          <button className="aiChatCreateButton" onClick={handleDismiss}>Dismiss</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="aiChatLoginBox">
@@ -71,8 +180,8 @@ export default function AiChatLoginBox() {
 
       {status && (
         <div className={`aiChatLoginStatus ${
-          status.includes('Error') ? 'aiChatLoginStatusError' : 
-          status.includes('success') || status.includes('Creating') || status.includes('Logging') ? 'aiChatLoginStatusSuccess' : 
+          statusType === 'error' ? 'aiChatLoginStatusError' :
+          statusType === 'success' ? 'aiChatLoginStatusSuccess' :
           'aiChatLoginStatusWarning'
         }`}>
           {status}

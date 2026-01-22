@@ -20,11 +20,12 @@
  import { createSlice } from '@reduxjs/toolkit';
 
  const initialState = {
-   authUser: null,            // From the supabase auth listener, contains .id (the authID)
-   userData: {},              // Loaded from users table (via our api) based on ids (auth, device, anon)
-   userDataLoading: false,    // Flag to show when user data is showing (used for display)
-   reloadUserDataTrigger: 0,  // Triggers a user data reload when incremented (via useEffect in the initalizer comonent)
- };
+  authUser: null,            // From the supabase auth listener, contains .id (the authID)
+  userData: {},              // Loaded from users table (via our api) based on ids (auth, device, anon)
+  userDataLoading: false,    // Flag to show when user data is showing (used for display)
+  reloadUserDataTrigger: 0,  // Triggers a user data reload when incremented (via useEffect in the initalizer comonent)
+  accountCreatedMessage: null,  // Object with { message, messageType } or null to show account created message
+};
 
  const userSlice = createSlice({
    name: 'userSlice',
@@ -46,9 +47,13 @@
      triggerReloadUserData(state) {
        state.reloadUserDataTrigger += 1;
      },
-   },
+    // Set account created message object { message, messageType }
+    setAccountCreatedMessage(state, action) {
+      state.accountCreatedMessage = action.payload ?? null;
+    },
+  },
  });
 
- export const { setAuthUser, setUserData, setUserDataLoading, triggerReloadUserData } = userSlice.actions;
+ export const { setAuthUser, setUserData, setUserDataLoading, triggerReloadUserData, setAccountCreatedMessage } = userSlice.actions;
 
  export default userSlice.reducer;
