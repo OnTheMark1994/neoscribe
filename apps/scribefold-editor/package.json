@@ -1,6 +1,6 @@
 {
   "name": "scribefold-editor",
-  "version": "0.1.11",
+  "version": "0.1.9",
   "description": "ScribeFold AI - A foldable section text editor with AI assistance built with Electron and React",
   "author": "",
   "private": true,
@@ -37,16 +37,16 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "cross-env BROWSER=none react-scripts start",
+    "react-start": "cross-env BROWSER=none react-scripts start",
     "start:web": "react-scripts start",
-    "build": "npm run react-build && electron-builder",
+    "react-build": "react-scripts build",
     "build:web": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "react-build": "react-scripts build",
-    "electron-dev": "concurrently \"npm run start\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron": "npm run electron-dev",
+    "electron-dev": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-pack": "npm run react-build && electron-builder",
+    "start": "npm run electron-dev",
+    "build": "npm run react-build && electron-builder",
     "build:win": "npm run react-build && electron-builder --win",
     "build:mac": "npm run react-build && electron-builder --mac",
     "build:linux": "npm run react-build && electron-builder --linux"
@@ -54,7 +54,7 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
-    "electron": "39.2.7",
+    "electron": "^39.2.6",
     "electron-builder": "^24.13.3",
     "wait-on": "^9.0.3"
   },
