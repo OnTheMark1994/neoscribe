@@ -2,6 +2,7 @@
 
 A comprehensive monorepo containing the ScribeFold AI ecosystem:
 - **Desktop App**: Electron-based desktop application
+- **Web App**: React-based web application
 - **Web Portal**: React web app for account management and downloads
 - **API Server**: Express backend with AI integration
 
@@ -109,12 +110,31 @@ npm run build
 
 ### Automated Desktop Releases
 
-Desktop app releases are automated via GitHub Actions:
+Desktop app releases are automated via GitHub Actions and a release script:
 
-1. **Update version** in `apps/desktop-app/package.json`
+**Using the release script (recommended):**
+```bash
+npm run release
+```
+
+The script automatically:
+- Bumps the patch version (e.g., 0.1.1 → 0.1.2)
+- Updates `apps/scribefold-editor/package.json`
+- Creates a git commit
+- Creates a git tag (vX.Y.Z)
+- Pushes to GitHub
+- Triggers GitHub Actions to build all platforms
+
+**For specific versions:**
+```bash
+npm run release -- -v1.0.5
+```
+
+**Or manually:**
+1. **Update version** in `apps/scribefold-editor/package.json`
 2. **Commit and tag:**
    ```bash
-   git add apps/desktop-app/package.json
+   git add apps/scribefold-editor/package.json
    git commit -m "Release v1.0.1"
    git tag v1.0.1
    git push origin main --tags
