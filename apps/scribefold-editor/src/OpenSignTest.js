@@ -18,7 +18,7 @@ export default function OpenSignTest(){
                 baseUrl="https://app.opensignlabs.com/api/app"
                 appId="opensign"
             />
-            <iframe src={"https://app.opensignlabs.com/api/app"}></iframe>
+            <iframe src={"https://app.opensignlabs.com/api/app"} title="OpenSign Document Viewer"></iframe>
         </Window>
     )
 }
