@@ -1,0 +1,111 @@
+.aiChatLoginBox {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.aiChatLoginBoxTitle {
+  text-align: center;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.aiChatLoginBoxInputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.aiChatLoginInput {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #ffffff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.aiChatLoginInput::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.aiChatLoginInput:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.aiChatLoginBoxButtons {
+  display: flex;
+  gap: 12px;
+}
+
+.aiChatLoginButton {
+  flex: 1;
+  padding: 12px 24px;
+  background-color: #64748b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.aiChatLoginButton:hover {
+  background-color: #475569;
+}
+
+.aiChatLoginButton:active {
+  transform: scale(0.98);
+}
+
+.aiChatCreateButton {
+  flex: 1;
+  padding: 12px 24px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.aiChatCreateButton:hover {
+  background-color: #45a049;
+}
+
+.aiChatCreateButton:active {
+  transform: scale(0.98);
+}
+
+.aiChatLoginStatus {
+  padding: 8px 12px;
+  background-color: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 6px;
+  color: #ffc107;
+  font-size: 13px;
+  text-align: center;
+}
+
+.aiChatLoginStatusSuccess {
+  background-color: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.3);
+  color: #4CAF50;
+}
+
+.aiChatLoginStatusError {
+  background-color: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #f44336;
+}

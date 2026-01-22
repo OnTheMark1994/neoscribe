@@ -22,6 +22,7 @@ import { useSelector } from 'react-redux';
 import AiChatInputArea from './AiChatInputArea';
 import AiChatMessage from './AiChatMessage';
 import AiChatTokenDisplay from './AiChatTokenDisplay';
+import AiChatLoginBox from './AiChatLoginBox';
 import './AiChatBar.css';
 export default function AiChatBar({ editorRef, originalDocRef }) {
 
@@ -30,6 +31,9 @@ export default function AiChatBar({ editorRef, originalDocRef }) {
 
   // The full chat history (user + assistant + placeholder thinking messages).
   const messages = useSelector(state => state.aiSlice.messages)
+
+  // Auth user state - determines if we show login box or regular chat
+  const authUser = useSelector(state => state.userSlice.authUser);
 
   // Used to scroll to the bottom when new messages are appended.
   const messageEndRef = useRef(null);
@@ -66,8 +70,11 @@ export default function AiChatBar({ editorRef, originalDocRef }) {
       <AiChatTokenDisplay/>
 
       <div className="aiChatMessages">
-        {safeMessages.length === 0 ? (
-          // Empty state shown before any messages are sent.
+        {!authUser ? (
+          // Show login box when no user is logged in
+          <AiChatLoginBox />
+        ) : safeMessages.length === 0 ? (
+          // Empty state shown before any messages are sent (when user is logged in).
           <div className="aiChatEmptyState">
             <div className="aiChatEmptyTitle">Ask anything</div>
             <div className="aiChatEmptySubtitle">Your messages will appear here.</div>
