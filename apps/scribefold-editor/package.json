@@ -1,8 +1,11 @@
 {
   "name": "scribefold-editor",
   "version": "0.1.2",
+  "description": "ScribeFold AI - A foldable section text editor with AI assistance built with Electron and React",
+  "author": "",
   "private": true,
   "main": "public/electron.js",
+  "homepage": "./",
   "dependencies": {
     "@codemirror/commands": "^6.10.1",
     "@codemirror/fold": "^0.19.4",
@@ -21,7 +24,6 @@
     "@testing-library/user-event": "^13.5.0",
     "@uiw/react-codemirror": "^4.25.4",
     "codemirror": "^6.0.2",
-    "electron": "^39.2.7",
     "electron-is-dev": "^2.0.0",
     "lodash": "^4.17.21",
     "monaco-editor": "^0.55.1",
@@ -52,7 +54,9 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
+    "electron": "^39.2.7",
     "electron-builder": "^24.13.3",
+    "fs-extra": "^11.3.2",
     "wait-on": "^9.0.3"
   },
   "eslintConfig": {
