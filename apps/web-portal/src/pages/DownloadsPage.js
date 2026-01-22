@@ -111,7 +111,7 @@ const DownloadsPage = () => {
           <a 
             href={getDownloadUrl('windows')} 
             className="sf-download-btn"
-            download
+            download="ScribeFold-Editor-Installer.exe"
           >
             Download for Windows
           </a>
@@ -122,7 +122,7 @@ const DownloadsPage = () => {
           <a 
             href={getDownloadUrl('mac')} 
             className="sf-download-btn"
-            download
+            download="ScribeFold-Editor-Installer.dmg"
           >
             Download for macOS
           </a>
@@ -133,7 +133,7 @@ const DownloadsPage = () => {
           <a 
             href={getDownloadUrl('linux')} 
             className="sf-download-btn"
-            download
+            download="ScribeFold-Editor-Installer.AppImage"
           >
             Download for Linux
           </a>

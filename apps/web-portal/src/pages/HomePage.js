@@ -1,4 +1,5 @@
 import React from 'react';
+import { NavLink } from 'react-router-dom';
 import './HomePage.css';
 
 const HomePage = () => {
@@ -15,9 +16,9 @@ const HomePage = () => {
             Check the downloads page for the latest released designed for authors and knowledge workers.
           </p>
           <div className="sf-hero-actions">
-            <a href="/downloads" className="sf-primary-btn">Download ScribeFold AI</a>
+            <NavLink to="/downloads" className="sf-primary-btn">Download ScribeFold AI</NavLink>
             <a
-              href="https://scribefold-ai-monorepo-web-build.onrender.com/"
+              href="https://scribefold-editor.onrender.com/"
               className="sf-secondary-btn"
               target="_blank"
               rel="noopener noreferrer"
