@@ -54,9 +54,8 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
-    "electron": "^39.2.7",
+    "electron": "39.2.7",
     "electron-builder": "^24.13.3",
-    "fs-extra": "^11.3.2",
     "wait-on": "^9.0.3"
   },
   "eslintConfig": {
