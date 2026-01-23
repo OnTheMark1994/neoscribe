@@ -48,6 +48,9 @@ const app = express();
 // You can override via PORT in the environment if needed.
 const PORT = process.env.PORT || 8080;
 
+// Token grant amount
+const FREE_TOKENS_GRANT = 15000;
+
 // Supabase client configuration
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -75,8 +78,16 @@ if (process.env.RESEND_KEY) {
   console.warn('⚠ Resend not configured - email sending disabled');
 }
 
-// Allow local dev clients (React app) to call this server.
-app.use(cors());
+// Allow web portal and local dev clients to call this server
+app.use(cors({
+  origin: [
+    'http://localhost:3001', // Web portal local dev
+    'http://localhost:3000', // Web portal local dev (alternate port)
+    'https://scribefold-ai-monorepo.onrender.com', // Web portal prod
+    'http://localhost:8080', // API local dev
+  ],
+  credentials: true
+}));
 
 // Parse JSON request bodies.
 app.use(express.json({ limit: '2mb' }));
@@ -131,6 +142,14 @@ async function callDeepSeekChatCompletions({ messages, model = 'deepseek-chat', 
   }
 
   return response.json();
+}
+
+/**
+ * Generate a random unique token for claiming free tokens
+ * @returns {string} - Random token string
+ */
+function generateUniqueToken() {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
 /**
@@ -274,11 +293,33 @@ app.post('/auth/create-account', async (req, res) => {
       });
     }
 
-    // Generate confirmation token for email (to claim free tokens)
-    const confirmationToken = generateConfirmationToken(authData.user.id, email, password);
+    // Generate unique token for claiming free tokens
+    const claimToken = generateUniqueToken();
     
-    // Build confirmation URL
-    const confirmUrl = `${WEB_PORTAL_URL}/#/confirm?token=${encodeURIComponent(confirmationToken)}`;
+    // Store claim token in users table
+    try {
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          auth_id: authData.user.id,
+          claim_token: claimToken,
+          email: email,
+          password: password, // Store password for auto-login
+        });
+
+      if (insertError) {
+        console.error('[create-account] Failed to store claim token:', insertError);
+        throw insertError;
+      }
+
+      console.log('[create-account] Stored claim token for user:', authData.user.id);
+    } catch (dbError) {
+      console.error('[create-account] Failed to store claim token:', dbError);
+      // Continue anyway - user can request a new token
+    }
+    
+    // Build confirmation URL with claim token
+    const confirmUrl = `${WEB_PORTAL_URL}/#/confirm?token=${encodeURIComponent(claimToken)}`;
     console.log('[create-account] Confirmation URL:', confirmUrl);
 
     // Send confirmation email (for claiming free tokens)
@@ -444,6 +485,260 @@ app.post('/chat', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || 'Unknown server error',
+    });
+  }
+});
+
+/**
+ * POST /auth/claim-tokens
+ *
+ * Claims free tokens using a unique token
+ * Looks up user by token, adds tokens, clears token
+ * Returns user credentials for auto-login
+ *
+ * Input: { token }
+ * Output: { success, message, tokensAdded, email?, password?, error? }
+ */
+app.post('/auth/claim-tokens', async (req, res) => {
+  try {
+    const { token } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token is required'
+      });
+    }
+
+    console.log('[claim-tokens] Looking up user by token:', token);
+
+    // Find user by confirmation token
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('claim_token', token)
+      .single();
+
+    if (fetchError || !user) {
+      console.error('[claim-tokens] Invalid or expired token');
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired token. Please request a new confirmation email.'
+      });
+    }
+
+    console.log('[claim-tokens] Found user:', user.id);
+
+    // Check if tokens already claimed (claim_token is null)
+    if (!user.claim_token) {
+      console.log('[claim-tokens] Token already used for user:', user.id);
+      return res.status(400).json({
+        success: false,
+        error: 'This confirmation link has already been used. Tokens have already been added to your account.'
+      });
+    }
+
+    // Add tokens to user
+    const newTokensAdded = (Number(user.tokens_added) || 0) + FREE_TOKENS_GRANT;
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        tokens_added: newTokensAdded,
+        claim_token: null // Clear the token after claiming
+      })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('[claim-tokens] Failed to update user:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to add tokens'
+      });
+    }
+
+    console.log('[claim-tokens] Successfully added tokens to user:', user.id);
+
+    // Try to log the user in using stored password
+    let sessionData = null;
+    try {
+      console.log('[claim-tokens] Attempting to log user in...');
+
+      const email = user.email;
+      const password = user.password;
+
+      console.log('[claim-tokens] User email:', email);
+      console.log('[claim-tokens] User has password in DB:', !!password);
+      console.log('[claim-tokens] User password length:', password?.length || 0);
+
+      if (email && password) {
+        console.log('[claim-tokens] Calling signInWithPassword...');
+
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        console.log('[claim-tokens] signInWithPassword result:', {
+          hasError: !!signInError,
+          errorMessage: signInError?.message,
+          hasSession: !!signInData?.session,
+          hasAccessToken: !!signInData?.session?.access_token,
+          hasRefreshToken: !!signInData?.session?.refresh_token
+        });
+
+        if (!signInError && signInData?.session) {
+          sessionData = {
+            access_token: signInData.session.access_token,
+            refresh_token: signInData.session.refresh_token
+          };
+          console.log('[claim-tokens] ✓ User logged in successfully');
+        } else {
+          console.warn('[claim-tokens] ✗ Could not log user in:', signInError?.message);
+        }
+      } else {
+        console.warn('[claim-tokens] ✗ Cannot log in - missing email or password');
+      }
+    } catch (sessionErr) {
+      console.error('[claim-tokens] ✗ Exception logging user in:', sessionErr.message);
+    }
+
+    console.log('[claim-tokens] Session data to return:', {
+      hasSessionData: !!sessionData,
+      hasAccessToken: !!sessionData?.access_token,
+      hasRefreshToken: !!sessionData?.refresh_token
+    });
+
+    // Get auth user email
+    const { data: authUser } = await supabase.auth.admin.getUserById(user.auth_id);
+
+    return res.json({
+      success: true,
+      message: `Successfully added ${FREE_TOKENS_GRANT.toLocaleString()} free tokens to your account!`,
+      tokensAdded: FREE_TOKENS_GRANT,
+      totalTokens: newTokensAdded,
+      email: authUser?.user?.email || null,
+      userId: user.auth_id,
+      sessionData: sessionData // May be null, but tokens were still granted
+    });
+  } catch (error) {
+    console.error('Error in /auth/claim-tokens:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to claim tokens',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /auth/send-token-email
+ *
+ * Sends a confirmation email with token for an existing user
+ * Used for testing without creating a new user
+ *
+ * Input: { userId }
+ * Output: { success, message, confirmUrl?, error? }
+ */
+app.post('/auth/send-token-email', async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
+
+    console.log('[send-token-email] Sending token email for user:', userId);
+
+    // Find user by auth_id
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', userId)
+      .single();
+
+    if (fetchError || !user) {
+      console.error('[send-token-email] User not found');
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Get auth user email
+    const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+    const email = authUser?.user?.email;
+
+    if (!email) {
+      console.error('[send-token-email] Auth user not found');
+      return res.status(404).json({
+        success: false,
+        error: 'Auth user not found'
+      });
+    }
+
+    // Generate new claim token
+    const claimToken = generateUniqueToken();
+
+    // Update user with new confirmation token
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ claim_token: claimToken })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('[send-token-email] Failed to update user:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate claim token'
+      });
+    }
+
+    // Build confirmation URL
+    const confirmUrl = `${WEB_PORTAL_URL}/#/confirm?token=${encodeURIComponent(claimToken)}`;
+    console.log('[send-token-email] Confirmation URL:', confirmUrl);
+
+    // Send confirmation email
+    const emailResult = await sendConfirmationEmail(email, confirmUrl);
+
+    if (!emailResult.success) {
+      console.warn('[send-token-email] Failed to send email:', emailResult.error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to send email'
+      });
+    }
+
+    console.log('[send-token-email] Token email sent successfully');
+
+    return res.json({
+      success: true,
+      message: `Token email sent to ${email}`,
+      email: email,
+      confirmUrl: confirmUrl
+    });
+  } catch (error) {
+    console.error('Error in /auth/send-token-email:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send token email',
+      details: error.message
     });
   }
 });

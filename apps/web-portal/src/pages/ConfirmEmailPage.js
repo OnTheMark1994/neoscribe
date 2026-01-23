@@ -1,28 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../constants';
+import { supabase } from '../supabaseClient';
 import './ConfirmEmailPage.css';
 
 /**
  * Email confirmation page - auto-confirms email when user clicks link from email
  * URL format: /#/confirm?token=...
- * After confirmation, redirects to /auto-login with credentials for seamless login
+ * After confirmation, shows two buttons: "Go to Account" and "Go to Web App"
+ * Both operations (token claiming and login) happen asynchronously
  */
 const ConfirmEmailPage = () => {
   const [status, setStatus] = useState('confirming'); // 'confirming' | 'success' | 'error'
   const [message, setMessage] = useState('');
   const [tokensAdded, setTokensAdded] = useState(0);
-  const [alreadyConfirmed, setAlreadyConfirmed] = useState(false);
-  const [autoLoginUrl, setAutoLoginUrl] = useState(null);
 
   const location = useLocation();
 
   useEffect(() => {
+    // This uses the token to cofirm email, add the tokens, and auto log in the user (api loggs them in and sends token)
     const confirmEmail = async () => {
       // Parse token from URL query params
       const params = new URLSearchParams(location.search);
       const token = params.get('token');
 
+      // If no token show error message
       if (!token) {
         setStatus('error');
         setMessage('No confirmation token found. Please check your email link.');
@@ -31,9 +33,10 @@ const ConfirmEmailPage = () => {
 
       try {
         setStatus('confirming');
-        setMessage('Confirming your email...');
+        setMessage('Checking confirmation link...');
 
-        const response = await fetch(`${API_BASE_URL}/api/email/confirm`, {
+        // Send to the confirm api
+        const response = await fetch(`${API_BASE_URL}/auth/claim-tokens`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -41,8 +44,10 @@ const ConfirmEmailPage = () => {
           body: JSON.stringify({ token }),
         });
 
+        // Get data from the api
         const data = await response.json();
 
+        // If there was an error show that
         if (!response.ok || !data.success) {
           setStatus('error');
           setMessage(data.error || 'Failed to confirm email. Please try again or request a new confirmation email.');
@@ -51,13 +56,38 @@ const ConfirmEmailPage = () => {
 
         setStatus('success');
         setMessage(data.message || 'Email confirmed successfully!');
-        setTokensAdded(data.tokensAdded || 0);
-        setAlreadyConfirmed(data.alreadyConfirmed || false);
-        
-        // Build auto-login URL if email and password are returned
-        if (data.email && data.password) {
-          const loginUrl = `/auto-login?email=${encodeURIComponent(data.email)}&password=${encodeURIComponent(data.password)}`;
-          setAutoLoginUrl(loginUrl);
+
+        console.log('[ConfirmEmailPage] API Response:', {
+          success: data.success,
+          message: data.message,
+          hasSessionData: !!data.sessionData,
+          hasAccessToken: !!data.sessionData?.access_token,
+          hasRefreshToken: !!data.sessionData?.refresh_token,
+          email: data.email,
+          userId: data.userId
+        });
+
+        // Auto-login in background if session data is available
+        if (data.sessionData) {
+          console.log('[ConfirmEmailPage] Attempting auto-login with session data...');
+          try {
+            console.log('[ConfirmEmailPage] Calling supabase.auth.setSession...');
+
+            const { error } = await supabase.auth.setSession({
+              access_token: data.sessionData.access_token,
+              refresh_token: data.sessionData.refresh_token
+            });
+
+            if (error) {
+              console.error('[ConfirmEmailPage] Auto-login failed:', error);
+            } else {
+              console.log('[ConfirmEmailPage] Auto-login successful!');
+            }
+          } catch (err) {
+            console.error('[ConfirmEmailPage] Auto-login exception:', err);
+          }
+        } else {
+          console.warn('[ConfirmEmailPage] No session data available for auto-login');
         }
       } catch (err) {
         console.error('[ConfirmEmailPage] Error:', err);
@@ -83,26 +113,21 @@ const ConfirmEmailPage = () => {
         {status === 'success' && (
           <>
             <div className="sf-confirm-icon sf-confirm-icon-success">✓</div>
-            <h1>{alreadyConfirmed ? 'Already Confirmed' : 'Email Confirmed!'}</h1>
+            <h1>Email Confirmed!</h1>
             <p className="sf-confirm-message">{message}</p>
-            
-            {tokensAdded > 0 && (
-              <div className="sf-confirm-tokens">
-                <span className="sf-confirm-tokens-amount">+{tokensAdded.toLocaleString()}</span>
-                <span className="sf-confirm-tokens-label">free tokens added</span>
-              </div>
-            )}
-
-            <p className="sf-confirm-instructions">
-              {autoLoginUrl 
-                ? 'Click the button below to go to your account.'
-                : 'You can now return to the application and press refresh to see your tokens.'}
-            </p>
 
             <div className="sf-confirm-actions">
-              <Link to={autoLoginUrl || '/account'} className="sf-confirm-btn sf-confirm-btn-primary">
+              <Link to="/account" className="sf-confirm-btn sf-confirm-btn-primary">
                 Go to Account
               </Link>
+              <a
+                href="https://scribefold-ai-monorepo.onrender.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sf-confirm-btn sf-confirm-btn-secondary"
+              >
+                Go to Web App
+              </a>
             </div>
           </>
         )}
@@ -112,7 +137,7 @@ const ConfirmEmailPage = () => {
             <div className="sf-confirm-icon sf-confirm-icon-error">✕</div>
             <h1>Confirmation Failed</h1>
             <p className="sf-confirm-message sf-confirm-message-error">{message}</p>
-            
+
             <div className="sf-confirm-actions">
               <Link to="/account" className="sf-confirm-btn sf-confirm-btn-secondary">
                 Go to Account
