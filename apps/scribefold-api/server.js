@@ -39,6 +39,7 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
+const { Resend } = require('resend');
 
 const { PROMPT_PREFACE } = require('./constants');
 
@@ -62,7 +63,17 @@ const supabase = supabaseUrl && supabaseServiceKey
 // Email confirmation settings
 const EMAIL_CONFIRM_SECRET = process.env.EMAIL_CONFIRM_SECRET || 'fallback-secret-change-me';
 const EMAIL_CONFIRM_EXPIRY = '24h';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
+const WEB_PORTAL_URL = process.env.WEB_PORTAL_URL || 'https://scribefold-ai-monorepo.onrender.com';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'ScribeFold AI <onboarding@resend.dev>';
+
+// Initialize Resend client for email
+let resend = null;
+if (process.env.RESEND_KEY) {
+  resend = new Resend(process.env.RESEND_KEY);
+  console.log('✓ Resend client initialized');
+} else {
+  console.warn('⚠ Resend not configured - email sending disabled');
+}
 
 // Allow local dev clients (React app) to call this server.
 app.use(cors());
@@ -135,6 +146,53 @@ function generateConfirmationToken(userId, email, password) {
 }
 
 /**
+ * Send confirmation email via Resend
+ * @param {string} toEmail - Recipient email
+ * @param {string} confirmUrl - Full confirmation URL
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+async function sendConfirmationEmail(toEmail, confirmUrl) {
+  if (!resend) {
+    console.warn('[sendConfirmationEmail] Resend not configured, skipping email. Confirm URL:', confirmUrl);
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: toEmail,
+      subject: 'Confirm your ScribeFold AI account',
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #333;">Welcome to ScribeFold AI!</h1>
+          <p>Thank you for creating an account. Please confirm your email address to receive your free tokens.</p>
+          <p style="margin: 24px 0;">
+            <a href="${confirmUrl}" 
+               style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Confirm Email
+            </a>
+          </p>
+          <p style="color: #666; font-size: 14px;">Or copy and paste this link into your browser:</p>
+          <p style="color: #666; font-size: 14px; word-break: break-all;">${confirmUrl}</p>
+          <p style="color: #999; font-size: 12px; margin-top: 32px;">This link expires in 24 hours.</p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('[sendConfirmationEmail] Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('[sendConfirmationEmail] Email sent successfully, id:', data?.id);
+    return { success: true };
+  } catch (err) {
+    console.error('[sendConfirmationEmail] Exception:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Verify and decode a confirmation token
  */
 function verifyConfirmationToken(token) {
@@ -179,7 +237,7 @@ app.post('/auth/create-account', async (req, res) => {
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm for testing
+      email_confirm: true, // Auto-confirm so user can sign in immediately
     });
 
     if (authError) {
@@ -216,14 +274,32 @@ app.post('/auth/create-account', async (req, res) => {
       });
     }
 
+    // Generate confirmation token for email (to claim free tokens)
+    const confirmationToken = generateConfirmationToken(authData.user.id, email, password);
+    
+    // Build confirmation URL
+    const confirmUrl = `${WEB_PORTAL_URL}/#/confirm?token=${encodeURIComponent(confirmationToken)}`;
+    console.log('[create-account] Confirmation URL:', confirmUrl);
+
+    // Send confirmation email (for claiming free tokens)
+    const emailResult = await sendConfirmationEmail(email, confirmUrl);
+    
+    if (!emailResult.success) {
+      console.warn('[create-account] Failed to send confirmation email:', emailResult.error);
+      // Don't fail the request - account is created and signed in, user can request resend
+    }
+
     console.log('✓ Create-account completed');
 
     return res.json({
       success: true,
-      message: 'Account created! Please check your email to collect 15,000 free tokens the click refresh here.',
+      message: 'Account created! Please check your email to claim 15,000 free tokens.',
       messageType: 'success',
       user: signInData.user,
-      session: signInData.session
+      session: signInData.session,
+      emailSent: emailResult.success,
+      // Include confirmUrl in response for dev/testing when Resend is not configured
+      ...(resend ? {} : { confirmationUrl: confirmUrl })
     });
   } catch (error) {
     console.error('Error in /auth/create-account:', error);
