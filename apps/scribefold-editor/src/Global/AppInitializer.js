@@ -18,16 +18,58 @@
  
  */
 import React, { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { fileOpened, setModified } from './ReduxSlices/EditorSlice';
 import { setShowFileEncryptionWindow } from './ReduxSlices/WindowSlice';
 import { openLastFile } from './FileIO';
 import { setEditorText } from './EditorRefHelpers';
-import { setAuthUser } from './ReduxSlices/UserSlice';
+import { setAuthUser, setUserData, setUserDataLoading, triggerReloadUserData } from './ReduxSlices/UserSlice';
 import { supabase } from './SupabaseClient';
+
+const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL || 'http://localhost:8080';
 
 export default function AppInitializer({ editorRef }) {
   const dispatch = useDispatch();
+  const authUser = useSelector(state => state.userSlice.authUser);
+  const reloadUserDataTrigger = useSelector(state => state.userSlice.reloadUserDataTrigger);
+
+  // Load user data from database
+  async function loadUserData() {
+    if (!authUser?.id) {
+      console.log('[AppInitializer] No auth user, skipping user data load');
+      return;
+    }
+
+    try {
+      console.log('[AppInitializer] Loading user data for:', authUser.id);
+      dispatch(setUserDataLoading(true));
+
+      const response = await fetch(`${API_BASE_URL}/auth/user-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: authUser.id }),
+      });
+
+      if (!response.ok) {
+        console.error('[AppInitializer] Failed to load user data:', response.statusText);
+        dispatch(setUserDataLoading(false));
+        return;
+      }
+
+      const data = await response.json();
+      console.log('[AppInitializer] User data loaded:', data);
+
+      if (data.success && data.userData) {
+        dispatch(setUserData(data.userData));
+      } else {
+        console.warn('[AppInitializer] No user data returned');
+      }
+    } catch (e) {
+      console.error('[AppInitializer] Error loading user data:', e);
+    } finally {
+      dispatch(setUserDataLoading(false));
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +153,8 @@ export default function AppInitializer({ editorRef }) {
 
     initAuth();
     loadLastFile();
+    loadUserData();
+
     return () => {
       cancelled = true;
       if (intervalId) {
@@ -123,6 +167,11 @@ export default function AppInitializer({ editorRef }) {
       }
     };
   }, [dispatch, editorRef]);
+
+  // Load user data when auth user changes or reload is triggered
+  useEffect(() => {
+    loadUserData();
+  }, [authUser?.id, reloadUserDataTrigger]);
 
   return (
     <div>

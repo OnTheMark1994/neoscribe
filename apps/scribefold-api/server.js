@@ -743,6 +743,89 @@ app.post('/auth/send-token-email', async (req, res) => {
   }
 });
 
+/**
+ * POST /auth/user-data
+ *
+ * Returns user data from the database including tokens
+ *
+ * Input: { userId }
+ * Output: { success, userData, error? }
+ */
+app.post('/auth/user-data', async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
+
+    console.log('[user-data] Fetching user data for:', userId);
+
+    // Find user by auth_id
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', userId)
+      .single();
+
+    if (fetchError || !user) {
+      console.error('[user-data] User not found');
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    console.log('[user-data] User data found:', {
+      id: user.id,
+      auth_id: user.auth_id,
+      tokens_added: user.tokens_added,
+      tokens_monthly: user.tokens_monthly,
+      tokens_used_this_month: user.tokens_used_this_month,
+      tokens_used_all_time: user.tokens_used_all_time
+    });
+
+    // Calculate available tokens: tokens_added + tokens_monthly - tokens_used_this_month
+    const tokensAdded = user.tokens_added || 0;
+    const tokensMonthly = user.tokens_monthly || 0;
+    const tokensUsedThisMonth = user.tokens_used_this_month || 0;
+    const availableTokens = tokensAdded + tokensMonthly - tokensUsedThisMonth;
+
+    console.log('[user-data] Available tokens:', availableTokens);
+
+    return res.json({
+      success: true,
+      userData: {
+        id: user.id,
+        auth_id: user.auth_id,
+        email: user.email,
+        tokens: availableTokens, // Calculated available tokens
+        tokens_added: tokensAdded,
+        tokens_monthly: tokensMonthly,
+        tokens_used_this_month: tokensUsedThisMonth,
+        tokens_used_all_time: user.tokens_used_all_time || 0,
+      }
+    });
+  } catch (error) {
+    console.error('Error in /auth/user-data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user data',
+      details: error.message
+    });
+  }
+});
+
 const server = app.listen(PORT, () => {
   console.log(`scribefold-api listening on http://localhost:${PORT}`);
   console.log(`GET  /            -> health (returns ok)`);

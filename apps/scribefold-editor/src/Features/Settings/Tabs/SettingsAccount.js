@@ -117,6 +117,38 @@ export default function SettingsAccount() {
           </div>
           <div className="settingsInlineValue">{formatMaybeNumber(tokensRemaining)}</div>
         </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Tokens added</div>
+            <div className="settingsRowLabelSub">One-time tokens from grants.</div>
+          </div>
+          <div className="settingsInlineValue">{formatMaybeNumber(userData?.tokens_added)}</div>
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Monthly tokens</div>
+            <div className="settingsRowLabelSub">Tokens from subscription.</div>
+          </div>
+          <div className="settingsInlineValue">{formatMaybeNumber(userData?.tokens_monthly)}</div>
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Used this month</div>
+            <div className="settingsRowLabelSub">Tokens used this month.</div>
+          </div>
+          <div className="settingsInlineValue">{formatMaybeNumber(userData?.tokens_used_this_month)}</div>
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Used all time</div>
+            <div className="settingsRowLabelSub">Total tokens used ever.</div>
+          </div>
+          <div className="settingsInlineValue">{formatMaybeNumber(userData?.tokens_used_all_time)}</div>
+        </div>
       </div>
 
       {/* Identifiers Section */}
