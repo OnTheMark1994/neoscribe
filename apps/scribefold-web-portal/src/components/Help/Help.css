@@ -1,0 +1,53 @@
+.sf-help-page {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.sf-help-section {
+  margin-top: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.sf-help-section-header {
+  width: 100%;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+/* .sf-help-section-header:hover {
+  background: rgba(15, 23, 42, 0.9);
+} */
+
+.sf-help-section-toggle {
+  font-size: 1.1rem;
+  opacity: 0.8;
+}
+
+.sf-help-section-body {
+  padding: 0 14px 12px;
+  font-size: 0.9rem;
+  color: #d1d5db;
+}
+
+.sf-help-section-body p + p {
+  margin-top: 8px;
+}
+
+.sf-help-cancel-btn {
+  margin-top: 10px;
+}
+
+.sf-help-note {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
