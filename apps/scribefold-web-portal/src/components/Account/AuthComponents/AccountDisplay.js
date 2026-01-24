@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { supabase } from '../../../Global/SupabaseClient';
 import RefreshUserData from '../../Util/RefreshUserData';
 import './AccountDisplay.css';
 
@@ -7,6 +8,7 @@ const AccountDisplay = () => {
   const authUser = useSelector(state => state.userSlice.authUser);
   const userData = useSelector(state => state.userSlice.userData);
   const [selectedAddonTokens, setSelectedAddonTokens] = useState(2_000_000);
+  const dispatch = useDispatch();
 
   const formatTokens = (value) => {
     if (!Number.isFinite(value)) return 'n/a';
@@ -16,6 +18,14 @@ const AccountDisplay = () => {
   const formatCurrency = (value) => {
     if (!Number.isFinite(value)) return 'n/a';
     return `$${value.toFixed(2)}`;
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -240,7 +250,7 @@ const AccountDisplay = () => {
             <button type="button" className="sf-secondary-btn">
               Change Password
             </button>
-            <button type="button" className="sf-secondary-btn">
+            <button type="button" className="sf-secondary-btn" onClick={handleLogout}>
               Log Out
             </button>
           </div>

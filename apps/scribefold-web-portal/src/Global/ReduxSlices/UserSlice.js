@@ -5,6 +5,7 @@ const initialState = {
   userData: {},
   userDataLoading: false,
   reloadUserDataTrigger: 0,
+  showAuthWindow: false,
 };
 
 const userSlice = createSlice({
@@ -23,9 +24,12 @@ const userSlice = createSlice({
     triggerReloadUserData(state) {
       state.reloadUserDataTrigger += 1;
     },
+    setShowAuthWindow(state, action) {
+      state.showAuthWindow = Boolean(action.payload);
+    },
   },
 });
 
-export const { setAuthUser, setUserData, setUserDataLoading, triggerReloadUserData } = userSlice.actions;
+export const { setAuthUser, setUserData, setUserDataLoading, triggerReloadUserData, setShowAuthWindow } = userSlice.actions;
 
 export default userSlice.reducer;

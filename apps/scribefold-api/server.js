@@ -905,6 +905,94 @@ app.post('/auth/user-data', async (req, res) => {
   }
 });
 
+/**
+ * POST /auth/auto-login
+ *
+ * Generates a Supabase magic link token for auto-login from editor to web portal
+ * Returns the token_hash for client-side verification
+ */
+app.post('/auth/auto-login', async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId is required'
+      });
+    }
+
+    console.log('[auto-login] Generating token for userId:', userId);
+
+    // Get user's email from Supabase auth
+    const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(userId);
+    if (authError || !authUser?.user?.email) {
+      console.error('[auto-login] Failed to get user email:', authError);
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const email = authUser.user.email;
+    console.log('[auto-login] User email:', email);
+
+    // Use Supabase admin API to generate a magic link (does NOT send email when called via admin)
+    const { data, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+      options: {
+        redirectTo: `${process.env.WEB_PORTAL_URL || 'http://localhost:3000'}/#/account`
+      }
+    });
+
+    if (linkError) {
+      console.error('[auto-login] Failed to generate magic link:', linkError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate auto-login token'
+      });
+    }
+
+    console.log('[auto-login] Full data response:', JSON.stringify(data, null, 2));
+
+    // Try to extract token_hash from multiple possible locations
+    const tokenHash = data.properties?.hashed_token || 
+                      data.properties?.token_hash ||
+                      data.properties?.action_link?.match(/token_hash=([^&]+)/)?.[1];
+
+    if (!tokenHash) {
+      console.error('[auto-login] No token_hash found in response');
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate auto-login token'
+      });
+    }
+
+    console.log('[auto-login] Magic token generated:', tokenHash);
+
+    // Return the token_hash for the editor to use
+    return res.json({
+      success: true,
+      tokenHash: tokenHash
+    });
+  } catch (error) {
+    console.error('Error in /auth/auto-login:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate auto-login token',
+      details: error.message
+    });
+  }
+});
+
 const server = app.listen(PORT, () => {
   console.log(`scribefold-api listening on http://localhost:${PORT}`);
   console.log(`GET  /            -> health (returns ok)`);
