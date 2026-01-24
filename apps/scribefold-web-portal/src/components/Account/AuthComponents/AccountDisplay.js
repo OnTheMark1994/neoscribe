@@ -23,8 +23,41 @@ const AccountDisplay = () => {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
+      console.log("process.env.REACT_PROJECT_REF: ", process.env.REACT_APP_SUPABASE_PROJECT_REF)
+      localStorage.removeItem(`sb-${process.env.REACT_APP_SUPABASE_PROJECT_REF}-auth-token`);
+      // Clear Supabase auth token to prevent session issues
     } catch (error) {
       console.error('Logout error:', error);
+    }
+  };
+
+  const handleGetMoreTokens = async () => {
+    try {
+      if (!authUser?.id) {
+        console.error('Cannot generate token - no user ID');
+        return;
+      }
+
+      // Call API to generate login token
+      const response = await fetch('/auth/generate-login-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: authUser.id })
+      });
+
+      const data = await response.json();
+
+      if (!data.success || !data.loginToken) {
+        console.error('Failed to generate login token:', data.error);
+        return;
+      }
+
+      // Redirect to editor with token in URL
+      const editorUrl = `${window.location.origin}/#/editor?token=${encodeURIComponent(data.loginToken)}`;
+      window.location.href = editorUrl;
+
+    } catch (error) {
+      console.error('Error in handleGetMoreTokens:', error);
     }
   };
 
@@ -312,8 +345,9 @@ const AccountDisplay = () => {
             <button
               type="button"
               className="sf-primary-btn sf-plans-subscribe-btn"
+              onClick={handleGetMoreTokens}
             >
-              Add {formatTokens(selectedAddonTokens)} tokens
+              Get {formatTokens(selectedAddonTokens)} more tokens
             </button>
           </div>
         </section>

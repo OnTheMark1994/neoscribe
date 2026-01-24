@@ -84,19 +84,11 @@ export default function AppInitializer({ editorRef }) {
           return;
         }
 
-        // Set initial session user
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!cancelled) {
-          dispatch(setAuthUser(session?.user ?? null));
-        }
-
         // Subscribe to auth state changes
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, newSession) => {
-          if (cancelled) return;
+          console.log("onAuthStateChange: ", newSession)
           dispatch(setAuthUser(newSession?.user ?? null));
         });
 

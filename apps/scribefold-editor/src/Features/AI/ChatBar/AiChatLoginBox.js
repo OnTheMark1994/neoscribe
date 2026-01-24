@@ -89,6 +89,8 @@ export default function AiChatLoginBox() {
         body: JSON.stringify({ email, password }),
       });
 
+      console.log("createa account response", response)
+
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -101,6 +103,7 @@ export default function AiChatLoginBox() {
         email,
         password,
       });
+      console.log("signInWithPassword: ", authData)
 
       if (signInError) {
         setStatus(`Error: ${signInError.message}`);
@@ -114,9 +117,7 @@ export default function AiChatLoginBox() {
         message: data.message || 'Account created successfully!',
         messageType: data.messageType || 'success'
       }));
-      
-      setEmail('');
-      setPassword('');
+
     } catch (error) {
       setStatus(`Error: ${error.message || 'Failed to connect to server'}`);
       setStatusType('error');

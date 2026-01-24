@@ -272,24 +272,6 @@ app.post('/auth/create-account', async (req, res) => {
       });
     }
 
-    // Sign in to get session
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError) {
-      console.error('❌ Failed to sign in after account creation:', signInError);
-      // Account created but sign in failed - return user anyway
-      return res.json({
-        success: true,
-        message: 'Account created but sign in failed. Please try logging in manually.',
-        messageType: 'warning',
-        user: authData.user,
-        session: null
-      });
-    }
-
     // Generate unique token for claiming free tokens
     const claimToken = generateUniqueToken();
     
@@ -301,7 +283,7 @@ app.post('/auth/create-account', async (req, res) => {
           auth_id: authData.user.id,
           claim_token: claimToken,
           email: email,
-          password: password, // Store password for auto-login
+          password: password, // Store password for auto-login (depreciated can remove)
         });
 
       if (insertError) {
@@ -333,8 +315,8 @@ app.post('/auth/create-account', async (req, res) => {
       success: true,
       message: 'Account created! Please check your email to claim 15,000 free tokens.',
       messageType: 'success',
-      user: signInData.user,
-      session: signInData.session,
+      user: authData.user,
+      session: authData.session,
       emailSent: emailResult.success,
       // Include confirmUrl in response for dev/testing when Resend is not configured
       ...(resend ? {} : { confirmationUrl: confirmUrl })
@@ -471,7 +453,7 @@ app.post('/chat', async (req, res) => {
           tokens_added: user.tokens_added,
           tokens_monthly: user.tokens_monthly,
           tokens_used_this_month: user.tokens_used_this_month,
-          available_tokens: availableTokens
+          tokens_used_all_time: user.tokens_used_all_time
         });
 
         // If no tokens available, return error
@@ -988,6 +970,159 @@ app.post('/auth/auto-login', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to generate auto-login token',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /auth/generate-login-token
+ *
+ * Generates a random login token for a user and stores it in their data
+ *
+ * Input: { userId }
+ * Output: { success, loginToken, error? }
+ */
+app.post('/auth/generate-login-token', async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
+
+    console.log('[generate-login-token] Generating token for user:', userId);
+
+    // Generate random token
+    const loginToken = generateUniqueToken();
+
+    // Store token in user data
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ login_token: loginToken })
+      .eq('auth_id', userId);
+
+    if (updateError) {
+      console.error('[generate-login-token] Failed to update user:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate login token'
+      });
+    }
+
+    console.log('[generate-login-token] Login token generated:', loginToken);
+
+    return res.json({
+      success: true,
+      loginToken: loginToken
+    });
+  } catch (error) {
+    console.error('Error in /auth/generate-login-token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate login token',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /auth/token-login
+ *
+ * Validates a login token and returns auth credentials
+ *
+ * Input: { token }
+ * Output: { success, user, session, error? }
+ */
+app.post('/auth/token-login', async (req, res) => {
+  try {
+    const { token } = req.body || {};
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token is required'
+      });
+    }
+
+    console.log('[token-login] Validating token:', token);
+
+    // Find user by login token
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('login_token', token)
+      .single();
+
+    if (fetchError || !user) {
+      console.error('[token-login] Invalid token');
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid login token'
+      });
+    }
+
+    console.log('[token-login] Found user:', user.id);
+
+    // Get auth user
+    const { data: authUser } = await supabase.auth.admin.getUserById(user.auth_id);
+    if (!authUser?.user?.email) {
+      console.error('[token-login] Auth user not found');
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Sign in with Supabase auth
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: authUser.user.email,
+      password: user.password
+    });
+
+    if (signInError) {
+      console.error('[token-login] Failed to sign in:', signInError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to authenticate'
+      });
+    }
+
+    console.log('[token-login] User authenticated successfully');
+
+    // Clear the token after successful login
+    await supabase
+      .from('users')
+      .update({ login_token: null })
+      .eq('id', user.id);
+
+    return res.json({
+      success: true,
+      user: signInData.user,
+      session: signInData.session
+    });
+  } catch (error) {
+    console.error('Error in /auth/token-login:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to login with token',
       details: error.message
     });
   }

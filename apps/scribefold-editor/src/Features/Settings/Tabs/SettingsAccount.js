@@ -3,13 +3,13 @@
 
   Account settings page with login/create account and logout functionality.
 */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { triggerReloadUserData } from '../../../Global/ReduxSlices/UserSlice';
-import { supabase } from '../../../Global/SupabaseClient';
+import { setAuthUser, setUserData, triggerReloadUserData } from '../../../Global/ReduxSlices/UserSlice';
 import AiChatLoginBox from '../../AI/ChatBar/AiChatLoginBox';
+import './SettingsAccount.css';
+import { supabase } from '../../../Global/SupabaseClient';
 import RefreshButton from '../../Util/RefreshButton';
-import '../SettingsTabs.css';
 
 function formatMaybeNumber(value) {
   return typeof value === 'number' ? value.toLocaleString() : '—';
@@ -35,7 +35,11 @@ export default function SettingsAccount() {
     }
     try {
       const { error } = await supabase.auth.signOut();
+      // This is to resolve a supabase bug related to magic link token generation causing sign out return a 403 error  
       if (error) {
+              localStorage.removeItem(`sb-${process.env.REACT_APP_SUPABASE_PROJECT_REF}-auth-token`);
+      dispatch(triggerReloadUserData())
+
         console.log("sign out error: ", error)
         return;
       }
@@ -43,6 +47,40 @@ export default function SettingsAccount() {
       // Clear status after 2 seconds
     } catch (error) {
         console.log("sign out error: ", error)
+    }
+  };
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    
+    if (token) {
+      handleTokenLogin(token);
+    }
+  }, []);
+
+  const handleTokenLogin = async (token) => {
+    try {
+      const response = await fetch('/auth/token-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.session) {
+        // Store session and reload user data
+        localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
+        dispatch(triggerReloadUserData());
+        
+        // Remove token from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else {
+        console.error('Token login failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Error in token login:', error);
     }
   };
 
