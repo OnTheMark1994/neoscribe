@@ -17,40 +17,32 @@ function formatMaybeNumber(value) {
 
 export default function SettingsAccount() {
   const dispatch = useDispatch();
-  const [logoutStatus, setLogoutStatus] = useState('');
 
   const authUser = useSelector(state => state.userSlice.authUser);
   const userData = useSelector(state => state.userSlice.userData) || {};
+  // For the refresh button
   const userDataLoading = useSelector(state => state.userSlice.userDataLoading);
+  // If this message is there show the account creation box even when the user is logged in (for email confirmation message) 
   const accountCreatedMessage = useSelector(state => state.userSlice.accountCreatedMessage);
 
   const tokensRemaining = userData?.tokens ?? userData?.token_balance;
-  const anonId = userData?.anonId ?? userData?.anon_id;
-  const deviceId = userData?.deviceId ?? userData?.device_id;
-  const authId = authUser?.id ?? userData?.authId ?? userData?.auth_id;
 
   const handleLogout = async () => {
-    setLogoutStatus('Logging out...');
     
+    if (!supabase) {
+      console.log("sign out error: !supabase")
+      return;
+    }
     try {
-      if (!supabase) {
-        setLogoutStatus('Supabase client not configured');
-        return;
-      }
-
       const { error } = await supabase.auth.signOut();
-
       if (error) {
-        setLogoutStatus(`Error: ${error.message}`);
+        console.log("sign out error: ", error)
         return;
       }
-
-      setLogoutStatus('Logged out successfully');
       
       // Clear status after 2 seconds
-      setTimeout(() => setLogoutStatus(''), 2000);
     } catch (error) {
-      setLogoutStatus(`Error: ${error.message || 'Failed to logout'}`);
+        console.log("sign out error: ", error)
     }
   };
 
@@ -75,24 +67,12 @@ export default function SettingsAccount() {
                 type="button"
                 className="settingsButton"
                 onClick={handleLogout}
-                disabled={logoutStatus === 'Logging out...'}
               >
-                {logoutStatus || 'Logout'}
+                Logout
               </button>
-
-              {/* For telling user they logged out? */}
-              {logoutStatus && (
-                <div className={`settingsNote ${
-                  logoutStatus.includes('Error') ? 'settingsNoteError' : 'settingsNoteSuccess'
-                }`}>
-                  {logoutStatus}
-                </div>
-              )}
             </div>
           }
-
       </div>
-    
 
       {/* Account Data Section */}
       <div className="settingsSection">
@@ -151,34 +131,6 @@ export default function SettingsAccount() {
         </div>
       </div>
 
-      {/* Identifiers Section */}
-      <div className="settingsSection">
-        <div className="settingsSectionTitle">Identifiers</div>
-
-        <div className="settingsRow">
-          <div className="settingsRowLabel">
-            <div className="settingsRowLabelTitle">Auth ID</div>
-            <div className="settingsRowLabelSub">Supabase auth user id (if logged in).</div>
-          </div>
-          <div className="settingsInlineValue">{authId || '—'}</div>
-        </div>
-
-        <div className="settingsRow">
-          <div className="settingsRowLabel">
-            <div className="settingsRowLabelTitle">Anon ID</div>
-            <div className="settingsRowLabelSub">Anonymous identifier used for token grants.</div>
-          </div>
-          <div className="settingsInlineValue">{anonId || '—'}</div>
-        </div>
-
-        <div className="settingsRow">
-          <div className="settingsRowLabel">
-            <div className="settingsRowLabelTitle">Device ID</div>
-            <div className="settingsRowLabelSub">Device identifier used for anti-abuse rules.</div>
-          </div>
-          <div className="settingsInlineValue">{deviceId || '—'}</div>
-        </div>
-      </div>
     </div>
   );
 }

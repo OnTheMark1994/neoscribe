@@ -157,6 +157,7 @@ export default function AppInitializer({ editorRef }) {
 
     return () => {
       cancelled = true;
+      // The interval is for insuring the editor text loads from the last file that was open
       if (intervalId) {
         clearInterval(intervalId);
         intervalId = null;
