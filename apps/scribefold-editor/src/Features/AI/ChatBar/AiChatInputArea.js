@@ -18,6 +18,7 @@ import { useSelector } from 'react-redux';
 import { addMessage, addProposedChanges } from '../../../Global/ReduxSlices/AiSlice';
 import { setShowSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import { toggleShowDiffView, setShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
+import { updateAvailableTokens } from '../../../Global/ReduxSlices/UserSlice';
 import { getAIVisibleLinesFromEditor } from '../../../Global/EditorRefHelpers';
 import { lineIdState } from '../../Editors/EditorMonaco/CodeMirror/EditorCodeMirrorSetup';
 import './AiChatInputArea.css';
@@ -33,11 +34,11 @@ import './AiChatInputArea.css';
  * - Input: prompt string
  * - Output: response text (string)
  */
-async function callChatApi(messages) {
+async function callChatApi(messages, userId) {
   const endpoint = `${process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL}/chat`;
 
   // Build request debug info on the client.
-  const requestBody = { messages };
+  const requestBody = { messages, userId };
   const debugInfo = {
     endpoint,
     fetchRequest: {
@@ -87,6 +88,7 @@ async function callChatApi(messages) {
 
   return {
     text: String(data?.text ?? ''),
+    availableTokens: data?.availableTokens,
     debugInfo,
   };
 }
@@ -115,6 +117,9 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
 
   // We send the full message chain for context.
   const messages = useSelector(state => state.aiSlice.messages)
+
+  // Get auth user ID for token tracking
+  const authUser = useSelector(state => state.userSlice.authUser);
 
   // Uncontrolled textarea ref (keeps this component simple; Redux does not store draft input).
   const inputRef = useRef(null);
@@ -171,19 +176,27 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
           .map(m => ({ role: m.role, content: String(m.content ?? '') }))
         : [];
 
-      // Put the new message into the messages array 
+      // Put the new message into the messages array
       const outgoingMessages = [
         ...previousChain,
         { role: 'user', content: userMessageForAi },
       ];
 
-      // This function calls the api and also comiles debug info 
-      const { text: responseText, debugInfo } = await callChatApi(outgoingMessages);
-      
-      // Try to parse the resonse 
+      // Get user ID for token tracking
+      const userId = authUser?.id;
+
+      // This function calls the api and also comiles debug info
+      const { text: responseText, availableTokens, debugInfo } = await callChatApi(outgoingMessages, userId);
+
+      // Update user data if availableTokens is provided
+      if (typeof availableTokens === 'number') {
+        dispatch(updateAvailableTokens(availableTokens));
+      }
+
+      // Try to parse the resonse
       const parsedResult = tryParseAiJsonResponse(responseText);
 
-      // Fall back to the response text if the parse failed 
+      // Fall back to the response text if the parse failed
       const assistantContent = parsedResult.message || responseText;
 
       // Add message to message array for display also clears "thinking"` placeholders.

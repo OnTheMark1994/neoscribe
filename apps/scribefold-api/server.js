@@ -42,6 +42,7 @@ const jwt = require('jsonwebtoken');
 const { Resend } = require('resend');
 
 const { PROMPT_PREFACE } = require('./constants');
+const { calculateAvailableTokens, estimateTokensUsed, updateUserTokens } = require('./functions');
 
 const app = express();
 // Default to 8080 because the editor currently targets http://localhost:8080.
@@ -127,18 +128,14 @@ async function callDeepSeekChatCompletions({ messages, model = 'deepseek-chat', 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const message = errorData?.error?.message || `DeepSeek API error: ${response.status} ${response.statusText}`;
-    const err = new Error(message);
-    err.status = response.status;
-    err.details = errorData;
-    throw err;
+    const errorText = await response.text();
+    throw new Error(`DeepSeek API error: ${response.status} - ${errorText}`);
   }
 
   return response.json();
@@ -436,6 +433,7 @@ app.post('/chat', async (req, res) => {
     const body = req.body || {};
     const incomingMessages = Array.isArray(body.messages) ? body.messages : [];
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+    const userId = body.userId; // auth_id from Supabase
 
     // Backwards compatible input:
     // - Preferred: { messages: [{ role, content }, ...] }
@@ -449,6 +447,52 @@ app.post('/chat', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Invalid request. Expected JSON body with at least one message. Example: { "messages": [{"role":"user","content":"..."}] }',
+      });
+    }
+
+    // Load user data if userId is provided
+    let userData = null;
+    let availableTokens = 0;
+
+    if (userId) {
+      console.log('[chat] Loading user data for:', userId);
+
+      const { data: user, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', userId)
+        .single();
+
+      if (!fetchError && user) {
+        userData = user;
+        availableTokens = calculateAvailableTokens(user);
+
+        console.log('[chat] User data loaded:', {
+          tokens_added: user.tokens_added,
+          tokens_monthly: user.tokens_monthly,
+          tokens_used_this_month: user.tokens_used_this_month,
+          available_tokens: availableTokens
+        });
+
+        // If no tokens available, return error
+        if (availableTokens <= 0) {
+          return res.status(200).json({
+            success: false,
+            error: 'No tokens available. Please get more tokens to continue using the AI.',
+            availableTokens: 0,
+          });
+        }
+      } else {
+        console.warn('[chat] User not found:', fetchError?.message);
+        return res.status(200).json({
+          success: false,
+          error: 'User not found.',
+        });
+      }
+    }else{
+      return res.status(200).json({
+        success: false,
+        error: 'User ID is required.',
       });
     }
 
@@ -475,9 +519,47 @@ app.post('/chat', async (req, res) => {
 
     const text = apiResponse?.choices?.[0]?.message?.content || '';
 
+    // Calculate and update tokens if user data exists
+    let newAvailableTokens = availableTokens;
+    if (userData && availableTokens > 0) {
+      // Estimate tokens used
+      const estimatedTokensUsed = estimateTokensUsed(incomingMessages, text);
+
+      console.log('[chat] Estimated tokens used:', estimatedTokensUsed);
+
+      // Calculate new token values (deducts from monthly first, then added)
+      const updatedTokens = updateUserTokens(userData, estimatedTokensUsed);
+
+      console.log('[chat] Updating user tokens:', {
+        new_tokens_monthly: updatedTokens.tokens_monthly,
+        new_tokens_added: updatedTokens.tokens_added,
+        new_tokens_used_this_month: updatedTokens.tokens_used_this_month,
+        new_tokens_used_all_time: updatedTokens.tokens_used_all_time,
+        new_available_tokens: updatedTokens.available_tokens
+      });
+
+      // Update user data
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          tokens_monthly: updatedTokens.tokens_monthly,
+          tokens_added: updatedTokens.tokens_added,
+          tokens_used_this_month: updatedTokens.tokens_used_this_month,
+          tokens_used_all_time: updatedTokens.tokens_used_all_time,
+        })
+        .eq('id', userData.id);
+
+      if (updateError) {
+        console.error('[chat] Failed to update user tokens:', updateError);
+      }
+
+      newAvailableTokens = updatedTokens.available_tokens;
+    }
+
     return res.status(200).json({
       success: true,
       text,
+      availableTokens: newAvailableTokens,
     });
   } catch (error) {
     console.error('[POST /chat] Error:', error);
@@ -795,11 +877,8 @@ app.post('/auth/user-data', async (req, res) => {
       tokens_used_all_time: user.tokens_used_all_time
     });
 
-    // Calculate available tokens: tokens_added + tokens_monthly - tokens_used_this_month
-    const tokensAdded = user.tokens_added || 0;
-    const tokensMonthly = user.tokens_monthly || 0;
-    const tokensUsedThisMonth = user.tokens_used_this_month || 0;
-    const availableTokens = tokensAdded + tokensMonthly - tokensUsedThisMonth;
+    // Calculate available tokens using helper function
+    const availableTokens = calculateAvailableTokens(user);
 
     console.log('[user-data] Available tokens:', availableTokens);
 
@@ -810,9 +889,9 @@ app.post('/auth/user-data', async (req, res) => {
         auth_id: user.auth_id,
         email: user.email,
         tokens: availableTokens, // Calculated available tokens
-        tokens_added: tokensAdded,
-        tokens_monthly: tokensMonthly,
-        tokens_used_this_month: tokensUsedThisMonth,
+        tokens_added: user.tokens_added || 0,
+        tokens_monthly: user.tokens_monthly || 0,
+        tokens_used_this_month: user.tokens_used_this_month || 0,
         tokens_used_all_time: user.tokens_used_all_time || 0,
       }
     });

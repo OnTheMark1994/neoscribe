@@ -23,6 +23,7 @@ import AiChatInputArea from './AiChatInputArea';
 import AiChatMessage from './AiChatMessage';
 import AiChatTokenDisplay from './AiChatTokenDisplay';
 import AiChatLoginBox from './AiChatLoginBox';
+import AiChatNoTokensBox from './AiChatNoTokensBox';
 import './AiChatBar.css';
 
 export default function AiChatBar({ editorRef, originalDocRef }) {
@@ -35,6 +36,9 @@ export default function AiChatBar({ editorRef, originalDocRef }) {
 
   // Auth user state - from Redux (synced by AppInitializer)
   const authUser = useSelector(state => state.userSlice.authUser);
+
+  // User data for token checking
+  const userData = useSelector(state => state.userSlice.userData);
 
   // Account created message object { message, messageType }
   const accountCreatedMessage = useSelector(state => state.userSlice.accountCreatedMessage);
@@ -53,6 +57,10 @@ export default function AiChatBar({ editorRef, originalDocRef }) {
 
   // If AI mode is off, do not mount anything. Changed this to try remove an error, its in another  place
   if(!showChatBar) return null
+
+  // Check if user has no tokens available
+  const availableTokens = userData?.tokens ?? 0;
+  const hasNoTokens = availableTokens <= 0 && authUser;
 
   return (
     // <div className={"aiChatBar resizable-x "+(showChatBar?"":"aiChatBarHidden")}>
@@ -77,6 +85,9 @@ export default function AiChatBar({ editorRef, originalDocRef }) {
         {!authUser || accountCreatedMessage ? (
           // Show login box when no user is logged in OR account created message is showing
           <AiChatLoginBox />
+        ) : hasNoTokens ? (
+          // Show "Get more tokens" box when user has no tokens
+          <AiChatNoTokensBox />
         ) : safeMessages.length === 0 ? (
           // Empty state shown before any messages are sent (when user is logged in).
           <div className="aiChatEmptyState">

@@ -1,0 +1,58 @@
+/*
+  AiChatNoTokensBox.css
+
+  Styles for the "Get more tokens" box shown when user has no tokens available.
+*/
+
+.aiChatNoTokensBox {
+  position: relative;
+  padding: 20px;
+  margin: 16px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  border-radius: 16px;
+  color: white;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.aiChatNoTokensMessage {
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  opacity: 0.95;
+  font-weight: 500;
+}
+
+.aiChatNoTokensButton {
+  background: white;
+  color: #f5576c;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.aiChatNoTokensButton:hover {
+  background: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.aiChatNoTokensButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.aiChatNoTokensIcon {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: bold;
+}

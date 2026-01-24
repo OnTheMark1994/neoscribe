@@ -51,9 +51,15 @@
     setAccountCreatedMessage(state, action) {
       state.accountCreatedMessage = action.payload ?? null;
     },
+    // Update available tokens after chat request
+     updateAvailableTokens(state, action) {
+       if (state.userData && typeof action.payload === 'number') {
+         state.userData.tokens = action.payload;
+       }
+     },
   },
  });
 
- export const { setAuthUser, setUserData, setUserDataLoading, triggerReloadUserData, setAccountCreatedMessage } = userSlice.actions;
+ export const { setAuthUser, setUserData, setUserDataLoading, triggerReloadUserData, setAccountCreatedMessage, updateAvailableTokens } = userSlice.actions;
 
  export default userSlice.reducer;
