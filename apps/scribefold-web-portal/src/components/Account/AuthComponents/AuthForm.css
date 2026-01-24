@@ -1,0 +1,83 @@
+.sf-auth-form {
+  display: block;
+  width: 400px;
+  background: rgba(15,23,42,0.9);
+  border-radius: 14px;
+  padding: 18px 18px 20px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+}
+
+.sf-auth-form h2 {
+  font-size: 1.25rem;
+  margin-bottom: 16px;
+  text-align: center;
+  color: #e5e7eb;
+}
+
+.sf-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.sf-form-row label {
+  font-size: 0.85rem;
+  color: #e5e7eb;
+}
+
+.sf-form-row input {
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  padding: 8px 10px;
+  background: #020617;
+  color: #e5e7eb;
+}
+
+.sf-status-message {
+  font-size: 0.85rem;
+  color: #fbbf24;
+  margin-top: 4px;
+  text-align: center;
+}
+
+.sf-auth-actions {
+  margin-top: 10px;
+}
+
+.sf-auth-actions .sf-primary-btn {
+  width: 100%;
+  display: block;
+}
+
+.sf-auth-toggle {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.sf-auth-secondary-row {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.sf-auth-secondary-separator {
+  color: #6b7280;
+}
+
+.sf-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: #93c5fd;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.sf-link-btn:hover {
+  color: #bfdbfe;
+}

@@ -5,6 +5,7 @@ import Home from './components/Home/Home';
 import Downloads from './components/Downloads/Downloads';
 import Help from './components/Help/Help';
 import './MainDisplay.css';
+import Account from './components/Account/Account';
 
 function App() {
   return (
@@ -41,7 +42,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/downloads" element={<Downloads />} />
-            <Route path="/account" element={<div><h1>Account</h1></div>} />
+            <Route path="/account" element={<Account />} />
             <Route path="/help" element={<Help />} />
           </Routes>
         </main>

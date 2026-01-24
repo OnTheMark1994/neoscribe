@@ -18,22 +18,34 @@ export default function AppInitializer() {
       console.log('[AppInitializer] Loading user data for:', authUser.id);
       dispatch(setUserDataLoading(true));
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', authUser.id)
-        .single();
+      const apiUrl = process.env.REACT_APP_API_URL;
+      console.log('[AppInitializer] API URL:', apiUrl);
+      console.log('[AppInitializer] Full URL:', `${apiUrl}/auth/user-data`);
 
-      if (error) {
-        console.error('[AppInitializer] Failed to load user data:', error);
-        dispatch(setUserDataLoading(false));
-        return;
+      const response = await fetch(`${apiUrl}/auth/user-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: authUser.id }),
+      });
+
+      console.log('[AppInitializer] Response status:', response.status);
+      console.log('[AppInitializer] Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[AppInitializer] Error response:', errorText);
+        throw new Error(`API error: ${response.status}`);
       }
 
-      console.log('[AppInitializer] User data loaded:', data);
-      dispatch(setUserData(data));
+      const data = await response.json();
+      console.log('[AppInitializer] User data loaded from API:', data);
+      // Extract userData from response (API returns { success: true, userData: {...} })
+      dispatch(setUserData(data.userData || data));
     } catch (e) {
-      console.error('[AppInitializer] Error loading user data:', e);
+      console.error('[AppInitializer] Error loading user data from API:', e);
+      dispatch(setUserData(null));
     } finally {
       dispatch(setUserDataLoading(false));
     }
@@ -43,7 +55,7 @@ export default function AppInitializer() {
     let cancelled = false;
     let authSubscription = null;
 
-    async function initAuth() {
+    (async () => {
       try {
         if (!supabase) {
           console.warn('[AppInitializer] Supabase client not available');
@@ -68,9 +80,7 @@ export default function AppInitializer() {
       } catch (e) {
         console.warn('[AppInitializer] Supabase auth init failed:', e?.message || e);
       }
-    }
-
-    initAuth();
+    })();
 
     return () => {
       cancelled = true;
