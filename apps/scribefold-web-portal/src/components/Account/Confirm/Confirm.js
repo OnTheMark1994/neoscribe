@@ -11,13 +11,13 @@ export default function Confirm() {
 
   useEffect(() => {
     const processConfirmation = async () => {
-      const token = searchParams.get('token');
+      const code = searchParams.get('code');
 
-      console.log('[Confirm] Processing confirmation with token:', token);
+      console.log('[Confirm] Processing confirmation with code:', code);
 
-      if (!token) {
+      if (!code) {
         setStatus('error');
-        setMessage('No confirmation token found. Please check your email link.');
+        setMessage('No confirmation code found. Please check your email link.');
         return;
       }
 
@@ -25,31 +25,29 @@ export default function Confirm() {
         setStatus('processing');
         setMessage('Adding tokens to your account...');
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/claim-tokens`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/verify-login-code`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+          body: JSON.stringify({ code })
         });
 
         const data = await response.json();
         console.log('[Confirm] API response:', data);
 
-        if (!data.success) {
+        if (!data.access_token) {
           setStatus('error');
           setMessage(data.error || 'Failed to process confirmation. The link may have expired or already been used.');
           return;
         }
 
-        if (data.sessionData) {
-          console.log('[Confirm] Setting Supabase session...');
-          await supabase.auth.setSession({
-            access_token: data.sessionData.access_token,
-            refresh_token: data.sessionData.refresh_token
-          });
-        }
+        console.log('[Confirm] Setting Supabase session with custom JWT...');
+        await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: '' // No refresh token for custom JWT
+        });
 
         setStatus('success');
-        setMessage(`Successfully added ${data.tokensAdded.toLocaleString()} free tokens to your account!`);
+        setMessage('Successfully logged in! Redirecting to your account...');
 
         setTimeout(() => {
           navigate('/account', { replace: true });
@@ -62,7 +60,7 @@ export default function Confirm() {
     };
 
     processConfirmation();
-  }, [navigate]);
+  }, [searchParams, navigate]);
 
   return (
     <div className="confirmContainer">

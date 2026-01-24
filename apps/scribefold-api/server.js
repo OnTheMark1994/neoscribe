@@ -37,6 +37,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const { Resend } = require('resend');
@@ -54,7 +55,7 @@ const FREE_TOKENS_GRANT = 15000;
 
 // Supabase client configuration
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY_SECRET;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.warn('⚠ Supabase not configured. Auth endpoints will be disabled.');
@@ -1053,6 +1054,130 @@ app.post('/auth/token-login', async (req, res) => {
       error: 'Failed to login with token',
       details: error.message
     });
+  }
+});
+
+// New secure auto-login endpoints using custom JWT
+
+/**
+ * POST /api/generate-login-code
+ * Validates user's access token and generates a one-time login code
+ * Input: Authorization header with Bearer token
+ * Output: { login_code }
+ */
+app.post('/api/generate-login-code', async (req, res) => {
+  try {
+    const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!userAccessToken) {
+      return res.status(401).json({ error: 'No access token provided' });
+    }
+
+    console.log('[generate-login-code] Validating user token...');
+    console.log('[generate-login-code] Token length:', userAccessToken.length);
+    console.log('[generate-login-code] Token format:', userAccessToken.substring(0, 20) + '...');
+
+    // Validate: Get verified user from their token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(userAccessToken);
+    if (userError || !user) {
+      console.error('[generate-login-code] Invalid token:', userError?.message);
+      return res.status(401).json({ 
+        error: 'Invalid token',
+        details: userError?.message 
+      });
+    }
+
+    console.log('[generate-login-code] User validated:', user.id);
+
+    // Get user's row in public.users table
+    const { data: userData, error: fetchError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+
+    if (fetchError || !userData) {
+      console.error('[generate-login-code] User not found in users table:', fetchError);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Create: Generate a secure, one-time code
+    const loginCode = crypto.randomBytes(32).toString('hex');
+
+    // Store: Save code in the user's row
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        login_token: loginCode
+      })
+      .eq('id', userData.id);
+
+    if (updateError) {
+      console.error('[generate-login-code] Failed to store login code:', updateError);
+      return res.status(500).json({ error: 'Failed to generate login code' });
+    }
+
+    console.log('[generate-login-code] Login code generated for user:', userData.id);
+
+    res.json({ login_code: loginCode });
+  } catch (error) {
+    console.error('[generate-login-code] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/verify-login-code
+ * Verifies login code and creates custom JWT for auto-login
+ * Input: { code }
+ * Output: { access_token }
+ */
+app.post('/api/verify-login-code', async (req, res) => {
+  try {
+    const { code } = req.body || {};
+
+    if (!code) {
+      return res.status(400).json({ error: 'No code provided' });
+    }
+
+    console.log('[verify-login-code] Verifying code...');
+
+    // Find: Lookup user by the valid code
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('id, auth_id')
+      .eq('login_token', code)
+      .single();
+
+    if (error || !userData) {
+      console.error('[verify-login-code] Invalid code:', error);
+      return res.status(400).json({ error: 'Invalid code' });
+    }
+
+    console.log('[verify-login-code] Found user:', userData.id);
+
+    // Invalidate: Clear the token immediately after use
+    await supabase
+      .from('users')
+      .update({ login_token: null })
+      .eq('id', userData.id);
+
+    // Create & Sign: Build and sign the custom JWT
+    const payload = {
+      aud: 'authenticated',
+      role: 'authenticated',
+      sub: userData.auth_id, // Use Supabase auth_id
+      exp: Math.floor(Date.now() / 1000) + (14 * 24 * 60 * 60), // 14 days
+    };
+
+    const accessToken = jwt.sign(payload, process.env.SUPABASE_JWT_SECRET);
+
+    console.log('[verify-login-code] JWT created for user:', userData.id);
+
+    res.json({ access_token: accessToken });
+  } catch (error) {
+    console.error('[verify-login-code] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

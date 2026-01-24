@@ -47,4 +47,5 @@ CREATE TABLE public.users (
   confirmation_token text,            // not sure why this is here actually?
   claim_token text UNIQUE,            // Token for claiming free tokens via email link
   login_token text UNIQUE,            // Token for auto-login from editor to web portal
+  token_expires_at timestamp,         // Expiry time for login_token
 );

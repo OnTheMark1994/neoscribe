@@ -12,15 +12,15 @@ export default function AutoLogin() {
 
   useEffect(() => {
     const performAutoLogin = async () => {
-      const token = searchParams.get('token');
+      const code = searchParams.get('code');
 
       console.log('[AutoLogin] Auto-login flow started');
-      console.log('[AutoLogin] Token from URL:', token);
+      console.log('[AutoLogin] Code from URL:', code);
 
-      if (!token) {
-        console.warn('[AutoLogin] No token found in URL params');
+      if (!code) {
+        console.warn('[AutoLogin] No code found in URL params');
         setStatus('error');
-        setMessage('No auto-login token found. Please log in manually.');
+        setMessage('No auto-login code found. Please log in manually.');
         return;
       }
 
@@ -34,30 +34,30 @@ export default function AutoLogin() {
 
       try {
         setStatus('validating');
-        setMessage('Validating your login token...');
+        setMessage('Validating your login code...');
 
-        console.log('[AutoLogin] Calling /auth/token-login endpoint...');
+        console.log('[AutoLogin] Calling /api/verify-login-code endpoint...');
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/token-login`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/verify-login-code`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+          body: JSON.stringify({ code })
         });
 
         const data = await response.json();
         console.log('[AutoLogin] API response:', data);
 
-        if (!data.success || !data.session) {
+        if (!data.access_token) {
           console.error('[AutoLogin] Failed to login:', data.error);
           setStatus('error');
           setMessage('Failed to log in. Please try again.');
           return;
         }
 
-        console.log('[AutoLogin] Setting Supabase session...');
+        console.log('[AutoLogin] Setting Supabase session with custom JWT...');
         await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token
+          access_token: data.access_token,
+          refresh_token: '' // No refresh token for custom JWT
         });
 
         setStatus('success');
