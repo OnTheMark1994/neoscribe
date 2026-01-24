@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../Global/SupabaseClient';
+import './AutoLogin.css';
 
 export default function AutoLogin() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState('initializing');
   const [message, setMessage] = useState('Initializing auto-login...');
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
     const performAutoLogin = async () => {
@@ -21,6 +23,14 @@ export default function AutoLogin() {
         setMessage('No auto-login token found. Please log in manually.');
         return;
       }
+
+      // Prevent multiple simultaneous calls
+      if (hasProcessed.current) {
+        console.warn('[AutoLogin] Already processed, skipping');
+        return;
+      }
+
+      hasProcessed.current = true;
 
       try {
         setStatus('validating');
@@ -63,7 +73,7 @@ export default function AutoLogin() {
         console.error('[AutoLogin] Error:', err);
         setStatus('error');
         setMessage('An error occurred during auto-login. Please try again.');
-      } 
+      }
     };
 
     performAutoLogin();
