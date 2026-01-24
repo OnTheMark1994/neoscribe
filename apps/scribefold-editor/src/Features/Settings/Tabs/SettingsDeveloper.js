@@ -20,6 +20,9 @@ export default function SettingsDeveloper() {
   const userData = useSelector(state => state.userSlice.userData) || {};
   const [sendTokenEmailStatus, setSendTokenEmailStatus] = useState('');
   const [sendTokenEmailMessage, setSendTokenEmailMessage] = useState('');
+  const [devAccountEmail, setDevAccountEmail] = useState('');
+  const [createDevAccountStatus, setCreateDevAccountStatus] = useState('');
+  const [createDevAccountMessage, setCreateDevAccountMessage] = useState('');
 
   const handleSendTokenEmail = async () => {
     if (!authUser?.id) {
@@ -51,6 +54,40 @@ export default function SettingsDeveloper() {
     } catch (error) {
       setSendTokenEmailStatus('error');
       setSendTokenEmailMessage(`Error: ${error.message || 'Failed to send token email'}`);
+    }
+  };
+
+  const handleCreateDevAccount = async () => {
+    if (!devAccountEmail || !devAccountEmail.includes('@')) {
+      setCreateDevAccountStatus('error');
+      setCreateDevAccountMessage('Please enter a valid email address');
+      return;
+    }
+
+    setCreateDevAccountStatus('sending');
+    setCreateDevAccountMessage('Creating dev account...');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/create-account-dev`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: devAccountEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setCreateDevAccountStatus('error');
+        setCreateDevAccountMessage(data.error || 'Failed to create dev account');
+        return;
+      }
+
+      setCreateDevAccountStatus('success');
+      setCreateDevAccountMessage(data.message || 'Dev account created successfully!');
+      setDevAccountEmail('');
+    } catch (error) {
+      setCreateDevAccountStatus('error');
+      setCreateDevAccountMessage(`Error: ${error.message || 'Failed to create dev account'}`);
     }
   };
 
@@ -130,6 +167,48 @@ export default function SettingsDeveloper() {
             sendTokenEmailStatus === 'error' ? 'settingsNoteError' : 'settingsNoteSuccess'
           }`}>
             {sendTokenEmailMessage}
+          </div>
+        )}
+      </div>
+
+      <div className="settingsSection">
+        <div className="settingsSectionTitle">Create Dev Account</div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Test account creation</div>
+            <div className="settingsRowLabelSub">
+              Creates a test account with just an email (no password) and sends confirmation email.
+              Useful for testing email verification flow without manually managing Supabase accounts.
+            </div>
+          </div>
+          <input
+            type="email"
+            className="settingsInput"
+            placeholder="Enter email address"
+            value={devAccountEmail}
+            onChange={(e) => setDevAccountEmail(e.target.value)}
+            disabled={createDevAccountStatus === 'sending'}
+          />
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel"></div>
+          <button
+            type="button"
+            className="settingsButton"
+            onClick={handleCreateDevAccount}
+            disabled={createDevAccountStatus === 'sending' || !devAccountEmail}
+          >
+            {createDevAccountStatus === 'sending' ? 'Creating...' : 'Create Dev Account'}
+          </button>
+        </div>
+
+        {createDevAccountMessage && (
+          <div className={`settingsNote ${
+            createDevAccountStatus === 'error' ? 'settingsNoteError' : 'settingsNoteSuccess'
+          }`}>
+            {createDevAccountMessage}
           </div>
         )}
       </div>

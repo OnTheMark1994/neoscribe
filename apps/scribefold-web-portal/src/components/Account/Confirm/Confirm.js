@@ -11,11 +11,12 @@ export default function Confirm() {
 
   useEffect(() => {
     const processConfirmation = async () => {
-      const code = searchParams.get('code');
+      const token = searchParams.get('token');
 
-      console.log('[Confirm] Processing confirmation with code:', code);
+      console.log('[Confirm] URL params - token:', token);
 
-      if (!code) {
+      if (!token) {
+        console.error('[Confirm] No confirmation code found in URL');
         setStatus('error');
         setMessage('No confirmation code found. Please check your email link.');
         return;
@@ -25,11 +26,15 @@ export default function Confirm() {
         setStatus('processing');
         setMessage('Adding tokens to your account...');
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/verify-login-code`, {
+        console.log('[Confirm] Calling /api/verify-email-token with token:', token);
+
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/verify-email-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code })
+          body: JSON.stringify({ token })
         });
+
+        console.log('[Confirm] Response status:', response.status);
 
         const data = await response.json();
         console.log('[Confirm] API response:', data);

@@ -762,7 +762,9 @@ app.post('/auth/send-token-email', async (req, res) => {
     // Update user with new confirmation token
     const { error: updateError } = await supabase
       .from('users')
-      .update({ claim_token: claimToken })
+      .update({ 
+        claim_token: claimToken
+      })
       .eq('id', user.id);
 
     if (updateError) {
@@ -1167,7 +1169,7 @@ app.post('/api/verify-login-code', async (req, res) => {
       aud: 'authenticated',
       role: 'authenticated',
       sub: userData.auth_id, // Use Supabase auth_id
-      exp: Math.floor(Date.now() / 1000) + (14 * 24 * 60 * 60), // 14 days
+      exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour
     };
 
     const accessToken = jwt.sign(payload, process.env.SUPABASE_JWT_SECRET);
@@ -1178,6 +1180,225 @@ app.post('/api/verify-login-code', async (req, res) => {
   } catch (error) {
     console.error('[verify-login-code] Error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/verify-email-token
+ *
+ * Verifies email confirmation token, adds free tokens, and creates custom JWT for auto-login
+ * Input: { token }
+ * Output: { access_token, tokensAdded }
+ */
+app.post('/api/verify-email-token', async (req, res) => {
+  try {
+    const { token } = req.body || {};
+
+    console.log('[verify-email-token] Request received');
+    console.log('[verify-email-token] Request body:', req.body);
+    console.log('[verify-email-token] Token provided:', token ? token.substring(0, 20) + '...' : 'none');
+
+    if (!supabase) {
+      console.error('[verify-email-token] Supabase not configured');
+      return res.status(503).json({ error: 'Database not configured' });
+    }
+
+    if (!token) {
+      console.error('[verify-email-token] No token provided');
+      return res.status(400).json({ error: 'No token provided' });
+    }
+
+    console.log('[verify-email-token] Verifying email token...');
+
+    // Find: Lookup user by claim_token
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('id, auth_id, claim_token')
+      .eq('claim_token', token)
+      .single();
+
+    console.log('[verify-email-token] Database query result:', {
+      hasError: !!error,
+      errorMessage: error?.message,
+      hasUserData: !!userData,
+      userDataId: userData?.id
+    });
+
+    if (error || !userData) {
+      console.error('[verify-email-token] Invalid token:', error);
+      return res.status(400).json({ error: 'Invalid or expired token. Please request a new confirmation email.' });
+    }
+
+    console.log('[verify-email-token] Found user:', userData.id);
+
+    // Check if tokens already claimed (claim_token is null)
+    if (!userData.claim_token) {
+      console.log('[verify-email-code] Token already used for user:', userData.id);
+      return res.status(400).json({
+        error: 'This confirmation link has already been used. Tokens have already been added to your account.'
+      });
+    }
+
+    // Add tokens to user
+    const { data: currentUser, error: fetchError } = await supabase
+      .from('users')
+      .select('tokens_added')
+      .eq('id', userData.id)
+      .single();
+
+    if (fetchError) {
+      console.error('[verify-email-token] Failed to fetch current tokens:', fetchError);
+      return res.status(500).json({ error: 'Failed to fetch current tokens' });
+    }
+
+    const newTokensAdded = FREE_TOKENS_GRANT;
+    const updatedTokensAdded = (Number(currentUser?.tokens_added) || 0) + newTokensAdded;
+
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        tokens_added: updatedTokensAdded,
+        claim_token: null // Clear the token after claiming
+      })
+      .eq('id', userData.id);
+
+    if (updateError) {
+      console.error('[verify-email-code] Failed to update user:', updateError);
+      return res.status(500).json({ error: 'Failed to add tokens' });
+    }
+
+    console.log('[verify-email-code] Successfully added tokens to user:', userData.id);
+
+    // Create & Sign: Build and sign the custom JWT with 1 month expiration
+    const payload = {
+      aud: 'authenticated',
+      role: 'authenticated',
+      sub: userData.auth_id, // Use Supabase auth_id
+      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days (1 month)
+    };
+
+    const accessToken = jwt.sign(payload, process.env.SUPABASE_JWT_SECRET);
+
+    console.log('[verify-email-code] JWT created for user:', userData.id);
+
+    res.json({
+      success: true,
+      access_token: accessToken,
+      tokensAdded: newTokensAdded
+    });
+  } catch (error) {
+    console.error('[verify-email-code] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/create-account-dev
+ *
+ * Development endpoint: Creates a test account with just an email (no password required)
+ * Generates a confirmation token and sends email
+ *
+ * Input: { email }
+ * Output: { success, message, confirmationUrl? }
+ */
+app.post('/api/create-account-dev', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+
+    console.log('[create-account-dev] Creating dev account for email:', email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is required'
+      });
+    }
+
+    // Generate a random password for Supabase auth (user won't need it)
+    const randomPassword = crypto.randomBytes(32).toString('hex');
+
+    // Create Supabase auth user
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password: randomPassword,
+      email_confirm: true,
+    });
+
+    if (authError) {
+      console.error('[create-account-dev] Failed to create auth user:', authError);
+
+      let errorMessage = authError.message || 'Failed to create auth user';
+
+      if (authError.name === 'AuthRetryableFetchError' || authError.message?.includes('fetch failed')) {
+        errorMessage = 'Cannot connect to Supabase. Please check your SUPABASE_URL and network connection.';
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+        details: authError
+      });
+    }
+
+    // Generate unique token for claiming free tokens
+    const claimToken = generateUniqueToken();
+
+    // Store claim token in users table
+    try {
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          auth_id: authData.user.id,
+          claim_token: claimToken,
+          email: email,
+        });
+
+      if (insertError) {
+        console.error('[create-account-dev] Failed to store claim token:', insertError);
+        throw insertError;
+      }
+
+      console.log('[create-account-dev] Stored claim token for user:', authData.user.id);
+    } catch (dbError) {
+      console.error('[create-account-dev] Failed to store claim token:', dbError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to store claim token',
+        details: dbError.message
+      });
+    }
+
+    // Build confirmation URL with claim token
+    const confirmUrl = `${WEB_PORTAL_URL}/#/confirm?token=${encodeURIComponent(claimToken)}`;
+    console.log('[create-account-dev] Confirmation URL:', confirmUrl);
+
+    // Send confirmation email (for claiming free tokens)
+    const emailResult = await sendConfirmationEmail(email, confirmUrl);
+
+    if (!emailResult.success) {
+      console.warn('[create-account-dev] Failed to send confirmation email:', emailResult.error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to send confirmation email',
+        details: emailResult.error
+      });
+    }
+
+    console.log('[create-account-dev] Dev account created and email sent');
+
+    return res.json({
+      success: true,
+      message: 'Dev account created! Confirmation email sent.',
+      email: email,
+      confirmationUrl: confirmUrl
+    });
+  } catch (error) {
+    console.error('[create-account-dev] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create dev account',
+      details: error.message
+    });
   }
 });
 
