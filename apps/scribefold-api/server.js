@@ -283,7 +283,6 @@ app.post('/auth/create-account', async (req, res) => {
           auth_id: authData.user.id,
           claim_token: claimToken,
           email: email,
-          password: password, // Store password for auto-login (depreciated can remove)
         });
 
       if (insertError) {
@@ -639,7 +638,6 @@ app.post('/auth/claim-tokens', async (req, res) => {
 
       console.log('[claim-tokens] User email:', email);
       console.log('[claim-tokens] User has password in DB:', !!password);
-      console.log('[claim-tokens] User password length:', password?.length || 0);
 
       if (email && password) {
         console.log('[claim-tokens] Calling signInWithPassword...');
@@ -887,93 +885,7 @@ app.post('/auth/user-data', async (req, res) => {
   }
 });
 
-/**
- * POST /auth/auto-login
- *
- * Generates a Supabase magic link token for auto-login from editor to web portal
- * Returns the token_hash for client-side verification
- */
-app.post('/auth/auto-login', async (req, res) => {
-  try {
-    const { userId } = req.body || {};
 
-    if (!supabase) {
-      return res.status(503).json({
-        success: false,
-        error: 'Database not configured'
-      });
-    }
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      });
-    }
-
-    console.log('[auto-login] Generating token for userId:', userId);
-
-    // Get user's email from Supabase auth
-    const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(userId);
-    if (authError || !authUser?.user?.email) {
-      console.error('[auto-login] Failed to get user email:', authError);
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    const email = authUser.user.email;
-    console.log('[auto-login] User email:', email);
-
-    // Use Supabase admin API to generate a magic link (does NOT send email when called via admin)
-    const { data, error: linkError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: email,
-      options: {
-        redirectTo: `${process.env.WEB_PORTAL_URL || 'http://localhost:3000'}/#/account`
-      }
-    });
-
-    if (linkError) {
-      console.error('[auto-login] Failed to generate magic link:', linkError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to generate auto-login token'
-      });
-    }
-
-    console.log('[auto-login] Full data response:', JSON.stringify(data, null, 2));
-
-    // Try to extract token_hash from multiple possible locations
-    const tokenHash = data.properties?.hashed_token || 
-                      data.properties?.token_hash ||
-                      data.properties?.action_link?.match(/token_hash=([^&]+)/)?.[1];
-
-    if (!tokenHash) {
-      console.error('[auto-login] No token_hash found in response');
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to generate auto-login token'
-      });
-    }
-
-    console.log('[auto-login] Magic token generated:', tokenHash);
-
-    // Return the token_hash for the editor to use
-    return res.json({
-      success: true,
-      tokenHash: tokenHash
-    });
-  } catch (error) {
-    console.error('Error in /auth/auto-login:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to generate auto-login token',
-      details: error.message
-    });
-  }
-});
 
 /**
  * POST /auth/generate-login-token
@@ -984,6 +896,8 @@ app.post('/auth/auto-login', async (req, res) => {
  * Output: { success, loginToken, error? }
  */
 app.post('/auth/generate-login-token', async (req, res) => {
+    console.log("in /auth/generate-login-token")
+
   try {
     const { userId } = req.body || {};
 
@@ -1005,6 +919,7 @@ app.post('/auth/generate-login-token', async (req, res) => {
 
     // Generate random token
     const loginToken = generateUniqueToken();
+    console.log("New token: ", loginToken)
 
     // Store token in user data
     const { error: updateError } = await supabase
@@ -1045,6 +960,7 @@ app.post('/auth/generate-login-token', async (req, res) => {
  * Output: { success, user, session, error? }
  */
 app.post('/auth/token-login', async (req, res) => {
+  console.log("in /auth/token-login")
   try {
     const { token } = req.body || {};
 
@@ -1081,7 +997,7 @@ app.post('/auth/token-login', async (req, res) => {
 
     console.log('[token-login] Found user:', user.id);
 
-    // Get auth user
+    // Get auth user email
     const { data: authUser } = await supabase.auth.admin.getUserById(user.auth_id);
     if (!authUser?.user?.email) {
       console.error('[token-login] Auth user not found');
@@ -1091,11 +1007,23 @@ app.post('/auth/token-login', async (req, res) => {
       });
     }
 
-    // Sign in with Supabase auth
+    const email = authUser.user.email;
+    const password = user.password;
+
+    if (!password) {
+      console.error('[token-login] No password stored for user');
+      return res.status(500).json({
+        success: false,
+        error: 'Password not found'
+      });
+    }
+
+    // Sign in with Supabase auth using stored password
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: authUser.user.email,
-      password: user.password
+      email,
+      password
     });
+    console.log("token login signInData: ", signInData)
 
     if (signInError) {
       console.error('[token-login] Failed to sign in:', signInError);
@@ -1130,10 +1058,6 @@ app.post('/auth/token-login', async (req, res) => {
 
 const server = app.listen(PORT, () => {
   console.log(`scribefold-api listening on http://localhost:${PORT}`);
-  console.log(`GET  /            -> health (returns ok)`);
-  console.log(`POST /chat        -> DeepSeek proxy (requires DEEPSEEK_API_KEY env var)`);
-  console.log(`POST /auth/create-account -> Create account`);
-  console.log(`POST /auth/login   -> Login with email and password`);
 });
 
 // If the process can't bind the port (already in use, permissions, etc), show a clear error.

@@ -12,13 +12,13 @@ export default function AutoLogin() {
 
   useEffect(() => {
     const performAutoLogin = async () => {
-      const tokenHash = searchParams.get('token_hash');
+      const token = searchParams.get('token');
 
       console.log('[AutoLogin] Auto-login flow started');
-      console.log('[AutoLogin] Token hash from URL:', tokenHash);
+      console.log('[AutoLogin] Token from URL:', token);
 
-      if (!tokenHash) {
-        console.warn('[AutoLogin] No token_hash found in URL params');
+      if (!token) {
+        console.warn('[AutoLogin] No token found in URL params');
         setStatus('error');
         setMessage('No auto-login token found. Please log in manually.');
         return;
@@ -36,35 +36,33 @@ export default function AutoLogin() {
         setStatus('validating');
         setMessage('Validating your login token...');
 
-        console.log('[AutoLogin] Calling supabase.auth.verifyOtp with token_hash...');
+        console.log('[AutoLogin] Calling /auth/token-login endpoint...');
 
-        // Use Supabase client to verify the OTP and create a session
-        const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: 'magiclink'
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/token-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
         });
 
-        if (verifyError) {
-          console.error('[AutoLogin] Failed to verify OTP:', verifyError);
+        const data = await response.json();
+        console.log('[AutoLogin] API response:', data);
+
+        if (!data.success || !data.session) {
+          console.error('[AutoLogin] Failed to login:', data.error);
           setStatus('error');
           setMessage('Failed to log in. Please try again.');
           return;
         }
 
-        console.log('[AutoLogin] OTP verified successfully');
-        console.log('[AutoLogin] Session present:', !!verifyData.session);
-
-        if (!verifyData.session) {
-          console.error('[AutoLogin] No session created');
-          setStatus('error');
-          setMessage('Failed to log in. Please try again.');
-          return;
-        }
+        console.log('[AutoLogin] Setting Supabase session...');
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token
+        });
 
         setStatus('success');
         setMessage('Login successful! Redirecting to your account...');
 
-        // Redirect to account page after a short delay
         setTimeout(() => {
           console.log('[AutoLogin] Redirecting to /account');
           navigate('/account', { replace: true });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { supabase } from '../../../Global/SupabaseClient';
 import RefreshUserData from '../../Util/RefreshUserData';
@@ -9,6 +9,44 @@ const AccountDisplay = () => {
   const userData = useSelector(state => state.userSlice.userData);
   const [selectedAddonTokens, setSelectedAddonTokens] = useState(2_000_000);
   const dispatch = useDispatch();
+
+  // Check for token on mount
+  useEffect(() => {
+    const hash = window.location.hash;
+    const urlParams = new URLSearchParams(hash.split('?')[1] || '');
+    const token = urlParams.get('token');
+    
+    if (token) {
+      handleTokenLogin(token);
+    }
+  }, []);
+
+  const handleTokenLogin = async (token) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/token-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.session) {
+        // Set Supabase session
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token
+        });
+        
+        // Remove token from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else {
+        console.error('Token login failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Error in token login:', error);
+    }
+  };
 
   const formatTokens = (value) => {
     if (!Number.isFinite(value)) return 'n/a';
@@ -39,7 +77,7 @@ const AccountDisplay = () => {
       }
 
       // Call API to generate login token
-      const response = await fetch('/auth/generate-login-token', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/generate-login-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: authUser.id })

@@ -45,4 +45,6 @@ CREATE TABLE public.users (
   device_id text,                     // for non auth users on a physical device (not browser)
   email_confirmed_at text,            // email confirmation button pressed
   confirmation_token text,            // not sure why this is here actually?
+  claim_token text UNIQUE,            // Token for claiming free tokens via email link
+  login_token text UNIQUE,            // Token for auto-login from editor to web portal
 );

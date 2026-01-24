@@ -1,0 +1,61 @@
+.confirmContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.confirmContent {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.confirmIcon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.confirmTitle {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.confirmInitializing p,
+.confirmProcessing p,
+.confirmSuccess p,
+.confirmError p {
+  color: #666;
+  line-height: 1.6;
+}
+
+.confirmRedirect {
+  color: #999;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.confirmButton {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.confirmButton:hover {
+  background: #5568d3;
+}

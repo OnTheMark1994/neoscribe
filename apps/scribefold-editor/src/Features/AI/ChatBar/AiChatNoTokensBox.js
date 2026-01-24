@@ -20,10 +20,10 @@ export default function AiChatNoTokensBox() {
       return;
     }
 
-    console.log('[AiChatNoTokensBox] Calling API for auto-login token...');
+    console.log('[AiChatNoTokensBox] Calling API for login token...');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/auto-login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/generate-login-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,11 +35,11 @@ export default function AiChatNoTokensBox() {
       console.log('[AiChatNoTokensBox] API response:', data);
 
       if (!response.ok || !data.success) {
-        console.error('[AiChatNoTokensBox] Failed to get auto-login token:', data.error);
+        console.error('[AiChatNoTokensBox] Failed to get login token:', data.error);
         return;
       }
 
-      const url = `${WEB_PORTAL_URL}/#/auto-login?token_hash=${encodeURIComponent(data.tokenHash)}`;
+      const url = `${WEB_PORTAL_URL}/#/auto-login?token=${data.loginToken}`;
       console.log('[AiChatNoTokensBox] Opening web portal at:', url);
       window.open(url, '_blank');
     } catch (err) {

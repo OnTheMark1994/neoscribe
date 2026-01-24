@@ -9,6 +9,7 @@ import Account from './components/Account/Account';
 import AutoLogin from './components/Account/AutoLogin/AutoLogin';
 import Navbar from './components/Layout/Nav/Navbar';
 import Footer from './components/Layout/Footer/Footer';
+import Confirm from './components/Account/Confirm/Confirm';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
             <Route path="/account" element={<Account />} />
             <Route path="/help" element={<Help />} />
             <Route path="/auto-login" element={<AutoLogin />} />
+            <Route path="/confirm" element={<Confirm />} />
           </Routes>
         </main>
         <Footer />
