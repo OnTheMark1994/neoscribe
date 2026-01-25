@@ -6,10 +6,12 @@ import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateSetting } from '../../../Global/ReduxSlices/SettingsSlice';
 import { toggleShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
+import { supabase } from '../../../Global/SupabaseClient';
 import ToggleSwitch from '../../Util/ToggleSwitch';
 import '../SettingsTabs.css';
 
 const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL || 'http://localhost:8080';
+const WEB_PORTAL_URL = process.env.REACT_APP_WEB_PORTAL_URL || 'http://localhost:3001';
 
 export default function SettingsDeveloper() {
   const dispatch = useDispatch();
@@ -23,6 +25,90 @@ export default function SettingsDeveloper() {
   const [devAccountEmail, setDevAccountEmail] = useState('');
   const [createDevAccountStatus, setCreateDevAccountStatus] = useState('');
   const [createDevAccountMessage, setCreateDevAccountMessage] = useState('');
+  const [encryptionKey, setEncryptionKey] = useState('');
+
+  const handleGenerateEncryptionKey = () => {
+    const key = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    console.log('ENCRYPTION KEY:', key);
+    console.log('Add to .env: ENCRYPTION_KEY=' + key);
+    setEncryptionKey(key);
+  };
+
+  const handleTestAutoLogin = async (method) => {
+    console.log('[AutoLogin Test] BUTTON CLICKED for method:', method);
+    console.log('[AutoLogin Test] Auth user:', authUser?.id);
+
+    if (!authUser?.id) {
+      console.error('[AutoLogin Test] You must be logged in to test auto-login');
+      return;
+    }
+
+    try {
+      console.log('[AutoLogin Test] ENV API_BASE_URL:', API_BASE_URL);
+      console.log('[AutoLogin Test] ENV WEB_PORTAL_URL:', WEB_PORTAL_URL);
+      console.log('[AutoLogin Test] Getting session...');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not logged in');
+      }
+
+      let autoLoginPath = '';
+      let apiEndpoint = '/api/generate-login-token';
+
+      if (method === 'password') {
+        autoLoginPath = '/auto-login-password';
+      } else if (method === 'jwt') {
+        autoLoginPath = '/auto-login-jwt';
+      } else if (method === 'magiclink') {
+        autoLoginPath = '/auto-login-magiclink';
+      } else if (method === 'encrypted-magiclink') {
+        autoLoginPath = '/auto-login-magiclink-enc';
+        apiEndpoint = '/api/generate-encrypted-login-token';
+      }
+
+      console.log('[AutoLogin Test] Calling API endpoint:', `${API_BASE_URL}${apiEndpoint}`);
+      const response = await fetch(`${API_BASE_URL}${apiEndpoint}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      console.log('[AutoLogin Test] Response status:', response.status);
+      const cloned1 = response.clone();
+      try { console.log('[AutoLogin Test] Raw response text:', await cloned1.text()); } catch {}
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[AutoLogin Test] Failed to generate login token:', response.status, errorText);
+        throw new Error('Failed to generate login token');
+      }
+
+      const data = await response.json();
+      console.log('[AutoLogin Test] API response data (parsed JSON):', JSON.stringify(data, null, 2));
+      console.log('[AutoLogin Test] API response keys:', Object.keys(data));
+      console.log('[AutoLogin Test] API response token:', data.token);
+
+      const { token } = data;
+
+      if (!token) {
+        console.error('[AutoLogin Test] No token in response:', data);
+        return;
+      }
+
+      console.log('[AutoLogin Test] Token generated, length:', token.length);
+
+      // Normalize base URL to ensure it includes a scheme (http://) to avoid browser launch errors
+      const baseUrl = /^https?:\/\//i.test(WEB_PORTAL_URL) ? WEB_PORTAL_URL : `http://${WEB_PORTAL_URL}`;
+      const url = `${baseUrl}/#${autoLoginPath}?token=${token}`;
+      console.log('[AutoLogin Test] Opening URL:', url);
+
+      window.open(url, '_blank');
+      console.log('[AutoLogin Test] Window opened');
+    } catch (error) {
+      console.error('[AutoLogin Test] Error:', error.message);
+    }
+  };
 
   const handleSendTokenEmail = async () => {
     if (!authUser?.id) {
@@ -209,6 +295,108 @@ export default function SettingsDeveloper() {
             createDevAccountStatus === 'error' ? 'settingsNoteError' : 'settingsNoteSuccess'
           }`}>
             {createDevAccountMessage}
+          </div>
+        )}
+      </div>
+
+      <div className="settingsSection">
+        <div className="settingsSectionTitle">Auto-Login Testing</div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Test Password Method</div>
+            <div className="settingsRowLabelSub">
+              Tests auto-login using stored password and signInWithPassword.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="settingsButton"
+            onClick={() => handleTestAutoLogin('password')}
+          >
+            Test Password
+          </button>
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Test JWT Method</div>
+            <div className="settingsRowLabelSub">
+              Tests auto-login using custom JWT signed with SUPABASE_JWT_SECRET.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="settingsButton"
+            onClick={() => handleTestAutoLogin('jwt')}
+          >
+            Test JWT
+          </button>
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Test Magic Link Method</div>
+            <div className="settingsRowLabelSub">
+              Tests auto-login using Supabase magic link and verifyOtp.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="settingsButton"
+            onClick={() => handleTestAutoLogin('magiclink')}
+          >
+            Test Magic Link
+          </button>
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Test Encrypted Magic Link</div>
+            <div className="settingsRowLabelSub">
+              Tests auto-login using encrypted session_builders table (more secure).
+            </div>
+          </div>
+          <button
+            type="button"
+            className="settingsButton"
+            onClick={() => handleTestAutoLogin('encrypted-magiclink')}
+          >
+            Test Encrypted Magic Link
+          </button>
+        </div>
+      </div>
+
+      <div className="settingsSection">
+        <div className="settingsSectionTitle">Encryption Key Generation</div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Generate Encryption Key</div>
+            <div className="settingsRowLabelSub">
+              Generates a 64-character hex string for AES-256 encryption.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="settingsButton"
+            onClick={handleGenerateEncryptionKey}
+          >
+            Generate Key
+          </button>
+        </div>
+
+        {encryptionKey && (
+          <div className="settingsRow">
+            <div className="settingsRowLabel">
+              <div className="settingsRowLabelTitle">Generated Key</div>
+              <div className="settingsRowLabelSub">
+                Add this to your .env file as ENCRYPTION_KEY
+              </div>
+            </div>
+            <div className="settingsValue">
+              <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{encryptionKey}</code>
+            </div>
           </div>
         )}
       </div>

@@ -28,25 +28,20 @@ export default function SettingsAccount() {
   const tokensRemaining = userData?.tokens ?? userData?.token_balance;
 
   const handleLogout = async () => {
-    
     if (!supabase) {
       console.log("sign out error: !supabase")
       return;
     }
     try {
       const { error } = await supabase.auth.signOut();
-      // This is to resolve a supabase bug related to magic link token generation causing sign out return a 403 error  
+      // Manually clear localStorage and reload to ensure complete logout
+      localStorage.removeItem(`sb-${process.env.REACT_APP_SUPABASE_PROJECT_REF}-auth-token`);
+      window.location.reload();
       if (error) {
-              localStorage.removeItem(`sb-${process.env.REACT_APP_SUPABASE_PROJECT_REF}-auth-token`);
-      dispatch(triggerReloadUserData())
-
         console.log("sign out error: ", error)
-        return;
       }
-      
-      // Clear status after 2 seconds
     } catch (error) {
-        console.log("sign out error: ", error)
+      console.log("sign out error: ", error)
     }
   };
 

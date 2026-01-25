@@ -7,6 +7,10 @@ import Help from './components/Help/Help';
 import './MainDisplay.css';
 import Account from './components/Account/Account';
 import AutoLogin from './components/Account/AutoLogin/AutoLogin';
+import AutoLoginPassword from './components/Account/AutoLoginPassword';
+import AutoLoginJWT from './components/Account/AutoLoginJWT';
+import AutoLoginMagicLink from './components/Account/AutoLoginMagicLink';
+import AutoLoginMagicLinkEnc from './components/Account/AutoLoginMagicLinkEnc';
 import Navbar from './components/Layout/Nav/Navbar';
 import Footer from './components/Layout/Footer/Footer';
 import Confirm from './components/Account/Confirm/Confirm';
@@ -24,6 +28,10 @@ function App() {
             <Route path="/account" element={<Account />} />
             <Route path="/help" element={<Help />} />
             <Route path="/auto-login" element={<AutoLogin />} />
+            <Route path="/auto-login-password" element={<AutoLoginPassword />} />
+            <Route path="/auto-login-jwt" element={<AutoLoginJWT />} />
+            <Route path="/auto-login-magiclink" element={<AutoLoginMagicLink />} />
+            <Route path="/auto-login-magiclink-enc" element={<AutoLoginMagicLinkEnc />} />
             <Route path="/confirm" element={<Confirm />} />
           </Routes>
         </main>

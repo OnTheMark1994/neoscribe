@@ -71,6 +71,43 @@ const EMAIL_CONFIRM_EXPIRY = '24h';
 const WEB_PORTAL_URL = process.env.WEB_PORTAL_URL || 'https://scribefold-ai-monorepo.onrender.com';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'ScribeFold AI <onboarding@resend.dev>';
 
+// Encryption utilities for session_builders table
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+const IV_LENGTH = 16;
+
+// Validate and log encryption key
+const keyBuffer = Buffer.from(ENCRYPTION_KEY, 'hex');
+console.log('========================================');
+console.log('ENCRYPTION KEY VALIDATION:');
+console.log('Key length (chars):', ENCRYPTION_KEY.length);
+console.log('Key buffer length (bytes):', keyBuffer.length);
+console.log('Expected: 64 chars, 32 bytes for AES-256');
+console.log('Valid:', keyBuffer.length === 32);
+console.log('========================================');
+
+// Use fixed IV for deterministic encryption (same input = same output)
+const FIXED_IV = Buffer.alloc(IV_LENGTH, 0);
+
+const encrypt = (text) => {
+  console.log('[ENC MAGIC LINK] ENCRYPT - Input length:', text.length);
+  const cipher = crypto.createCipheriv('aes-256-cbc', keyBuffer, FIXED_IV);
+  const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+  const result = encrypted.toString('hex');
+  console.log('[ENC MAGIC LINK] ENCRYPT - Output length:', result.length, 'prefix:', result.substring(0, 20) + '...');
+  return result;
+};
+
+const decrypt = (text) => {
+  console.log('[ENC MAGIC LINK] DECRYPT - Input length:', text.length, 'prefix:', text.substring(0, 20) + '...');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, FIXED_IV);
+  const result = Buffer.concat([
+    decipher.update(Buffer.from(text, 'hex')),
+    decipher.final()
+  ]).toString();
+  console.log('[ENC MAGIC LINK] DECRYPT - Output length:', result.length);
+  return result;
+};
+
 // Initialize Resend client for email
 let resend = null;
 if (process.env.RESEND_KEY) {
@@ -888,72 +925,6 @@ app.post('/auth/user-data', async (req, res) => {
   }
 });
 
-
-
-/**
- * POST /auth/generate-login-token
- *
- * Generates a random login token for a user and stores it in their data
- *
- * Input: { userId }
- * Output: { success, loginToken, error? }
- */
-app.post('/auth/generate-login-token', async (req, res) => {
-    console.log("in /auth/generate-login-token")
-
-  try {
-    const { userId } = req.body || {};
-
-    if (!supabase) {
-      return res.status(503).json({
-        success: false,
-        error: 'Database not configured'
-      });
-    }
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'User ID is required'
-      });
-    }
-
-    console.log('[generate-login-token] Generating token for user:', userId);
-
-    // Generate random token
-    const loginToken = generateUniqueToken();
-    console.log("New token: ", loginToken)
-
-    // Store token in user data
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ login_token: loginToken })
-      .eq('auth_id', userId);
-
-    if (updateError) {
-      console.error('[generate-login-token] Failed to update user:', updateError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to generate login token'
-      });
-    }
-
-    console.log('[generate-login-token] Login token generated:', loginToken);
-
-    return res.json({
-      success: true,
-      loginToken: loginToken
-    });
-  } catch (error) {
-    console.error('Error in /auth/generate-login-token:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to generate login token',
-      details: error.message
-    });
-  }
-});
-
 /**
  * POST /auth/token-login
  *
@@ -1067,63 +1038,65 @@ app.post('/auth/token-login', async (req, res) => {
  * Input: Authorization header with Bearer token
  * Output: { login_code }
  */
-app.post('/api/generate-login-code', async (req, res) => {
+app.post('/api/generate-login-token', async (req, res) => {
   try {
+    console.log('[generate-login-token] Incoming headers Authorization exists:', !!req.headers.authorization);
+    console.log('[generate-login-token] Raw Authorization header prefix:', req.headers.authorization?.substring(0, 20) + '...');
     const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
 
     if (!userAccessToken) {
       return res.status(401).json({ error: 'No access token provided' });
     }
 
-    console.log('[generate-login-code] Validating user token...');
-    console.log('[generate-login-code] Token length:', userAccessToken.length);
-    console.log('[generate-login-code] Token format:', userAccessToken.substring(0, 20) + '...');
+    console.log('[generate-login-token] Validating user token...');
+    console.log('[generate-login-token] Token length:', userAccessToken.length);
+    console.log('[generate-login-token] Token prefix:', userAccessToken.substring(0, 20) + '...');
 
-    // Validate: Get verified user from their token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(userAccessToken);
-    if (userError || !user) {
-      console.error('[generate-login-code] Invalid token:', userError?.message);
-      return res.status(401).json({ 
-        error: 'Invalid token',
-        details: userError?.message 
-      });
+    // Validate: Verify JWT locally and extract user id (sub)
+    let decoded;
+    try {
+      decoded = jwt.verify(userAccessToken, process.env.SUPABASE_JWT_SECRET);
+    } catch (e) {
+      console.error('[generate-login-token] JWT verify failed:', e?.message);
+      return res.status(401).json({ error: 'Invalid token', details: e?.message });
     }
 
-    console.log('[generate-login-code] User validated:', user.id);
+    const authUserId = decoded?.sub;
+    console.log('[generate-login-token] User token verified. sub:', authUserId);
 
     // Get user's row in public.users table
     const { data: userData, error: fetchError } = await supabase
       .from('users')
       .select('id')
-      .eq('auth_id', user.id)
+      .eq('auth_id', authUserId)
       .single();
 
     if (fetchError || !userData) {
-      console.error('[generate-login-code] User not found in users table:', fetchError);
+      console.error('[generate-login-token] User not found in users table. Error:', fetchError);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Create: Generate a secure, one-time code
-    const loginCode = crypto.randomBytes(32).toString('hex');
+    // Create: Generate a secure, one-time token
+    const loginToken = crypto.randomBytes(32).toString('hex');
 
-    // Store: Save code in the user's row
+    // Store: Save token in the user's row
     const { error: updateError } = await supabase
       .from('users')
       .update({
-        login_token: loginCode
+        login_token: loginToken
       })
       .eq('id', userData.id);
 
     if (updateError) {
-      console.error('[generate-login-code] Failed to store login code:', updateError);
-      return res.status(500).json({ error: 'Failed to generate login code' });
+      console.error('[generate-login-token] Failed to store login token:', updateError);
+      return res.status(500).json({ error: 'Failed to generate login token' });
     }
 
-    console.log('[generate-login-code] Login code generated for user:', userData.id);
+    console.log('[generate-login-token] Login token generated for user:', userData.id, 'prefix:', loginToken.substring(0, 10) + '...');
 
-    res.json({ login_code: loginCode });
+    res.json({ token: loginToken });
   } catch (error) {
-    console.error('[generate-login-code] Error:', error);
+    console.error('[generate-login-token] Exception:', { message: error?.message, stack: error?.stack });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1401,6 +1374,254 @@ app.post('/api/create-account-dev', async (req, res) => {
     });
   }
 });
+
+// ============================================================================
+// ENCRYPTED AUTO-LOGIN ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/generate-encrypted-login-token
+ * Generates a one-time token, encrypts email and token, saves to session_builders table
+ * Input: Authorization header with access token
+ * Output: { token }
+ */
+app.post('/api/generate-encrypted-login-token', async (req, res) => {
+  try {
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Starting');
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Incoming headers Authorization exists:', !!req.headers.authorization);
+    const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!userAccessToken) {
+      console.log('[ENC MAGIC LINK] GENERATE TOKEN - No access token provided');
+      return res.status(401).json({ error: 'No access token provided' });
+    }
+
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Validating user token...');
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Token length:', userAccessToken.length);
+
+    // Validate: Verify JWT locally and extract user id (sub)
+    let decoded;
+    try {
+      decoded = jwt.verify(userAccessToken, process.env.SUPABASE_JWT_SECRET);
+    } catch (e) {
+      console.error('[ENC MAGIC LINK] GENERATE TOKEN - JWT verify failed:', e?.message);
+      return res.status(401).json({ error: 'Invalid token', details: e?.message });
+    }
+
+    const authUserId = decoded?.sub;
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - User token verified. sub:', authUserId);
+
+    // Get user's row in public.users table
+    const { data: userData, error: fetchError } = await supabase
+      .from('users')
+      .select('id, auth_id')
+      .eq('auth_id', authUserId)
+      .single();
+
+    if (fetchError || !userData) {
+      console.error('[ENC MAGIC LINK] GENERATE TOKEN - User not found in users table. Error:', fetchError);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - User found:', userData.id);
+
+    // Get user email
+    const { data: user, error: userError } = await supabase.auth.admin.getUserById(userData.auth_id);
+    if (userError || !user?.user?.email) {
+      console.error('[ENC MAGIC LINK] GENERATE TOKEN - User not found. Error:', userError);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const email = user.user.email;
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - User email:', email);
+
+    // Generate a secure, one-time token
+    const loginToken = crypto.randomBytes(32).toString('hex');
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Generated token length:', loginToken.length, 'prefix:', loginToken.substring(0, 10) + '...');
+
+    // Encrypt token and email
+    const encryptedToken = encrypt(loginToken);
+    const encryptedEmail = encrypt(email);
+
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Encrypted token stored in field1');
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Encrypted email stored in field2');
+
+    // Save to session_builders table (field1 = encrypted token, field2 = encrypted email)
+    const { error: insertError } = await supabase
+      .from('session_builders')
+      .insert({
+        field1: encryptedToken,
+        field2: encryptedEmail
+      });
+
+    if (insertError) {
+      console.error('[ENC MAGIC LINK] GENERATE TOKEN - Failed to save to session_builders:', insertError);
+      return res.status(500).json({ error: 'Failed to generate login token' });
+    }
+
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Saved to session_builders table');
+    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Returning plain token to client');
+
+    res.json({ token: loginToken });
+  } catch (error) {
+    console.error('[ENC MAGIC LINK] GENERATE TOKEN - Exception:', { message: error?.message, stack: error?.stack });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /auth/auto-login-magiclink-enc
+ * Validates encrypted token, decrypts email, generates magic link
+ * Input: { token }
+ * Output: { token_hash, type }
+ */
+app.post('/auth/auto-login-magiclink-enc', async (req, res) => {
+  try {
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Starting');
+    const { token } = req.body || {};
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Incoming body:', { tokenLength: token?.length, tokenPrefix: token?.slice(0, 10) });
+
+    if (!token) {
+      console.log('[ENC MAGIC LINK] VALIDATE TOKEN - No token provided');
+      return res.status(400).json({ error: 'No token provided' });
+    }
+
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Encrypting token for lookup...');
+    // Look up in session_builders table by encrypted token
+    const encryptedToken = encrypt(token);
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Encrypted token for lookup, prefix:', encryptedToken.substring(0, 20) + '...');
+
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Looking up in session_builders table...');
+    const { data: sessionData, error: findError } = await supabase
+      .from('session_builders')
+      .select('field1, field2')
+      .eq('field1', encryptedToken)
+      .single();
+
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Session lookup:', { found: !!sessionData, error: findError?.message });
+    if (findError || !sessionData) {
+      console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Invalid or expired token');
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Session found, decrypting email...');
+    // Decrypt email from field2
+    const encryptedEmail = sessionData.field2;
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Encrypted email prefix:', encryptedEmail.substring(0, 20) + '...');
+
+    const email = decrypt(encryptedEmail);
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Decrypted email:', email);
+
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Deleting session entry...');
+    // Delete the session entry after use
+    await supabase
+      .from('session_builders')
+      .delete()
+      .eq('field1', encryptedToken);
+
+    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Session entry deleted');
+
+    console.log('[ENC MAGIC LINK] GENERATE MAGIC LINK - Starting for email:', email);
+    // Generate magic link
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+      options: { redirectTo: `${process.env.REACT_APP_URL || 'http://localhost:3001'}/#/account` }
+    });
+
+    console.log('[ENC MAGIC LINK] GENERATE MAGIC LINK - Generate link:', { success: !!linkData, error: linkError?.message });
+    if (linkError) {
+      return res.status(linkError.status || 500).json({ error: linkError.message });
+    }
+
+    // Extract token_hash from the action_link
+    const url = new URL(linkData.properties.action_link);
+    const token_hash = url.searchParams.get('token');
+    console.log('[ENC MAGIC LINK] GENERATE MAGIC LINK - Extracted token_hash prefix:', token_hash?.slice(0, 10));
+
+    console.log('[ENC MAGIC LINK] GENERATE MAGIC LINK - Returning token_hash to client');
+    res.json({ token_hash, type: 'magiclink' });
+  } catch (e) {
+    console.error('[ENC MAGIC LINK] VALIDATE TOKEN - Error:', e.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================================
+// END ENCRYPTED AUTO-LOGIN ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /auth/auto-login-magiclink
+ * Generates magic link server-side and returns token_hash for client verifyOtp
+ * Input: { token }
+ * Output: { token_hash, type }
+ */
+app.post('/auth/auto-login-magiclink', async (req, res) => {
+  try {
+    const { token } = req.body || {};
+    console.log('[auto-login-magiclink] Incoming body:', { tokenLength: token?.length, tokenPrefix: token?.slice(0, 10) });
+
+    if (!token) {
+      return res.status(400).json({ error: 'No token provided' });
+    }
+
+    // Validate token against users.login_token
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('id, auth_id')
+      .eq('login_token', token)
+      .single();
+
+    console.log('[auto-login-magiclink] Token lookup:', { found: !!userData, error: error?.message });
+    if (error || !userData) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+
+    // Invalidate the one-time token
+    await supabase
+      .from('users')
+      .update({ login_token: null })
+      .eq('id', userData.id);
+
+    console.log('[auto-login-magiclink] Token invalidated for user:', userData.id);
+
+    // Get user email
+    const { data: user, error: userError } = await supabase.auth.admin.getUserById(userData.auth_id);
+    console.log('[auto-login-magiclink] User fetch:', { email: user?.user?.email, error: userError?.message });
+    if (userError || !user?.user?.email) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const email = user.user.email;
+
+    // Generate magic link
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+      options: { redirectTo: `${process.env.REACT_APP_URL || 'http://localhost:3001'}/#/account` }
+    });
+
+    console.log('[auto-login-magiclink] Generate link:', { success: !!linkData, error: linkError?.message });
+    if (linkError) {
+      return res.status(linkError.status || 500).json({ error: linkError.message });
+    }
+
+    // Extract token_hash from the action_link
+    const url = new URL(linkData.properties.action_link);
+    const token_hash = url.searchParams.get('token');
+    console.log('[auto-login-magiclink] Extracted token_hash prefix:', token_hash?.slice(0, 10));
+
+    res.json({ token_hash, type: 'magiclink' });
+  } catch (e) {
+    console.error('[auto-login-magiclink] Error:', e.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================================
+// END AUTO-LOGIN TESTING ENDPOINTS
+// ============================================================================
 
 const server = app.listen(PORT, () => {
   console.log(`scribefold-api listening on http://localhost:${PORT}`);
