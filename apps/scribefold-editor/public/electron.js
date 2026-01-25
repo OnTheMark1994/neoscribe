@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const isDev = require('electron-is-dev');
@@ -145,6 +145,18 @@ ipcMain.handle('save-file-as', async (event, payload) => {
     fs.writeFileSync(finalPath, content ?? '', 'utf-8');
     return { success: true, filePath: finalPath };
   } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('open-external', async (event, url) => {
+  console.log('[Main] open-external called with URL:', url);
+  try {
+    await shell.openExternal(url);
+    console.log('[Main] Successfully opened URL in system browser');
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Failed to open URL:', error);
     return { success: false, error: error.message };
   }
 });

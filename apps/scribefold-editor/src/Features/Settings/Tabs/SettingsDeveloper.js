@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { updateSetting } from '../../../Global/ReduxSlices/SettingsSlice';
 import { toggleShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
 import { supabase } from '../../../Global/SupabaseClient';
+import { openUrlInBrowser } from '../../../Global/helpers/urlHelpers';
 import ToggleSwitch from '../../Util/ToggleSwitch';
 import '../SettingsTabs.css';
 
@@ -102,8 +103,7 @@ export default function SettingsDeveloper() {
       const baseUrl = /^https?:\/\//i.test(WEB_PORTAL_URL) ? WEB_PORTAL_URL : `http://${WEB_PORTAL_URL}`;
       const url = `${baseUrl}/#${autoLoginPath}?token=${token}`;
       console.log('[AutoLogin Test] Opening URL:', url);
-
-      window.open(url, '_blank');
+      await openUrlInBrowser(url);
       console.log('[AutoLogin Test] Window opened');
     } catch (error) {
       console.error('[AutoLogin Test] Error:', error.message);

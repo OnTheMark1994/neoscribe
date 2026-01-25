@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, shell, ipcRenderer } = require('electron');
 
 // Minimal API surface, but still exposes window.electronAPI like desktop-app
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
   saveFile: (filePath, content) => ipcRenderer.invoke('save-file', { filePath, content }),
   saveFileAs: (payload) => ipcRenderer.invoke('save-file-as', payload),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 });

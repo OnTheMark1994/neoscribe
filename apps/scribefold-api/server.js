@@ -72,38 +72,128 @@ const EMAIL_FROM = process.env.EMAIL_FROM || 'ScribeFold AI <onboarding@resend.d
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 const IV_LENGTH = 16;
 
-// Validate and log encryption key
+// Validate encryption key
 const keyBuffer = Buffer.from(ENCRYPTION_KEY, 'hex');
-console.log('========================================');
-console.log('ENCRYPTION KEY VALIDATION:');
-console.log('Key length (chars):', ENCRYPTION_KEY.length);
-console.log('Key buffer length (bytes):', keyBuffer.length);
-console.log('Expected: 64 chars, 32 bytes for AES-256');
-console.log('Valid:', keyBuffer.length === 32);
-console.log('========================================');
+if (keyBuffer.length !== 32) {
+  console.error('Invalid ENCRYPTION_KEY: must be 64 hex characters (32 bytes)');
+  process.exit(1);
+}
 
 // Use fixed IV for deterministic encryption (same input = same output)
 const FIXED_IV = Buffer.alloc(IV_LENGTH, 0);
 
 const encrypt = (text) => {
-  console.log('[ENC MAGIC LINK] ENCRYPT - Input length:', text.length);
   const cipher = crypto.createCipheriv('aes-256-cbc', keyBuffer, FIXED_IV);
   const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
-  const result = encrypted.toString('hex');
-  console.log('[ENC MAGIC LINK] ENCRYPT - Output length:', result.length, 'prefix:', result.substring(0, 20) + '...');
-  return result;
+  return encrypted.toString('hex');
 };
 
 const decrypt = (text) => {
-  console.log('[ENC MAGIC LINK] DECRYPT - Input length:', text.length, 'prefix:', text.substring(0, 20) + '...');
   const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, FIXED_IV);
-  const result = Buffer.concat([
+  return Buffer.concat([
     decipher.update(Buffer.from(text, 'hex')),
     decipher.final()
   ]).toString();
-  console.log('[ENC MAGIC LINK] DECRYPT - Output length:', result.length);
-  return result;
 };
+
+/**
+ * Sends a claim token email using encrypted magic link approach
+ * This is the working implementation used by the test endpoint
+ *
+ * @param {string} email - User's email address
+ * @param {string} userId - User's auth_id (optional, for existing users)
+ * @returns {Promise<{success: boolean, message?: string, error?: string, magicLinkUrl?: string}>}
+ */
+async function sendClaimTokenEmail(email, userId = null) {
+  try {
+    console.log('[sendClaimTokenEmail] Sending claim token email to:', email);
+
+    // If userId provided, find user and update their claim token
+    let user = null;
+    if (userId) {
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('id, auth_id')
+        .eq('auth_id', userId)
+        .single();
+
+      if (fetchError || !userData) {
+        console.error('[sendClaimTokenEmail] User not found:', userId);
+        return { success: false, error: 'User not found' };
+      }
+      user = userData;
+    }
+
+    // Generate claim token for claiming free tokens
+    const claimToken = generateUniqueToken();
+
+    // If user exists, update their claim token
+    if (user) {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ claim_token: claimToken })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('[sendClaimTokenEmail] Failed to update claim token:', updateError);
+        return { success: false, error: 'Failed to generate claim token' };
+      }
+    }
+
+    // Encrypt claim token for magic link
+    const encryptedClaimToken = encrypt(claimToken);
+    const encryptedEmail = encrypt(email);
+
+    // Save to session_builders table
+    const { error: insertError } = await supabase
+      .from('session_builders')
+      .insert({
+        field1: encryptedClaimToken,
+        field2: encryptedEmail
+      });
+
+    if (insertError) {
+      console.error('[sendClaimTokenEmail] Failed to save to session_builders:', insertError);
+      return { success: false, error: 'Failed to generate magic link' };
+    }
+
+    // Generate magic link URL for email
+    const magicLinkUrl = `${WEB_PORTAL_URL}/#/claim-tokens-encrypted?token=${claimToken}`;
+
+    // Send magic link email for claiming tokens
+    const emailResult = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: email,
+      subject: 'Claim Your Free Tokens for ScribeFold',
+      html: `
+        <h2>Claim Your Free Tokens</h2>
+        <p>Click the link below to claim ${FREE_TOKENS_GRANT.toLocaleString()} free tokens for your ScribeFold account:</p>
+        <p><a href="${magicLinkUrl}">${magicLinkUrl}</a></p>
+        <p>This link will expire after use.</p>
+      `
+    });
+
+    if (emailResult.error) {
+      console.error('[sendClaimTokenEmail] Failed to send email:', emailResult.error);
+      return { success: false, error: 'Failed to send email' };
+    }
+
+    console.log('[sendClaimTokenEmail] Email sent successfully');
+    return {
+      success: true,
+      message: `Magic link email sent to ${email}`,
+      email: email,
+      magicLinkUrl: magicLinkUrl
+    };
+  } catch (error) {
+    console.error('[sendClaimTokenEmail] Error:', error);
+    return {
+      success: false,
+      error: 'Failed to send magic link email',
+      details: error.message
+    };
+  }
+}
 
 // Initialize Resend client for email
 let resend = null;
@@ -309,7 +399,7 @@ app.post('/auth/create-account', async (req, res) => {
 
     // Generate unique token for claiming free tokens
     const claimToken = generateUniqueToken();
-    
+
     // Store claim token in users table
     try {
       const { error: insertError } = await supabase
@@ -330,16 +420,12 @@ app.post('/auth/create-account', async (req, res) => {
       console.error('[create-account] Failed to store claim token:', dbError);
       // Continue anyway - user can request a new token
     }
-    
-    // Build confirmation URL with claim token
-    const confirmUrl = `${WEB_PORTAL_URL}/#/confirm?token=${encodeURIComponent(claimToken)}`;
-    console.log('[create-account] Confirmation URL:', confirmUrl);
 
-    // Send confirmation email (for claiming free tokens)
-    const emailResult = await sendConfirmationEmail(email, confirmUrl);
-    
+    // Send claim token email using the reusable function
+    const emailResult = await sendClaimTokenEmail(email, authData.user.id);
+
     if (!emailResult.success) {
-      console.warn('[create-account] Failed to send confirmation email:', emailResult.error);
+      console.warn('[create-account] Failed to send claim token email:', emailResult.error);
       // Don't fail the request - account is created and signed in, user can request resend
     }
 
@@ -352,8 +438,8 @@ app.post('/auth/create-account', async (req, res) => {
       user: authData.user,
       session: authData.session,
       emailSent: emailResult.success,
-      // Include confirmUrl in response for dev/testing when Resend is not configured
-      ...(resend ? {} : { confirmationUrl: confirmUrl })
+      // Include magicLinkUrl in response for dev/testing when Resend is not configured
+      ...(resend ? {} : { magicLinkUrl: emailResult.magicLinkUrl })
     });
   } catch (error) {
     console.error('Error in /auth/create-account:', error);
@@ -588,157 +674,10 @@ app.post('/chat', async (req, res) => {
 });
 
 /**
- * POST /auth/claim-tokens
- *
- * Claims free tokens using a unique token
- * Looks up user by token, adds tokens, clears token
- * Returns user credentials for auto-login
- *
- * Input: { token }
- * Output: { success, message, tokensAdded, email?, password?, error? }
- */
-app.post('/auth/claim-tokens', async (req, res) => {
-  try {
-    const { token } = req.body || {};
-
-    if (!supabase) {
-      return res.status(503).json({
-        success: false,
-        error: 'Database not configured'
-      });
-    }
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        error: 'Token is required'
-      });
-    }
-
-    console.log('[claim-tokens] Looking up user by token:', token);
-
-    // Find user by confirmation token
-    const { data: user, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('claim_token', token)
-      .single();
-
-    if (fetchError || !user) {
-      console.error('[claim-tokens] Invalid or expired token');
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid or expired token. Please request a new confirmation email.'
-      });
-    }
-
-    console.log('[claim-tokens] Found user:', user.id);
-
-    // Check if tokens already claimed (claim_token is null)
-    if (!user.claim_token) {
-      console.log('[claim-tokens] Token already used for user:', user.id);
-      return res.status(400).json({
-        success: false,
-        error: 'This confirmation link has already been used. Tokens have already been added to your account.'
-      });
-    }
-
-    // Add tokens to user
-    const newTokensAdded = (Number(user.tokens_added) || 0) + FREE_TOKENS_GRANT;
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({
-        tokens_added: newTokensAdded,
-        claim_token: null // Clear the token after claiming
-      })
-      .eq('id', user.id);
-
-    if (updateError) {
-      console.error('[claim-tokens] Failed to update user:', updateError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to add tokens'
-      });
-    }
-
-    console.log('[claim-tokens] Successfully added tokens to user:', user.id);
-
-    // Try to log the user in using stored password
-    let sessionData = null;
-    try {
-      console.log('[claim-tokens] Attempting to log user in...');
-
-      const email = user.email;
-      const password = user.password;
-
-      console.log('[claim-tokens] User email:', email);
-      console.log('[claim-tokens] User has password in DB:', !!password);
-
-      if (email && password) {
-        console.log('[claim-tokens] Calling signInWithPassword...');
-
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        console.log('[claim-tokens] signInWithPassword result:', {
-          hasError: !!signInError,
-          errorMessage: signInError?.message,
-          hasSession: !!signInData?.session,
-          hasAccessToken: !!signInData?.session?.access_token,
-          hasRefreshToken: !!signInData?.session?.refresh_token
-        });
-
-        if (!signInError && signInData?.session) {
-          sessionData = {
-            access_token: signInData.session.access_token,
-            refresh_token: signInData.session.refresh_token
-          };
-          console.log('[claim-tokens] ✓ User logged in successfully');
-        } else {
-          console.warn('[claim-tokens] ✗ Could not log user in:', signInError?.message);
-        }
-      } else {
-        console.warn('[claim-tokens] ✗ Cannot log in - missing email or password');
-      }
-    } catch (sessionErr) {
-      console.error('[claim-tokens] ✗ Exception logging user in:', sessionErr.message);
-    }
-
-    console.log('[claim-tokens] Session data to return:', {
-      hasSessionData: !!sessionData,
-      hasAccessToken: !!sessionData?.access_token,
-      hasRefreshToken: !!sessionData?.refresh_token
-    });
-
-    // Get auth user email
-    const { data: authUser } = await supabase.auth.admin.getUserById(user.auth_id);
-
-    return res.json({
-      success: true,
-      message: `Successfully added ${FREE_TOKENS_GRANT.toLocaleString()} free tokens to your account!`,
-      tokensAdded: FREE_TOKENS_GRANT,
-      totalTokens: newTokensAdded,
-      email: authUser?.user?.email || null,
-      userId: user.auth_id,
-      sessionData: sessionData // May be null, but tokens were still granted
-    });
-  } catch (error) {
-    console.error('Error in /auth/claim-tokens:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to claim tokens',
-      details: error.message
-    });
-  }
-});
-
-/**
  * POST /auth/send-magiclink-email
  *
  * Sends an encrypted magic link email for testing the token claiming flow
- * Generates claim_token, stores encrypted in session_builders, sends email with claim link
+ * Uses the same sendClaimTokenEmail function as create-account endpoint
  *
  * Input: { userId }
  * Output: { success, message, magicLinkUrl?, error? }
@@ -747,8 +686,6 @@ app.post('/auth/send-magiclink-email', async (req, res) => {
   try {
     const { userId } = req.body || {};
 
-    console.log('[send-magiclink-email] Sending encrypted magic link email for testing, user:', userId);
-
     if (!supabase) {
       return res.status(503).json({
         success: false,
@@ -771,7 +708,6 @@ app.post('/auth/send-magiclink-email', async (req, res) => {
       .single();
 
     if (fetchError || !user) {
-      console.error('[send-magiclink-email] User not found');
       return res.status(404).json({
         success: false,
         error: 'User not found'
@@ -781,226 +717,27 @@ app.post('/auth/send-magiclink-email', async (req, res) => {
     // Get user email
     const { data: authUser, error: userError } = await supabase.auth.admin.getUserById(userId);
     if (userError || !authUser?.user?.email) {
-      console.error('[send-magiclink-email] User not found. Error:', userError);
       return res.status(404).json({ error: 'User not found' });
     }
 
     const email = authUser.user.email;
-    console.log('[send-magiclink-email] User email:', email);
 
-    // Generate claim token for claiming free tokens
-    const claimToken = generateUniqueToken();
-    console.log('[send-magiclink-email] Generated claim token length:', claimToken.length, 'prefix:', claimToken.substring(0, 10) + '...');
+    // Use the reusable function to send claim token email
+    const result = await sendClaimTokenEmail(email, userId);
 
-    // Update user with claim token
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ claim_token: claimToken })
-      .eq('id', user.id);
-
-    if (updateError) {
-      console.error('[send-magiclink-email] Failed to update user:', updateError);
-      return res.status(500).json({ error: 'Failed to generate claim token' });
-    }
-
-    console.log('[send-magiclink-email] Claim token stored in users table');
-
-    // Encrypt claim token for magic link
-    const encryptedClaimToken = encrypt(claimToken);
-    const encryptedEmail = encrypt(email);
-
-    console.log('[send-magiclink-email] Encrypted claim token stored in session_builders field1');
-    console.log('[send-magiclink-email] Encrypted email stored in session_builders field2');
-
-    // Save to session_builders table
-    const { error: insertError } = await supabase
-      .from('session_builders')
-      .insert({
-        field1: encryptedClaimToken,
-        field2: encryptedEmail
-      });
-
-    if (insertError) {
-      console.error('[send-magiclink-email] Failed to save to session_builders:', insertError);
-      return res.status(500).json({ error: 'Failed to generate magic link' });
-    }
-
-    console.log('[send-magiclink-email] Saved to session_builders table');
-
-    // Generate magic link URL for email
-    const magicLinkUrl = `${WEB_PORTAL_URL}/#/claim-tokens-encrypted?token=${claimToken}`;
-    console.log('[send-magiclink-email] Magic link URL:', magicLinkUrl);
-
-    // Send magic link email for claiming tokens
-    const emailResult = await resend.emails.send({
-      from: EMAIL_FROM,
-      to: email,
-      subject: 'Claim Your Free Tokens for ScribeFold',
-      html: `
-        <h2>Claim Your Free Tokens</h2>
-        <p>Click the link below to claim ${FREE_TOKENS_GRANT.toLocaleString()} free tokens for your ScribeFold account:</p>
-        <p><a href="${magicLinkUrl}">${magicLinkUrl}</a></p>
-        <p>This link will expire after use.</p>
-      `
-    });
-
-    if (emailResult.error) {
-      console.warn('[send-magiclink-email] Failed to send email:', emailResult.error);
+    if (!result.success) {
       return res.status(500).json({
         success: false,
-        error: 'Failed to send email'
+        error: result.error || 'Failed to send magic link email'
       });
     }
 
-    console.log('[send-magiclink-email] Magic link email sent successfully');
-
-    return res.json({
-      success: true,
-      message: `Magic link email sent to ${email}`,
-      email: email,
-      magicLinkUrl: magicLinkUrl
-    });
+    return res.json(result);
   } catch (error) {
     console.error('[send-magiclink-email] Error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send magic link email',
-      details: error.message
-    });
-  }
-});
-
-/**
- * POST /auth/send-token-email
- *
- * Sends a confirmation email with claim token for an existing user
- * Uses encrypted magic link flow for secure token delivery
- *
- * Input: { userId }
- * Output: { success, message, magicLinkUrl?, error? }
- */
-app.post('/auth/send-token-email', async (req, res) => {
-  try {
-    const { userId } = req.body || {};
-
-    console.log('[send-token-email] Sending encrypted magic link email for claiming tokens, user:', userId);
-
-    if (!supabase) {
-      return res.status(503).json({
-        success: false,
-        error: 'Database not configured'
-      });
-    }
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'User ID is required'
-      });
-    }
-
-    // Find user by auth_id
-    const { data: user, error: fetchError } = await supabase
-      .from('users')
-      .select('id, auth_id')
-      .eq('auth_id', userId)
-      .single();
-
-    if (fetchError || !user) {
-      console.error('[send-token-email] User not found');
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    // Get user email
-    const { data: authUser, error: userError } = await supabase.auth.admin.getUserById(userId);
-    if (userError || !authUser?.user?.email) {
-      console.error('[send-token-email] User not found. Error:', userError);
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const email = authUser.user.email;
-    console.log('[send-token-email] User email:', email);
-
-    // Generate claim token for claiming free tokens
-    const claimToken = generateUniqueToken();
-    console.log('[send-token-email] Generated claim token length:', claimToken.length, 'prefix:', claimToken.substring(0, 10) + '...');
-
-    // Update user with claim token
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ claim_token: claimToken })
-      .eq('id', user.id);
-
-    if (updateError) {
-      console.error('[send-token-email] Failed to update user:', updateError);
-      return res.status(500).json({ error: 'Failed to generate claim token' });
-    }
-
-    console.log('[send-token-email] Claim token stored in users table');
-
-    // Encrypt claim token for magic link
-    const encryptedClaimToken = encrypt(claimToken);
-    const encryptedEmail = encrypt(email);
-
-    console.log('[send-token-email] Encrypted claim token stored in session_builders field1');
-    console.log('[send-token-email] Encrypted email stored in session_builders field2');
-
-    // Save to session_builders table
-    const { error: insertError } = await supabase
-      .from('session_builders')
-      .insert({
-        field1: encryptedClaimToken,
-        field2: encryptedEmail
-      });
-
-    if (insertError) {
-      console.error('[send-token-email] Failed to save to session_builders:', insertError);
-      return res.status(500).json({ error: 'Failed to generate magic link' });
-    }
-
-    console.log('[send-token-email] Saved to session_builders table');
-
-    // Generate magic link URL for claiming tokens
-    const magicLinkUrl = `${WEB_PORTAL_URL}/#/claim-tokens-encrypted?token=${claimToken}`;
-    console.log('[send-token-email] Magic link URL:', magicLinkUrl);
-
-    // Send magic link email for claiming tokens
-    const emailResult = await resend.emails.send({
-      from: EMAIL_FROM,
-      to: email,
-      subject: 'Claim Your Free Tokens for ScribeFold',
-      html: `
-        <h2>Claim Your Free Tokens</h2>
-        <p>Click the link below to claim ${FREE_TOKENS_GRANT.toLocaleString()} free tokens for your ScribeFold account:</p>
-        <p><a href="${magicLinkUrl}">${magicLinkUrl}</a></p>
-        <p>This link will expire after use.</p>
-      `
-    });
-
-    if (emailResult.error) {
-      console.warn('[send-token-email] Failed to send email:', emailResult.error);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to send email'
-      });
-    }
-
-    console.log('[send-token-email] Magic link email sent successfully');
-
-    return res.json({
-      success: true,
-      message: `Magic link email sent to ${email}`,
-      email: email,
-      magicLinkUrl: magicLinkUrl
-    });
-  } catch (error) {
-    console.error('[send-token-email] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to send token email',
       details: error.message
     });
   }
@@ -1017,9 +754,7 @@ app.post('/auth/send-token-email', async (req, res) => {
  */
 app.post('/auth/claim-tokens-encrypted', async (req, res) => {
   try {
-    console.log('[claim-tokens-encrypted] Starting');
     const { token } = req.body || {};
-    console.log('[claim-tokens-encrypted] Incoming body:', { tokenLength: token?.length, tokenPrefix: token?.slice(0, 10) });
 
     if (!supabase) {
       return res.status(503).json({
@@ -1035,40 +770,29 @@ app.post('/auth/claim-tokens-encrypted', async (req, res) => {
       });
     }
 
-    console.log('[claim-tokens-encrypted] Encrypting token for lookup...');
     // Encrypt token to match session_builders.field1
     const encryptedToken = encrypt(token);
-    console.log('[claim-tokens-encrypted] Encrypted token for lookup, prefix:', encryptedToken.substring(0, 20) + '...');
 
-    console.log('[claim-tokens-encrypted] Looking up in session_builders table...');
+    // Look up in session_builders table
     const { data: sessionRow, error: findError } = await supabase
       .from('session_builders')
       .select('field1, field2')
       .eq('field1', encryptedToken)
       .single();
 
-    console.log('[claim-tokens-encrypted] Session lookup:', { found: !!sessionRow, error: findError?.message });
     if (findError || !sessionRow) {
-      console.log('[claim-tokens-encrypted] Invalid or expired token');
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
 
-    console.log('[claim-tokens-encrypted] Session found, decrypting email...');
     // Decrypt email from field2
     const encryptedEmail = sessionRow.field2;
-    console.log('[claim-tokens-encrypted] Encrypted email prefix:', encryptedEmail.substring(0, 20) + '...');
-
     const email = decrypt(encryptedEmail);
-    console.log('[claim-tokens-encrypted] Decrypted email:', email);
 
-    console.log('[claim-tokens-encrypted] Deleting session entry...');
     // Delete the session entry after use
     await supabase
       .from('session_builders')
       .delete()
       .eq('field1', encryptedToken);
-
-    console.log('[claim-tokens-encrypted] Session entry deleted');
 
     // Find user by email
     const { data: user, error: userError } = await supabase
@@ -1078,18 +802,14 @@ app.post('/auth/claim-tokens-encrypted', async (req, res) => {
       .single();
 
     if (userError || !user) {
-      console.error('[claim-tokens-encrypted] User not found');
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
     }
 
-    console.log('[claim-tokens-encrypted] Found user:', user.id);
-
     // Check if tokens already claimed (claim_token is null)
     if (!user.claim_token) {
-      console.log('[claim-tokens-encrypted] Token already used for user:', user.id);
       return res.status(400).json({
         success: false,
         error: 'This confirmation link has already been used. Tokens have already been added to your account.'
@@ -1107,38 +827,21 @@ app.post('/auth/claim-tokens-encrypted', async (req, res) => {
       .eq('id', user.id);
 
     if (updateError) {
-      console.error('[claim-tokens-encrypted] Failed to update user:', updateError);
       return res.status(500).json({
         success: false,
         error: 'Failed to add tokens'
       });
     }
 
-    console.log('[claim-tokens-encrypted] Successfully added tokens to user:', user.id);
-
     // Try to log the user in using stored password
     let sessionData = null;
     try {
-      console.log('[claim-tokens-encrypted] Attempting to log user in...');
-
       const password = user.password;
 
-      console.log('[claim-tokens-encrypted] User has password in DB:', !!password);
-
       if (email && password) {
-        console.log('[claim-tokens-encrypted] Calling signInWithPassword...');
-
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password
-        });
-
-        console.log('[claim-tokens-encrypted] signInWithPassword result:', {
-          hasError: !!signInError,
-          errorMessage: signInError?.message,
-          hasSession: !!signInData?.session,
-          hasAccessToken: !!signInData?.session?.access_token,
-          hasRefreshToken: !!signInData?.session?.refresh_token
         });
 
         if (!signInError && signInData?.session) {
@@ -1146,15 +849,10 @@ app.post('/auth/claim-tokens-encrypted', async (req, res) => {
             access_token: signInData.session.access_token,
             refresh_token: signInData.session.refresh_token
           };
-          console.log('[claim-tokens-encrypted] ✓ User logged in successfully');
-        } else {
-          console.warn('[claim-tokens-encrypted] ✗ Could not log user in:', signInError?.message);
         }
-      } else {
-        console.warn('[claim-tokens-encrypted] ✗ Cannot log in - missing email or password');
       }
     } catch (sessionErr) {
-      console.error('[claim-tokens-encrypted] ✗ Exception logging user in:', sessionErr.message);
+      // Session login failed, but tokens were still granted
     }
 
     // Get auth user email
@@ -1722,29 +1420,21 @@ app.post('/api/create-account-dev', async (req, res) => {
  */
 app.post('/api/generate-encrypted-login-token', async (req, res) => {
   try {
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Starting');
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Incoming headers Authorization exists:', !!req.headers.authorization);
     const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
 
     if (!userAccessToken) {
-      console.log('[ENC MAGIC LINK] GENERATE TOKEN - No access token provided');
       return res.status(401).json({ error: 'No access token provided' });
     }
-
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Validating user token...');
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Token length:', userAccessToken.length);
 
     // Validate: Verify JWT locally and extract user id (sub)
     let decoded;
     try {
       decoded = jwt.verify(userAccessToken, process.env.SUPABASE_JWT_SECRET);
     } catch (e) {
-      console.error('[ENC MAGIC LINK] GENERATE TOKEN - JWT verify failed:', e?.message);
       return res.status(401).json({ error: 'Invalid token', details: e?.message });
     }
 
     const authUserId = decoded?.sub;
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - User token verified. sub:', authUserId);
 
     // Get user's row in public.users table
     const { data: userData, error: fetchError } = await supabase
@@ -1754,32 +1444,23 @@ app.post('/api/generate-encrypted-login-token', async (req, res) => {
       .single();
 
     if (fetchError || !userData) {
-      console.error('[ENC MAGIC LINK] GENERATE TOKEN - User not found in users table. Error:', fetchError);
       return res.status(404).json({ error: 'User not found' });
     }
-
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - User found:', userData.id);
 
     // Get user email
     const { data: user, error: userError } = await supabase.auth.admin.getUserById(userData.auth_id);
     if (userError || !user?.user?.email) {
-      console.error('[ENC MAGIC LINK] GENERATE TOKEN - User not found. Error:', userError);
       return res.status(404).json({ error: 'User not found' });
     }
 
     const email = user.user.email;
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - User email:', email);
 
     // Generate a secure, one-time token
     const loginToken = crypto.randomBytes(32).toString('hex');
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Generated token length:', loginToken.length, 'prefix:', loginToken.substring(0, 10) + '...');
 
     // Encrypt token and email
     const encryptedToken = encrypt(loginToken);
     const encryptedEmail = encrypt(email);
-
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Encrypted token stored in field1');
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Encrypted email stored in field2');
 
     // Save to session_builders table (field1 = encrypted token, field2 = encrypted email)
     const { error: insertError } = await supabase
@@ -1790,16 +1471,12 @@ app.post('/api/generate-encrypted-login-token', async (req, res) => {
       });
 
     if (insertError) {
-      console.error('[ENC MAGIC LINK] GENERATE TOKEN - Failed to save to session_builders:', insertError);
       return res.status(500).json({ error: 'Failed to generate login token' });
     }
 
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Saved to session_builders table');
-    console.log('[ENC MAGIC LINK] GENERATE TOKEN - Returning plain token to client');
-
     res.json({ token: loginToken });
   } catch (error) {
-    console.error('[ENC MAGIC LINK] GENERATE TOKEN - Exception:', { message: error?.message, stack: error?.stack });
+    console.error('[generate-encrypted-login-token] Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1812,51 +1489,34 @@ app.post('/api/generate-encrypted-login-token', async (req, res) => {
  */
 app.post('/auth/auto-login-magiclink-enc', async (req, res) => {
   try {
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Starting');
     const { token } = req.body || {};
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Incoming body:', { tokenLength: token?.length, tokenPrefix: token?.slice(0, 10) });
 
     if (!token) {
-      console.log('[ENC MAGIC LINK] VALIDATE TOKEN - No token provided');
       return res.status(400).json({ error: 'No token provided' });
     }
 
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Encrypting token for lookup...');
     // Look up in session_builders table by encrypted token
     const encryptedToken = encrypt(token);
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Encrypted token for lookup, prefix:', encryptedToken.substring(0, 20) + '...');
-
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Looking up in session_builders table...');
     const { data: sessionRow, error: findError } = await supabase
       .from('session_builders')
       .select('field1, field2')
       .eq('field1', encryptedToken)
       .single();
 
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Session lookup:', { found: !!sessionRow, error: findError?.message });
     if (findError || !sessionRow) {
-      console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Invalid or expired token');
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
 
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Session found, decrypting email...');
     // Decrypt email from field2
     const encryptedEmail = sessionRow.field2;
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Encrypted email prefix:', encryptedEmail.substring(0, 20) + '...');
-
     const email = decrypt(encryptedEmail);
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Decrypted email:', email);
 
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Deleting session entry...');
     // Delete the session entry after use
     await supabase
       .from('session_builders')
       .delete()
       .eq('field1', encryptedToken);
 
-    console.log('[ENC MAGIC LINK] VALIDATE TOKEN - Session entry deleted');
-
-    console.log('[ENC MAGIC LINK] GENERATE MAGIC LINK - Starting for email:', email);
     // Generate magic link
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
@@ -1864,7 +1524,6 @@ app.post('/auth/auto-login-magiclink-enc', async (req, res) => {
       options: { redirectTo: `${process.env.REACT_APP_URL || 'http://localhost:3001'}/#/account` }
     });
 
-    console.log('[ENC MAGIC LINK] GENERATE MAGIC LINK - Generate link:', { success: !!linkData, error: linkError?.message });
     if (linkError) {
       return res.status(linkError.status || 500).json({ error: linkError.message });
     }
@@ -1872,12 +1531,10 @@ app.post('/auth/auto-login-magiclink-enc', async (req, res) => {
     // Extract token_hash from the action_link
     const url = new URL(linkData.properties.action_link);
     const token_hash = url.searchParams.get('token');
-    console.log('[ENC MAGIC LINK] GENERATE MAGIC LINK - Extracted token_hash prefix:', token_hash?.slice(0, 10));
 
-    console.log('[ENC MAGIC LINK] GENERATE MAGIC LINK - Returning token_hash to client');
     res.json({ token_hash, type: 'magiclink' });
   } catch (e) {
-    console.error('[ENC MAGIC LINK] VALIDATE TOKEN - Error:', e.message);
+    console.error('[auto-login-magiclink-enc] Error:', e.message);
     res.status(500).json({ error: 'Server error' });
   }
 });

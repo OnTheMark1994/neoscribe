@@ -7,6 +7,7 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { supabase } from '../../../Global/SupabaseClient';
+import { openUrlInBrowser } from '../../../Global/helpers/urlHelpers';
 import './AiChatNoTokensBox.css';
 
 const WEB_PORTAL_URL = process.env.REACT_APP_WEB_PORTAL_URL || 'http://localhost:3000';
@@ -59,7 +60,7 @@ export default function AiChatNoTokensBox() {
       const baseUrl = /^https?:\/\//i.test(WEB_PORTAL_URL) ? WEB_PORTAL_URL : `http://${WEB_PORTAL_URL}`;
       const url = `${baseUrl}/#/auto-login-magiclink-enc?token=${token}`;
       console.log('[AiChatNoTokensBox] Opening URL:', url);
-      window.open(url, '_blank');
+      await openUrlInBrowser(url);
       console.log('[AiChatNoTokensBox] Window opened');
     } catch (err) {
       console.error('[AiChatNoTokensBox] Error:', err);
