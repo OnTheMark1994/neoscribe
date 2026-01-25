@@ -11,6 +11,7 @@ import AutoLoginPassword from './components/Account/AutoLoginPassword';
 import AutoLoginJWT from './components/Account/AutoLoginJWT';
 import AutoLoginMagicLink from './components/Account/AutoLoginMagicLink';
 import AutoLoginMagicLinkEnc from './components/Account/AutoLoginMagicLinkEnc';
+import ClaimTokensEncrypted from './components/Account/ClaimTokensEncrypted';
 import Navbar from './components/Layout/Nav/Navbar';
 import Footer from './components/Layout/Footer/Footer';
 import Confirm from './components/Account/Confirm/Confirm';
@@ -32,6 +33,7 @@ function App() {
             <Route path="/auto-login-jwt" element={<AutoLoginJWT />} />
             <Route path="/auto-login-magiclink" element={<AutoLoginMagicLink />} />
             <Route path="/auto-login-magiclink-enc" element={<AutoLoginMagicLinkEnc />} />
+            <Route path="/claim-tokens-encrypted" element={<ClaimTokensEncrypted />} />
             <Route path="/confirm" element={<Confirm />} />
           </Routes>
         </main>

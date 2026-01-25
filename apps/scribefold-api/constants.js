@@ -20,7 +20,7 @@ CRITICAL RULES:
 FORMATTING:
 - Lines starting with "#chapter" or "#section" are headers
 - Other lines are regular content
-- Blank lines are intentional - do not remove them
+- Blank lines are intentional - do not remove
 - When you insert after a lineID, the new lines go immediately after that specific line
 
 RESPONSE FORMAT - Respond with ONLY valid JSON:
@@ -49,6 +49,10 @@ IMPORTANT:
 - For "insert", ALL consecutive lines go in ONE linesToInsert array
 - Respond with ONLY the JSON, no markdown formatting`;
 
+// Token grant amount for new users and token claiming
+const FREE_TOKENS_GRANT = 15000;
+
 module.exports = {
   PROMPT_PREFACE,
+  FREE_TOKENS_GRANT,
 };

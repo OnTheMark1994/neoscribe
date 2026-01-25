@@ -118,28 +118,30 @@ export default function SettingsDeveloper() {
     }
 
     setSendTokenEmailStatus('sending');
-    setSendTokenEmailMessage('Sending test token email...');
+    setSendTokenEmailMessage('Sending magic link email...');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/send-token-email`, {
+      console.log('[Send Token Email] Calling /auth/send-magiclink-email...');
+      const emailResponse = await fetch(`${API_BASE_URL}/auth/send-magiclink-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: authUser.id }),
+        body: JSON.stringify({ userId: authUser.id })
       });
 
-      const data = await response.json();
+      const emailData = await emailResponse.json();
 
-      if (!response.ok || !data.success) {
+      if (!emailResponse.ok || !emailData.success) {
         setSendTokenEmailStatus('error');
-        setSendTokenEmailMessage(data.error || 'Failed to send token email');
+        setSendTokenEmailMessage(emailData.error || 'Failed to send magic link email');
         return;
       }
 
       setSendTokenEmailStatus('success');
-      setSendTokenEmailMessage(data.message || 'Token email sent successfully!');
+      setSendTokenEmailMessage(emailData.message || 'Magic link email sent successfully!');
     } catch (error) {
+      console.error('[Send Token Email] Error:', error);
       setSendTokenEmailStatus('error');
-      setSendTokenEmailMessage(`Error: ${error.message || 'Failed to send token email'}`);
+      setSendTokenEmailMessage(`Error: ${error.message || 'Failed to send magic link email'}`);
     }
   };
 
