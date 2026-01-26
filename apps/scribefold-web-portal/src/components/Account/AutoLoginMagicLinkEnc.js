@@ -35,9 +35,9 @@ export default function AutoLoginMagicLinkEnc() {
         setStatus('validating');
         setMessage('Validating your encrypted login token...');
 
-        console.log('[AutoLoginMagicLinkEnc] Calling /auth/auto-login-magiclink-enc endpoint...');
+        console.log('[AutoLoginMagicLinkEnc] Calling /auto/auto-login-magiclink-enc endpoint...');
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/auto-login-magiclink-enc`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/auto/auto-login-magiclink-enc`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })

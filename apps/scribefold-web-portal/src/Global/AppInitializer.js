@@ -18,6 +18,15 @@ export default function AppInitializer() {
       console.log('[AppInitializer] Loading user data for:', authUser.id);
       dispatch(setUserDataLoading(true));
 
+      // Get current session from Supabase client
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('[AppInitializer] No valid session:', sessionError);
+        dispatch(setUserDataLoading(false));
+        return;
+      }
+
+      const accessToken = session.access_token;
       const apiUrl = process.env.REACT_APP_API_URL;
       console.log('[AppInitializer] API URL:', apiUrl);
       console.log('[AppInitializer] Full URL:', `${apiUrl}/auth/user-data`);
@@ -26,8 +35,8 @@ export default function AppInitializer() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
         },
-        body: JSON.stringify({ userId: authUser.id }),
       });
 
       console.log('[AppInitializer] Response status:', response.status);

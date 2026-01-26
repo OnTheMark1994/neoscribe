@@ -125,7 +125,10 @@ export default function AiChatLoginBox() {
   };
 
   const handleDismiss = () => {
-    dispatch(setAccountCreatedMessage(null));
+    dispatch(triggerReloadUserData());
+    setTimeout(() => {
+      dispatch(setAccountCreatedMessage(null));
+    }, 500);
   };
 
   const handleRefresh = () => {

@@ -22,6 +22,7 @@ const Home = () => {
               className="sf-secondary-btn"
               target="_blank"
               rel="noopener noreferrer"
+              style={{ borderColor: 'white', color: 'white' }}
             >
               <span style={{paddingRight: "5px"}}>Try Web App</span>
               <svg

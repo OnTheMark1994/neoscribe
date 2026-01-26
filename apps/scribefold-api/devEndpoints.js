@@ -3,14 +3,16 @@ const router = express.Router();
 const { FREE_TOKENS_GRANT } = require('./constants');
 const { sendClaimTokenEmail, encrypt } = require('./functions');
 
-/**
- * POST /dev/send-magiclink-email
- * Sends an encrypted magic link email for testing the token claiming flow
- * Uses the same sendClaimTokenEmail function as create-account endpoint
- * Input: { userId }
- * Output: { success, message, magicLinkUrl?, error? }
- */
+
+// Sends an encrypted magic link email for testing the token claiming flow
 router.post('/send-magiclink-email', async (req, res) => {
+  /**
+   * POST /dev/send-magiclink-email
+   * 
+   * Uses the same sendClaimTokenEmail function as create-account endpoint
+   * Input: { userId }
+   * Output: { success, message, magicLinkUrl?, error? }
+  */
   try {
     const { userId } = req.body || {};
 

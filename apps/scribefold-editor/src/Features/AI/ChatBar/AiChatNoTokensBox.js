@@ -34,10 +34,10 @@ export default function AiChatNoTokensBox() {
     const accessToken = session.access_token;
     console.log('[AiChatNoTokensBox] Access token:', accessToken.substring(0, 20) + '...');
 
-    console.log('[AiChatNoTokensBox] Calling /api/generate-encrypted-login-token...');
+    console.log('[AiChatNoTokensBox] Calling /auto/generate-encrypted-login-token...');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/generate-encrypted-login-token`, {
+      const response = await fetch(`${API_BASE_URL}/auto/generate-encrypted-login-token`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`
@@ -79,6 +79,7 @@ export default function AiChatNoTokensBox() {
       >
         Get More Tokens
         <span className="aiChatNoTokensIcon">↗</span>
+        <div className="aiChatNoTokensSub">(auto log-in)</div>
       </button>
     </div>
   );

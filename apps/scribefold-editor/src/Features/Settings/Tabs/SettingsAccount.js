@@ -4,6 +4,7 @@ import AiChatLoginBox from '../../AI/ChatBar/AiChatLoginBox';
 import './SettingsAccount.css';
 import { supabase } from '../../../Global/SupabaseClient';
 import RefreshButton from '../../Util/RefreshButton';
+import { openWebPortalWithAutoLogin } from '../../../Global/helpers/urlHelpers';
 
 function formatMaybeNumber(value) {
   return typeof value === 'number' ? value.toLocaleString() : '—';
@@ -39,6 +40,10 @@ export default function SettingsAccount() {
     }
   };
 
+  const handleViewWebPortal = async () => {
+    await openWebPortalWithAutoLogin(supabase, authUser);
+  };
+
   return (
     <div>
       {/* Login / Create Account Section */}
@@ -47,24 +52,42 @@ export default function SettingsAccount() {
         <div className="settingsSectionTitle">Account</div>
 
           {/* If there is no auth user or a accountCreatedMessage show the new account stuff */}
-          {!authUser || accountCreatedMessage ?
+          {!authUser || accountCreatedMessage ? (
             <AiChatLoginBox />
-            :
+          ) : (
             // Else show the auth info and logout button
-            <div className="settingsRow">
-              <div className="settingsRowLabel">
-                <div className="settingsRowLabelTitle">Logged in as</div>
-                <div className="settingsRowLabelSub">{authUser?.email || 'Unknown'}</div>
+            <>
+              <div className="settingsRow">
+                <div className="settingsRowLabel">
+                  <div className="settingsRowLabelTitle">View web portal</div>
+                  <div className="settingsRowLabelSub">Opens web portal with auto-login</div>
+                </div>
+                <button
+                  type="button"
+                  className="settingsButton"
+                  onClick={handleViewWebPortal}
+                  disabled={!authUser}
+                >
+                  View Web Portal
+                  <div className="settingsButtonSub">(auto login)</div>
+                </button>
               </div>
-              <button
-                type="button"
-                className="settingsButton"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
-            </div>
-          }
+              <div className="settingsRow">
+                <div className="settingsRowLabel">
+                  <div className="settingsRowLabelTitle">Logged in as</div>
+                  <div className="settingsRowLabelSub">{authUser?.email || 'Unknown'}</div>
+                </div>
+                <button
+                  type="button"
+                  className="settingsButton"
+                  onClick={handleLogout}
+                >
+                  Logout
+                </button>
+              </div>
+
+            </>
+          )}
       </div>
 
       {/* Account Data Section */}

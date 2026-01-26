@@ -63,7 +63,6 @@ const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toSt
 // Create key buffer for encryption/decryption
 const keyBuffer = createKeyBuffer(ENCRYPTION_KEY);
 
-
 // Allow web portal and local dev clients to call this server
 app.use(cors({
   origin: [
@@ -78,8 +77,20 @@ app.use(cors({
 // Parse JSON request bodies.
 app.use(express.json({ limit: '2mb' }));
 
-// Attach dependencies to request object for dev endpoints
+// Attach dependencies to request object for endpoints
 app.use('/dev', (req, res, next) => {
+  req.supabase = supabase;
+  req.resend = resend;
+  req.keyBuffer = keyBuffer;
+  next();
+});
+app.use('/auth', (req, res, next) => {
+  req.supabase = supabase;
+  req.resend = resend;
+  req.keyBuffer = keyBuffer;
+  next();
+});
+app.use('/auto', (req, res, next) => {
   req.supabase = supabase;
   req.resend = resend;
   req.keyBuffer = keyBuffer;
@@ -90,195 +101,26 @@ app.use('/dev', (req, res, next) => {
 const devEndpoints = require('./devEndpoints');
 app.use('/dev', devEndpoints);
 
-// Basic server helth function
-app.get('/', (req, res) => {
-  res.status(200).send('ok');
-});
+// Use auth endpoints router
+const authEndpoints = require('./authEndpoints');
+app.use('/auth', authEndpoints);
 
-// #region Auth, User Data, Chat
+// Use auto endpoints router
+const autoEndpoints = require('./autoEndpoints');
+app.use('/auto', autoEndpoints);
 
-app.post('/auth/create-account', async (req, res) => {
-  try {
-    const { email, password } = req.body || {};
+// Use health endpoints router
+const healthEndpoints = require('./healthEndpoints');
+app.use('/', healthEndpoints);
 
-    if (!supabase) {
-      return res.status(503).json({
-        success: false,
-        error: 'Database not configured'
-      });
-    }
+// Serve static files from public folder (must be after custom routes)
+app.use(express.static('public'));
 
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email and password are required'
-      });
-    }
-
-    console.log('[create-account] Creating account for email:', email);
-
-    // Create Supabase auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm so user can sign in immediately
-    });
-
-    if (authError) {
-      console.error('❌ Failed to create auth user:', authError);
-      
-      let errorMessage = authError.message || 'Failed to create auth user';
-      
-      if (authError.name === 'AuthRetryableFetchError' || authError.message?.includes('fetch failed')) {
-        errorMessage = 'Cannot connect to Supabase. Please check your SUPABASE_URL and network connection.';
-      }
-      
-      return res.status(500).json({
-        success: false,
-        error: errorMessage,
-        details: authError
-      });
-    }
-
-    // Generate unique token for claiming free tokens
-    const claimToken = generateUniqueToken();
-
-    // Store claim token in users table
-    try {
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-          auth_id: authData.user.id,
-          claim_token: claimToken,
-          email: email,
-        });
-
-      if (insertError) {
-        console.error('[create-account] Failed to store claim token:', insertError);
-        throw insertError;
-      }
-
-      console.log('[create-account] Stored claim token for user:', authData.user.id);
-    } catch (dbError) {
-      console.error('[create-account] Failed to store claim token:', dbError);
-      // Continue anyway - user can request a new token
-    }
-
-    // Send claim token email using the reusable function
-    const emailResult = await sendClaimTokenEmail(
-      supabase,
-      resend,
-      email,
-      authData.user.id,
-      process.env.WEB_PORTAL_URL,
-      FREE_TOKENS_GRANT,
-      process.env.EMAIL_FROM,
-      (text) => encrypt(text, keyBuffer)
-    );
-
-    if (!emailResult.success) {
-      console.warn('[create-account] Failed to send claim token email:', emailResult.error);
-      // Don't fail the request - account is created and signed in, user can request resend
-    }
-
-    console.log('✓ Create-account completed');
-
-    return res.json({
-      success: true,
-      message: 'Account created! Please check your email to claim 15,000 free tokens.',
-      messageType: 'success',
-      user: authData.user,
-      session: authData.session,
-      emailSent: emailResult.success,
-      // Include magicLinkUrl in response for dev/testing when Resend is not configured
-      ...(resend ? {} : { magicLinkUrl: emailResult.magicLinkUrl })
-    });
-  } catch (error) {
-    console.error('Error in /auth/create-account:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create account',
-      details: error.message
-    });
-  }
-});
-
-// todo: /data route
-// Returns user data such as token counts
-app.post('/auth/user-data', async (req, res) => {
-  try {
-    const { userId } = req.body || {};
-
-    if (!supabase) {
-      return res.status(503).json({
-        success: false,
-        error: 'Database not configured'
-      });
-    }
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'User ID is required'
-      });
-    }
-
-    console.log('[user-data] Fetching user data for:', userId);
-
-    // Find user by auth_id
-    const { data: user, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', userId)
-      .single();
-
-    if (fetchError || !user) {
-      console.error('[user-data] User not found');
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    console.log('[user-data] User data found:', {
-      id: user.id,
-      auth_id: user.auth_id,
-      tokens_added: user.tokens_added,
-      tokens_monthly: user.tokens_monthly,
-      tokens_used_this_month: user.tokens_used_this_month,
-      tokens_used_all_time: user.tokens_used_all_time
-    });
-
-    // Calculate available tokens using helper function
-    const availableTokens = calculateAvailableTokens(user);
-
-    console.log('[user-data] Available tokens:', availableTokens);
-
-    return res.json({
-      success: true,
-      userData: {
-        id: user.id,
-        auth_id: user.auth_id,
-        email: user.email,
-        tokens: availableTokens, // Calculated available tokens
-        tokens_added: user.tokens_added || 0,
-        tokens_monthly: user.tokens_monthly || 0,
-        tokens_used_this_month: user.tokens_used_this_month || 0,
-        tokens_used_all_time: user.tokens_used_all_time || 0,
-      }
-    });
-  } catch (error) {
-    console.error('Error in /auth/user-data:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch user data',
-      details: error.message
-    });
-  }
-});
+// Serve images folder
+app.use('/images', express.static('images'));
 
 // Simple chat endpoint
-app.post('/chat', async (req, res) => {
+app.post('/api/chat', async (req, res) => {
   try {
     const body = req.body || {};
     const incomingMessages = Array.isArray(body.messages) ? body.messages : [];
@@ -421,238 +263,6 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-// #endregion Auth, User Data, Chat
-
-//#region  AUTO-LOGIN ENDPOINTS
-
-// todo: /auth route
-// Creates a token and saves encrypted copy, used for auto login 
-app.post('/api/generate-encrypted-login-token', async (req, res) => {
-  try {
-    const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
-
-    if (!userAccessToken) {
-      return res.status(401).json({ error: 'No access token provided' });
-    }
-
-    // Validate: Verify JWT locally and extract user id (sub)
-    let decoded;
-    try {
-      decoded = jwt.verify(userAccessToken, process.env.SUPABASE_JWT_SECRET);
-    } catch (e) {
-      return res.status(401).json({ error: 'Invalid token', details: e?.message });
-    }
-
-    const authUserId = decoded?.sub;
-
-    // Get user's row in public.users table
-    const { data: userData, error: fetchError } = await supabase
-      .from('users')
-      .select('id, auth_id')
-      .eq('auth_id', authUserId)
-      .single();
-
-    if (fetchError || !userData) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Get user email
-    const { data: user, error: userError } = await supabase.auth.admin.getUserById(userData.auth_id);
-    if (userError || !user?.user?.email) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const email = user.user.email;
-
-    // Generate a secure, one-time token
-    const loginToken = crypto.randomBytes(32).toString('hex');
-
-    // Encrypt token and email
-    const encryptedToken = encrypt(loginToken, keyBuffer);
-    const encryptedEmail = encrypt(email, keyBuffer);
-
-    // Save to session_builders table (field1 = encrypted token, field2 = encrypted email)
-    const { error: insertError } = await supabase
-      .from('session_builders')
-      .insert({
-        field1: encryptedToken,
-        field2: encryptedEmail
-      });
-
-    if (insertError) {
-      return res.status(500).json({ error: 'Failed to generate login token' });
-    }
-
-    res.json({ token: loginToken });
-  } catch (error) {
-    console.error('[generate-encrypted-login-token] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Logs user in given token, verifying, sending back a magic link
-app.post('/auth/auto-login-magiclink-enc', async (req, res) => {
-  try {
-    const { token } = req.body || {};
-
-    if (!token) {
-      return res.status(400).json({ error: 'No token provided' });
-    }
-
-    // Look up in session_builders table by encrypted token
-    const encryptedToken = encrypt(token, keyBuffer);
-    const { data: sessionRow, error: findError } = await supabase
-      .from('session_builders')
-      .select('field1, field2')
-      .eq('field1', encryptedToken)
-      .single();
-
-    if (findError || !sessionRow) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-
-    // Decrypt email from field2
-    const encryptedEmail = sessionRow.field2;
-    const email = decrypt(encryptedEmail, keyBuffer);
-
-    // Delete the session entry after use
-    await supabase
-      .from('session_builders')
-      .delete()
-      .eq('field1', encryptedToken);
-
-    // Generate magic link
-    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: email,
-      options: { redirectTo: `${process.env.REACT_APP_URL || 'http://localhost:3001'}/#/account` }
-    });
-
-    if (linkError) {
-      return res.status(linkError.status || 500).json({ error: linkError.message });
-    }
-
-    // Extract token_hash from the action_link
-    const url = new URL(linkData.properties.action_link);
-    const token_hash = url.searchParams.get('token');
-
-    res.json({ token_hash, type: 'magiclink' });
-  } catch (e) {
-    console.error('[auto-login-magiclink-enc] Error:', e.message);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// todo: /claim route
-// Claims free tokens using encrypted claim token created in create-account
-app.post('/auth/claim-tokens-encrypted', async (req, res) => {
-  try {
-    const { token } = req.body || {};
-
-    if (!supabase) {
-      return res.status(503).json({
-        success: false,
-        error: 'Database not configured'
-      });
-    }
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        error: 'Token is required'
-      });
-    }
-
-    // Encrypt token to match session_builders.field1
-    const encryptedToken = encrypt(token, keyBuffer);
-
-    // Look up in session_builders table
-    const { data: sessionRow, error: findError } = await supabase
-      .from('session_builders')
-      .select('field1, field2')
-      .eq('field1', encryptedToken)
-      .single();
-
-    if (findError || !sessionRow) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-
-    // Decrypt email from field2
-    const encryptedEmail = sessionRow.field2;
-    const email = decrypt(encryptedEmail, keyBuffer);
-
-    // Delete the session entry after use
-    await supabase
-      .from('session_builders')
-      .delete()
-      .eq('field1', encryptedToken);
-
-    // Find user by email
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
-
-    if (userError || !user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    // Add tokens to user
-    const newTokensAdded = (Number(user.tokens_added) || 0) + FREE_TOKENS_GRANT;
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({
-        tokens_added: newTokensAdded,
-      })
-      .eq('id', user.id);
-
-    if (updateError) {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to add tokens'
-      });
-    }
-
-    // Generate magic link for auto-login
-    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: email,
-      options: { redirectTo: `${process.env.WEB_PORTAL_URL || 'http://localhost:3001'}/#/account` }
-    });
-
-    if (linkError) {
-      return res.status(linkError.status || 500).json({ error: linkError.message });
-    }
-
-    // Extract token_hash from the action_link
-    const url = new URL(linkData.properties.action_link);
-    const token_hash = url.searchParams.get('token');
-
-    return res.json({
-      success: true,
-      message: `Successfully added ${FREE_TOKENS_GRANT.toLocaleString()} free tokens to your account!`,
-      tokensAdded: FREE_TOKENS_GRANT,
-      totalTokens: newTokensAdded,
-      token_hash,
-      type: 'magiclink',
-    });
-  } catch (error) {
-    console.error('[claim-tokens-encrypted] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to claim tokens',
-      details: error.message
-    });
-  }
-});
-
-//#endregion  AUTO-LOGIN ENDPOINTS
-
-
 const server = app.listen(PORT, () => {
-  console.log(`scribefold-api listening on http://localhost:${PORT}`);
+  console.log(`scribefold-api listening on ${PORT}`);
 });

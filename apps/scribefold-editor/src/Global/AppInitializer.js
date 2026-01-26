@@ -44,14 +44,39 @@ export default function AppInitializer({ editorRef }) {
       console.log('[AppInitializer] Loading user data for:', authUser.id);
       dispatch(setUserDataLoading(true));
 
-      const response = await fetch(`${API_BASE_URL}/auth/user-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: authUser.id }),
+      // Get current session from Supabase client
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('[AppInitializer] Session check:', {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        sessionError: sessionError?.message
       });
 
+      if (sessionError || !session) {
+        console.error('[AppInitializer] No valid session:', sessionError);
+        dispatch(setUserDataLoading(false));
+        return;
+      }
+
+      const accessToken = session.access_token;
+      console.log('[AppInitializer] Access token length:', accessToken?.length);
+
+      const apiUrl = `${API_BASE_URL}/auth/user-data`;
+      console.log('[AppInitializer] POST URL:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+      });
+
+      console.log('[AppInitializer] User data response status:', response.status);
+
       if (!response.ok) {
-        console.error('[AppInitializer] Failed to load user data:', response.statusText);
+        const errorText = await response.text();
+        console.error('[AppInitializer] Failed to load user data:', response.status, errorText);
         dispatch(setUserDataLoading(false));
         return;
       }

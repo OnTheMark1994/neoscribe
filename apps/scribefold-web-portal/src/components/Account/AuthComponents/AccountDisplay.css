@@ -90,12 +90,12 @@
 }
 
 .sf-plans-section {
-  margin-top: 40px;
+  /* margin-top: 40px; */
 }
 
 .sf-plans-header h2 {
   font-size: 1.6rem;
-  padding-bottom: 8px;
+  padding-bottom: 0px;
 }
 
 .sf-plans-header p {
@@ -117,6 +117,21 @@
   gap: 12px;
   margin-top: 18px;
 }
+.sf-plans-grid button{
+  min-width: 150px;
+}
+
+@media (max-width: 700px) {
+  .sf-plans-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 400px) {
+  .sf-plans-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
 
 .sf-plan-card {
   position: relative;
@@ -131,22 +146,39 @@
 }
 
 .sf-plan-card:hover {
-  border-color: #e5e7eb;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.6);
-  transform: translateY(-1px);
+  border-color: rgba(148, 163, 184, 0.9);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transform: translateY(-2px);
 }
 
 .sf-plan-card-selected {
   border-color: #38bdf8;
-  box-shadow: 0 12px 32px rgba(56, 189, 248, 0.5);
-  background: radial-gradient(circle at top, rgba(56,189,248,0.2), rgba(15,23,42,0.96));
+  box-shadow: 0 10px 26px rgba(56, 189, 248, 0.4);
+  background: radial-gradient(circle at top, rgba(56,189,248,0.16), rgba(15,23,42,0.95));
 }
 
 .sf-plan-card-selected:hover {
   border-color: #38bdf8;
-  box-shadow: 0 12px 32px rgba(56, 189, 248, 0.5);
-  background: radial-gradient(circle at top, rgba(56,189,248,0.2), rgba(15,23,42,0.96));
+  box-shadow: 0 10px 26px rgba(56, 189, 248, 0.4);
+  background: radial-gradient(circle at top, rgba(56,189,248,0.16), rgba(15,23,42,0.95));
   transform: translateY(-1px);
+}
+
+.sf-plans-subscribe-btn-glow {
+  border-color: #fbbf24 !important;
+  border-width: 2px !important;
+  color: #fbbf24 !important;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(251, 191, 36, 0.9);
+  }
 }
 
 .sf-plan-header-row {
@@ -372,7 +404,7 @@
 
 .sf-secondary-btn {
   border: 1px solid rgba(148, 163, 184, 0.7);
-  color: #e5e7eb;
+  color: #000000;
 }
 
 .sf-secondary-btn:hover {

@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { supabase } from '../../Global/SupabaseClient';
+import { triggerReloadUserData } from '../../Global/ReduxSlices/UserSlice';
 import './AutoLogin/AutoLogin.css';
 
 const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL || 'http://localhost:8080';
@@ -8,6 +10,7 @@ const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL || 'http://lo
 export default function ClaimTokensEncrypted() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [status, setStatus] = useState('initializing');
   const [message, setMessage] = useState('Initializing token claim...');
   const isProcessing = useRef(false);
@@ -37,9 +40,9 @@ export default function ClaimTokensEncrypted() {
         setStatus('claiming');
         setMessage('Claiming your free tokens...');
 
-        console.log('[ClaimTokensEncrypted] Calling /auth/claim-tokens-encrypted endpoint...');
+        console.log('[ClaimTokensEncrypted] Calling /auto/claim-tokens-encrypted endpoint...');
 
-        const response = await fetch(`${API_BASE_URL}/auth/claim-tokens-encrypted`, {
+        const response = await fetch(`${API_BASE_URL}/auto/claim-tokens-encrypted`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })
@@ -77,6 +80,10 @@ export default function ClaimTokensEncrypted() {
             setMessage('Tokens added but auto-login failed. Please log in manually.');
             return;
           }
+
+          // Trigger user data reload after successful claim and auto-login
+          console.log('[ClaimTokensEncrypted] Triggering user data reload...');
+          dispatch(triggerReloadUserData());
         }
 
         setStatus('success');

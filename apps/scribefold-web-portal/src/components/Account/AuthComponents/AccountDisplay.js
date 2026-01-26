@@ -4,10 +4,19 @@ import { supabase } from '../../../Global/SupabaseClient';
 import RefreshUserData from '../../Util/RefreshUserData';
 import './AccountDisplay.css';
 
+// Plan definitions - may be moved to server later
+const PLANS = [
+  { id: 'light', name: 'Light', description: 'Good for occasional writing and small projects.', tokens: 1000000, monthlyPrice: 8.5, tier_id: 1 },
+  { id: 'basic', name: 'Basic', description: 'Good for regular use and active editing sessions.', tokens: 2500000, monthlyPrice: 14.5, tier_id: 2 },
+  { id: 'full', name: 'Standard', description: 'Great for creating stories and books.', tokens: 8500000, monthlyPrice: 28.5, tier_id: 3 },
+  { id: 'heavy', name: 'Heavy', description: 'Dare you to use them all.', tokens: 85000000, monthlyPrice: 89.5, tier_id: 4 },
+];
+
 const AccountDisplay = () => {
   const authUser = useSelector(state => state.userSlice.authUser);
   const userData = useSelector(state => state.userSlice.userData);
   const [selectedAddonTokens, setSelectedAddonTokens] = useState(2_000_000);
+  const [selectedPlanId, setSelectedPlanId] = useState(null);
   const dispatch = useDispatch();
 
   // Check for token on mount
@@ -102,54 +111,77 @@ const AccountDisplay = () => {
   return (
     <div className="sf-page sf-account-page">
       <div className="sf-account-inner">
-        <header className="sf-page-header">
-          <h1>Your Account</h1>
-          <p>View your ScribeFold AI usage and manage your account.</p>
-        </header>
-
-        <section className="sf-account-summary">
-          <div>
-            <div className="sf-section-header">
-              <h2>Account details</h2>
-              <RefreshUserData />
-            </div>
-            <div className="sf-account-detail-row">
-              <span>Email</span>
-              <span>{authUser?.email || 'Loading...'}</span>
-            </div>
-            <div className="sf-account-detail-row">
-              <span>User ID</span>
-              <span>{authUser?.id || 'Loading...'}</span>
-            </div>
-            <div className="sf-account-detail-row">
-              <span>Current Plan</span>
-              <span>
-                {!userData
-                  ? 'Loading...'
-                  : userData.subscription_tier_name
-                    ? `${userData.subscription_tier_name} (${userData.subscription_status || 'active'})`
-                    : 'No active subscription'}
-              </span>
-            </div>
-            {userData?.stripe_subscription_id && (
-              <div className="sf-account-detail-row">
-                <span>Subscription ID</span>
-                <span style={{ fontSize: '0.8em', opacity: 0.7 }}>{userData.stripe_subscription_id}</span>
-              </div>
-            )}
-            <div className="sf-account-detail-row">
-              <span>Next Billing Date</span>
-              <span>
-                {!userData
-                  ? 'Loading...'
-                  : userData.next_billing_date
-                    ? new Date(userData.next_billing_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })
-                    : 'N/A'}
-              </span>
+        <section className="sf-plans-section">
+          <div className="sf-plans-header" style={{ textAlign: 'center' }}>
+            <h2>Choose a Plan</h2>
+          </div>
+          <div className="sf-plans-grid">
+            {PLANS.map((plan) => {
+              const numericTokens = Number(plan.tokens);
+              const numericPrice = Number(plan.monthlyPrice);
+              const hasNumericTokens = Number.isFinite(numericTokens);
+              const hasNumericPrice = Number.isFinite(numericPrice);
+              const pricePerThousand =
+                hasNumericTokens && hasNumericPrice && numericTokens > 0
+                  ? numericPrice / (numericTokens / 1000)
+                  : null;
+              const isCurrentPlan =
+                userData?.tier_id != null &&
+                Number(plan.tier_id) === Number(userData.tier_id);
+              const isSelected = selectedPlanId === plan.id;
+              return (
+                <button
+                  key={plan.id}
+                  type="button"
+                  className={`sf-plan-card ${isSelected ? 'sf-plan-card-selected' : ''}`}
+                  onClick={() => setSelectedPlanId(plan.id)}
+                >
+                  {isCurrentPlan && (
+                    <div className="sf-plan-current-badge">
+                      <span>Your</span>
+                      <span>Plan</span>
+                    </div>
+                  )}
+                  <div className="sf-plan-header-row">
+                    <span className="sf-plan-name">
+                      {plan.name}
+                    </span>
+                  </div>
+                  <div className="sf-plan-body">
+                    <div className="sf-plan-tokens">
+                      {hasNumericTokens
+                        ? `${formatTokens(numericTokens)} tokens / month`
+                        : 'Loading tokens...'}
+                    </div>
+                    <div className="sf-plan-price">
+                      {hasNumericPrice ? `$${numericPrice}/mo` : 'Loading...'}
+                    </div>
+                    <div className="sf-plan-unit-price">
+                      {pricePerThousand != null
+                        ? `$${pricePerThousand.toFixed(3)} per 1k tokens`
+                        : 'Loading...'}
+                    </div>
+                    <div className="sf-plan-description" style={{ textAlign: 'center' }}>
+                      {plan.description}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="sf-plans-footer">
+            <div className="sf-plans-buttons">
+              <button 
+                type="button" 
+                className={`sf-primary-btn sf-plans-subscribe-btn ${(() => {
+                  const currentTierId = userData?.tier_id;
+                  const selectedPlan = PLANS.find(p => p.id === selectedPlanId);
+                  const selectedTierId = selectedPlan?.tier_id;
+                  return (selectedPlanId && (!currentTierId || selectedTierId > currentTierId)) ? 'sf-plans-subscribe-btn-glow' : '';
+                })()}`}
+              >
+                {userData?.tier_id ? 'Change Plan' : 'Subscribe'}
+              </button>
             </div>
           </div>
         </section>
@@ -234,106 +266,6 @@ const AccountDisplay = () => {
           }}
         />
 
-        <section className="sf-plans-section">
-          <div className="sf-plans-header">
-            <h2>Choose A Plan</h2>
-            <p>Choose a monthly plan that fits your writing and editing volume.</p>
-          </div>
-          <div className="sf-plans-grid">
-            {[
-              { id: 'light', name: 'Light', description: 'Perfect for casual writers', tokens: 500000, monthlyPrice: 5, tier_id: 1 },
-              { id: 'basic', name: 'Basic', description: 'For regular writing projects', tokens: 2000000, monthlyPrice: 15, tier_id: 2 },
-              { id: 'full', name: 'Full', description: 'For professional authors', tokens: 5000000, monthlyPrice: 30, tier_id: 3 },
-              { id: 'heavy', name: 'Heavy', description: 'For power users', tokens: 10000000, monthlyPrice: 50, tier_id:4 },
-            ].map((plan) => {
-              const numericTokens = Number(plan.tokens);
-              const numericPrice = Number(plan.monthlyPrice);
-              const hasNumericTokens = Number.isFinite(numericTokens);
-              const hasNumericPrice = Number.isFinite(numericPrice);
-              const pricePerThousand =
-                hasNumericTokens && hasNumericPrice && numericTokens > 0
-                  ? numericPrice / (numericTokens / 1000)
-                  : null;
-              const isCurrentPlan =
-                userData?.tier_id != null &&
-                Number(plan.tier_id) === Number(userData.tier_id);
-              return (
-                <button
-                  key={plan.id}
-                  type="button"
-                  className="sf-plan-card"
-                >
-                  {isCurrentPlan && (
-                    <div className="sf-plan-current-badge">
-                      <span>Your</span>
-                      <span>Plan</span>
-                    </div>
-                  )}
-                  <div className="sf-plan-header-row">
-                    <span className="sf-plan-name">
-                      {plan.name}
-                    </span>
-                  </div>
-                  <div className="sf-plan-body">
-                    <div className="sf-plan-tokens">
-                      {hasNumericTokens
-                        ? `${formatTokens(numericTokens)} tokens / month`
-                        : 'Loading tokens...'}
-                    </div>
-                    <div className="sf-plan-price">
-                      {hasNumericPrice ? `$${numericPrice}/mo` : 'Loading...'}
-                    </div>
-                    <div className="sf-plan-unit-price">
-                      {pricePerThousand != null
-                        ? `$${pricePerThousand.toFixed(3)} per 1k tokens`
-                        : 'Loading...'}
-                    </div>
-                    <div className="sf-plan-description" style={{ textAlign: 'center' }}>
-                      {plan.description}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="sf-plans-footer">
-            <div className="sf-plans-buttons">
-              <button type="button" className="sf-primary-btn sf-plans-subscribe-btn">
-                {userData?.tier_id ? 'Change Plan' : 'Subscribe'}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <div
-          style={{
-            borderTop: '1px solid var(--sf-border-color, #333)',
-            margin: '24px 0',
-          }}
-        />
-
-        <section className="sf-account-actions-section">
-          <h2>Account Actions</h2>
-          <div className="sf-account-actions-grid">
-            <button type="button" className="sf-secondary-btn">
-              Manage Subscription
-            </button>
-            <button type="button" className="sf-secondary-btn">
-              Change Password
-            </button>
-            <button type="button" className="sf-secondary-btn" onClick={handleLogout}>
-              Log Out
-            </button>
-          </div>
-        </section>
-
-        <div
-          style={{
-            borderTop: '1px solid var(--sf-border-color, #333)',
-            margin: '24px 0',
-          }}
-        />
-
         <section className="sf-addon-section">
           <div className="sf-addon-header">
             <h2>One-time token packs</h2>
@@ -386,6 +318,82 @@ const AccountDisplay = () => {
               onClick={handleGetMoreTokens}
             >
               Get {formatTokens(selectedAddonTokens)} more tokens
+            </button>
+          </div>
+        </section>
+
+        <div
+          style={{
+            borderTop: '1px solid var(--sf-border-color, #333)',
+            margin: '24px 0',
+          }}
+        />
+
+        <section className="sf-account-summary">
+          <div>
+            <div className="sf-section-header">
+              <h2>Account details</h2>
+              <RefreshUserData />
+            </div>
+            <div className="sf-account-detail-row">
+              <span>Email</span>
+              <span>{authUser?.email || 'Loading...'}</span>
+            </div>
+            <div className="sf-account-detail-row">
+              <span>User ID</span>
+              <span>{authUser?.id || 'Loading...'}</span>
+            </div>
+            <div className="sf-account-detail-row">
+              <span>Current Plan</span>
+              <span>
+                {!userData
+                  ? 'Loading...'
+                  : userData.subscription_tier_name
+                    ? `${userData.subscription_tier_name} (${userData.subscription_status || 'active'})`
+                    : 'No active subscription'}
+              </span>
+            </div>
+            {userData?.stripe_subscription_id && (
+              <div className="sf-account-detail-row">
+                <span>Subscription ID</span>
+                <span style={{ fontSize: '0.8em', opacity: 0.7 }}>{userData.stripe_subscription_id}</span>
+              </div>
+            )}
+            <div className="sf-account-detail-row">
+              <span>Next Billing Date</span>
+              <span>
+                {!userData
+                  ? 'Loading...'
+                  : userData.next_billing_date
+                    ? new Date(userData.next_billing_date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })
+                    : 'N/A'}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <div
+          style={{
+            borderTop: '1px solid var(--sf-border-color, #333)',
+            margin: '24px 0',
+          }}
+        />
+
+        <section className="sf-account-actions-section">
+          <h2>Account Actions</h2>
+          <div className="sf-account-actions-grid">
+            <button type="button" className="sf-download-btn">
+              Manage Subscription
+            </button>
+            <button type="button" className="sf-download-btn">
+              Change Password
+            </button>
+            <button type="button" className="sf-download-btn" onClick={handleLogout}>
+              Log Out
             </button>
           </div>
         </section>

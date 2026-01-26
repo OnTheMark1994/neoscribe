@@ -56,7 +56,7 @@ export default function SettingsDeveloper() {
       }
 
       let autoLoginPath = '';
-      let apiEndpoint = '/api/generate-login-token';
+      let apiEndpoint = '/auto/generate-encrypted-login-token';
 
       if (method === 'password') {
         autoLoginPath = '/auto-login-password';
@@ -66,7 +66,6 @@ export default function SettingsDeveloper() {
         autoLoginPath = '/auto-login-magiclink';
       } else if (method === 'encrypted-magiclink') {
         autoLoginPath = '/auto-login-magiclink-enc';
-        apiEndpoint = '/api/generate-encrypted-login-token';
       }
 
       console.log('[AutoLogin Test] Calling API endpoint:', `${API_BASE_URL}${apiEndpoint}`);
