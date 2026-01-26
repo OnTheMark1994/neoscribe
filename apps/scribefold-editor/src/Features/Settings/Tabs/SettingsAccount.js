@@ -1,11 +1,5 @@
-/*
-  SettingsAccount
-
-  Account settings page with login/create account and logout functionality.
-*/
-import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { setAuthUser, setUserData, triggerReloadUserData } from '../../../Global/ReduxSlices/UserSlice';
+import { triggerReloadUserData } from '../../../Global/ReduxSlices/UserSlice';
 import AiChatLoginBox from '../../AI/ChatBar/AiChatLoginBox';
 import './SettingsAccount.css';
 import { supabase } from '../../../Global/SupabaseClient';
@@ -34,7 +28,7 @@ export default function SettingsAccount() {
     }
     try {
       const { error } = await supabase.auth.signOut();
-      // Manually clear localStorage and reload to ensure complete logout
+      // Manually clear localStorage and reload to ensure complete logout avoid 403 magic link errors
       localStorage.removeItem(`sb-${process.env.REACT_APP_SUPABASE_PROJECT_REF}-auth-token`);
       window.location.reload();
       if (error) {
@@ -42,40 +36,6 @@ export default function SettingsAccount() {
       }
     } catch (error) {
       console.log("sign out error: ", error)
-    }
-  };
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    
-    if (token) {
-      handleTokenLogin(token);
-    }
-  }, []);
-
-  const handleTokenLogin = async (token) => {
-    try {
-      const response = await fetch('/auth/token-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.session) {
-        // Store session and reload user data
-        localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
-        dispatch(triggerReloadUserData());
-        
-        // Remove token from URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else {
-        console.error('Token login failed:', data.error);
-      }
-    } catch (error) {
-      console.error('Error in token login:', error);
     }
   };
 

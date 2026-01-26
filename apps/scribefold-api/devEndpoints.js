@@ -1,0 +1,83 @@
+const express = require('express');
+const router = express.Router();
+const { FREE_TOKENS_GRANT } = require('./constants');
+const { sendClaimTokenEmail, encrypt } = require('./functions');
+
+/**
+ * POST /dev/send-magiclink-email
+ * Sends an encrypted magic link email for testing the token claiming flow
+ * Uses the same sendClaimTokenEmail function as create-account endpoint
+ * Input: { userId }
+ * Output: { success, message, magicLinkUrl?, error? }
+ */
+router.post('/send-magiclink-email', async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+
+    if (!req.supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
+
+    // Find user by auth_id
+    const { data: user, error: fetchError } = await req.supabase
+      .from('users')
+      .select('id, auth_id')
+      .eq('auth_id', userId)
+      .single();
+
+    if (fetchError || !user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Get user email
+    const { data: authUser, error: userError } = await req.supabase.auth.admin.getUserById(userId);
+    if (userError || !authUser?.user?.email) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const email = authUser.user.email;
+
+    // Use the reusable function to send claim token email
+    const result = await sendClaimTokenEmail(
+      req.supabase,
+      req.resend,
+      email,
+      userId,
+      process.env.WEB_PORTAL_URL,
+      FREE_TOKENS_GRANT,
+      process.env.EMAIL_FROM,
+      (text) => encrypt(text, req.keyBuffer)
+    );
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to send magic link email'
+      });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('[send-magiclink-email] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send magic link email',
+      details: error.message
+    });
+  }
+});
+
+module.exports = router;

@@ -121,8 +121,8 @@ export default function SettingsDeveloper() {
     setSendTokenEmailMessage('Sending magic link email...');
 
     try {
-      console.log('[Send Token Email] Calling /auth/send-magiclink-email...');
-      const emailResponse = await fetch(`${API_BASE_URL}/auth/send-magiclink-email`, {
+      console.log('[Send Token Email] Calling /dev/send-magiclink-email...');
+      const emailResponse = await fetch(`${API_BASE_URL}/dev/send-magiclink-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: authUser.id })
