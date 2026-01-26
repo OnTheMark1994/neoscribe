@@ -47,34 +47,37 @@ function createKeyBuffer(encryptionKey) {
 }
 
 /**
- * Encrypt text using AES-256-CBC with fixed IV
+ * Encrypt text using AES-256-CBC with random IV
  */
 function encrypt(text, keyBuffer) {
   const IV_LENGTH = 16;
-  const FIXED_IV = Buffer.alloc(IV_LENGTH, 0);
-  const cipher = crypto.createCipheriv('aes-256-cbc', keyBuffer, FIXED_IV);
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv('aes-256-cbc', keyBuffer, iv);
   const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
-  return encrypted.toString('hex');
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
 /**
- * Decrypt text using AES-256-CBC with fixed IV
+ * Decrypt text using AES-256-CBC with random IV
  */
 function decrypt(text, keyBuffer) {
   const IV_LENGTH = 16;
-  const FIXED_IV = Buffer.alloc(IV_LENGTH, 0);
-  const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, FIXED_IV);
+  const parts = text.split(':');
+  const iv = Buffer.from(parts[0], 'hex');
+  const encrypted = Buffer.from(parts[1], 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, iv);
   return Buffer.concat([
-    decipher.update(Buffer.from(text, 'hex')),
+    decipher.update(encrypted),
     decipher.final()
   ]).toString();
 }
 
 /**
- * Generate a random unique token
+ * Generate a cryptographically secure random token
  */
 function generateUniqueToken() {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  // Use crypto.randomBytes for cryptographically secure random values
+  return crypto.randomBytes(32).toString('hex');
 }
 
 /**

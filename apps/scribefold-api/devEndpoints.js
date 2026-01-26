@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const { FREE_TOKENS_GRANT } = require('./constants');
 const { sendClaimTokenEmail, encrypt } = require('./functions');
 
@@ -8,12 +9,40 @@ const { sendClaimTokenEmail, encrypt } = require('./functions');
 router.post('/send-magiclink-email', async (req, res) => {
   /**
    * POST /dev/send-magiclink-email
-   * 
+   *
    * Uses the same sendClaimTokenEmail function as create-account endpoint
    * Input: { userId }
    * Output: { success, message, magicLinkUrl?, error? }
   */
   try {
+    // Verify JWT token from Authorization header
+    const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!userAccessToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authorization token required'
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(userAccessToken, process.env.SUPABASE_JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token'
+      });
+    }
+
+    const callerUserId = decoded?.sub; // auth_id from JWT token
+
+    if (!callerUserId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token: no user ID found'
+      });
+    }
+
     const { userId } = req.body || {};
 
     if (!req.supabaseAdmin) {

@@ -128,7 +128,34 @@ app.post('/api/chat', async (req, res) => {
     const body = req.body || {};
     const incomingMessages = Array.isArray(body.messages) ? body.messages : [];
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-    const userId = body.userId; // auth_id from Supabase
+
+    // Verify JWT token from Authorization header
+    const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!userAccessToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authorization token required'
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(userAccessToken, process.env.SUPABASE_JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token'
+      });
+    }
+
+    const userId = decoded?.sub; // auth_id from JWT token
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token: no user ID found'
+      });
+    }
 
     // Backwards compatible input:
     // - Preferred: { messages: [{ role, content }, ...] }

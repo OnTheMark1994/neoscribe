@@ -21,6 +21,7 @@ import { toggleShowDiffView, setShowDiffView } from '../../../Global/ReduxSlices
 import { updateAvailableTokens } from '../../../Global/ReduxSlices/UserSlice';
 import { getAIVisibleLinesFromEditor } from '../../../Global/EditorRefHelpers';
 import { lineIdState } from '../../Editors/EditorMonaco/CodeMirror/EditorCodeMirrorSetup';
+import { supabase } from '../../../Global/SupabaseClient';
 import './AiChatInputArea.css';
 
 /**
@@ -34,7 +35,7 @@ import './AiChatInputArea.css';
  * - Input: prompt string
  * - Output: response text (string)
  */
-async function callChatApi(messages, userId) {
+async function callChatApi(messages, userId, accessToken) {
   const endpoint = `${process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL}/api/chat`;
 
   // Build request debug info on the client.
@@ -44,7 +45,10 @@ async function callChatApi(messages, userId) {
     fetchRequest: {
       url: endpoint,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
       body: requestBody,
       bodyString: JSON.stringify(requestBody, null, 2),
     },
@@ -185,8 +189,16 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
       // Get user ID for token tracking
       const userId = authUser?.id;
 
+      // Get access token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        throw new Error('No access token available. Please log in.');
+      }
+
       // This function calls the api and also comiles debug info
-      const { text: responseText, availableTokens, debugInfo } = await callChatApi(outgoingMessages, userId);
+      const { text: responseText, availableTokens, debugInfo } = await callChatApi(outgoingMessages, userId, accessToken);
 
       // Update user data if availableTokens is provided
       if (typeof availableTokens === 'number') {

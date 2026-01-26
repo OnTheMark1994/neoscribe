@@ -163,7 +163,7 @@ Phases:
         the github build pipeline that places the downloadables onto the web portal 
     
     security
-        supabase table rls 
+        supabase table rls (done)
         scan through for vulnerabilities 
 
 
