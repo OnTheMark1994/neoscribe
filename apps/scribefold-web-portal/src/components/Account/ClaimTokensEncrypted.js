@@ -65,13 +65,18 @@ export default function ClaimTokensEncrypted() {
         console.log('[ClaimTokensEncrypted] Tokens claimed successfully');
         console.log('[ClaimTokensEncrypted] Tokens added:', data.tokensAdded);
 
-        // Auto-login if session data is available
-        if (data.sessionData && data.sessionData.access_token) {
-          console.log('[ClaimTokensEncrypted] Setting Supabase session...');
-          await supabase.auth.setSession({
-            access_token: data.sessionData.access_token,
-            refresh_token: data.sessionData.refresh_token
-          });
+        // Auto-login using magic link flow
+        if (data.token_hash && data.type) {
+          console.log('[ClaimTokensEncrypted] Verifying OTP with Supabase...');
+          const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({ token_hash: data.token_hash, type: data.type });
+          console.log('[ClaimTokensEncrypted] verifyOtp result:', { userId: verifyData?.user?.id, error: verifyError?.message });
+
+          if (verifyError) {
+            console.error('[ClaimTokensEncrypted] verifyOtp error:', verifyError);
+            setStatus('error');
+            setMessage('Tokens added but auto-login failed. Please log in manually.');
+            return;
+          }
         }
 
         setStatus('success');

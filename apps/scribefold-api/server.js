@@ -203,6 +203,7 @@ app.post('/auth/create-account', async (req, res) => {
   }
 });
 
+// todo: /data route
 // Returns user data such as token counts
 app.post('/auth/user-data', async (req, res) => {
   try {
@@ -424,6 +425,8 @@ app.post('/chat', async (req, res) => {
 
 //#region  AUTO-LOGIN ENDPOINTS
 
+// todo: /auth route
+// Creates a token and saves encrypted copy, used for auto login 
 app.post('/api/generate-encrypted-login-token', async (req, res) => {
   try {
     const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
@@ -487,6 +490,7 @@ app.post('/api/generate-encrypted-login-token', async (req, res) => {
   }
 });
 
+// Logs user in given token, verifying, sending back a magic link
 app.post('/auth/auto-login-magiclink-enc', async (req, res) => {
   try {
     const { token } = req.body || {};
@@ -539,7 +543,8 @@ app.post('/auth/auto-login-magiclink-enc', async (req, res) => {
   }
 });
 
-// Claims free tokens using encrypted claim token from magic link
+// todo: /claim route
+// Claims free tokens using encrypted claim token created in create-account
 app.post('/auth/claim-tokens-encrypted', async (req, res) => {
   try {
     const { token } = req.body || {};
@@ -596,21 +601,12 @@ app.post('/auth/claim-tokens-encrypted', async (req, res) => {
       });
     }
 
-    // Check if tokens already claimed (claim_token is null)
-    if (!user.claim_token) {
-      return res.status(400).json({
-        success: false,
-        error: 'This confirmation link has already been used. Tokens have already been added to your account.'
-      });
-    }
-
     // Add tokens to user
     const newTokensAdded = (Number(user.tokens_added) || 0) + FREE_TOKENS_GRANT;
     const { error: updateError } = await supabase
       .from('users')
       .update({
         tokens_added: newTokensAdded,
-        claim_token: null // Clear the token after claiming
       })
       .eq('id', user.id);
 
@@ -621,39 +617,28 @@ app.post('/auth/claim-tokens-encrypted', async (req, res) => {
       });
     }
 
-    // Try to log the user in using stored password
-    let sessionData = null;
-    try {
-      const password = user.password;
+    // Generate magic link for auto-login
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+      options: { redirectTo: `${process.env.WEB_PORTAL_URL || 'http://localhost:3001'}/#/account` }
+    });
 
-      if (email && password) {
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (!signInError && signInData?.session) {
-          sessionData = {
-            access_token: signInData.session.access_token,
-            refresh_token: signInData.session.refresh_token
-          };
-        }
-      }
-    } catch (sessionErr) {
-      // Session login failed, but tokens were still granted
+    if (linkError) {
+      return res.status(linkError.status || 500).json({ error: linkError.message });
     }
 
-    // Get auth user email
-    const { data: authUser } = await supabase.auth.admin.getUserById(user.auth_id);
+    // Extract token_hash from the action_link
+    const url = new URL(linkData.properties.action_link);
+    const token_hash = url.searchParams.get('token');
 
     return res.json({
       success: true,
       message: `Successfully added ${FREE_TOKENS_GRANT.toLocaleString()} free tokens to your account!`,
       tokensAdded: FREE_TOKENS_GRANT,
       totalTokens: newTokensAdded,
-      email: authUser?.user?.email || null,
-      userId: user.auth_id,
-      sessionData: sessionData // May be null, but tokens were still granted
+      token_hash,
+      type: 'magiclink',
     });
   } catch (error) {
     console.error('[claim-tokens-encrypted] Error:', error);
