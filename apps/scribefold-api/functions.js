@@ -171,29 +171,16 @@ async function sendClaimTokenEmail(supabase, resend, email, userId = null, webPo
     // Generate claim token for claiming free tokens
     const claimToken = generateUniqueToken();
 
-    // If user exists, update their claim token
-    if (user) {
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ claim_token: claimToken })
-        .eq('id', user.id);
-
-      if (updateError) {
-        console.error('[sendClaimTokenEmail] Failed to update claim token:', updateError);
-        return { success: false, error: 'Failed to generate claim token' };
-      }
-    }
-
     // Encrypt claim token for magic link
     const encryptedClaimToken = encrypt(claimToken);
-    const encryptedEmail = encrypt(email);
+    const encryptedAuthId = encrypt(userId);
 
     // Save to session_builders table
     const { error: insertError } = await supabase
       .from('session_builders')
       .insert({
         field1: encryptedClaimToken,
-        field2: encryptedEmail
+        field2: encryptedAuthId
       });
 
     if (insertError) {

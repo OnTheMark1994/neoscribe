@@ -137,23 +137,8 @@ Phases:
         
 
     1 week
-    server functionality 
-        todo: auto login and email conformation is working BUT its using a saved password which is not secure, so need a new method 
-            supabase auto login deepseek chat, maybe real maybe its halucinating
-            its generating nonsense
-                but basically
-                send user id and session to the server (or just session actually?)
-                validate the session matches the user id somehow so can't spoof user id 
-                    this is the part that was not secure, it just sent the auth id, now even worse just using password stored in plaintext 
-                create a random string and put it in user data 
-                send that back and generate link from it 
-                go to link auto sign or confirm from web portal 
-                it calls the endpiont which checks for that auto login link in a user row 
-                if it finds it then it creates a login sessoin for that user and sends that session back 
-                    this is the part that was not certain, it thought I could just do this with admin.create sessin (does not exist)
-                    maybe can create a custom jwt for this with the secret key?
-                send that jwt back and the supabase cient on the web portal can use that to sign in  
-        chat api 
+    server functionality (partially done)
+        chat api (done)
             sends proper response 
             tokens 
                 loads tokens 
@@ -169,26 +154,18 @@ Phases:
             token confirmation
                 adds tokens 
                 loggs in user 
-        stripe  
+        stripe  (todo)
             montly  
             one time 
 
+    web opps 
+        the render.com from the correct apps/ folders 
+        the github build pipeline that places the downloadables onto the web portal 
+    
+    security
+        supabase table rls 
+        scan through for vulnerabilities 
 
-    auto login
-        send authenticated access token to server 
-        await supabaseAdmin.auth.getUser(userAccessToken)
-        get their user id from that getUser
-        if its valid create a random string and put it in the db 
-        on web portal send that string to an endpoint 
-        find the user it is correlated with 
-        create a custom jwt with secret key that supabase will accept to sign in the user 
-            this bit may be a halucination, can this be done? 
-                seems like it can be done based on prompt responses 
-                says need to create refresh token though 
-        web portal uses that jwt to sign the user in without needing a password 
-
-    todo: switch to / instead of /# so the auto links work right away 
-    why did I use # anyway? 
 
     1 week
     referrals feature

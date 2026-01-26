@@ -49,30 +49,6 @@ router.post('/create-account', async (req, res) => {
       });
     }
 
-    // Generate unique token for claiming free tokens
-    const claimToken = generateUniqueToken();
-
-    // Store claim token in users table
-    try {
-      const { error: insertError } = await req.supabase
-        .from('users')
-        .insert({
-          auth_id: authData.user.id,
-          claim_token: claimToken,
-          email: email,
-        });
-
-      if (insertError) {
-        console.error('[create-account] Failed to store claim token:', insertError);
-        throw insertError;
-      }
-
-      console.log('[create-account] Stored claim token for user:', authData.user.id);
-    } catch (dbError) {
-      console.error('[create-account] Failed to store claim token:', dbError);
-      // Continue anyway - user can request a new token
-    }
-
     // Send claim token email using the reusable function
     const emailResult = await sendClaimTokenEmail(
       req.supabase,

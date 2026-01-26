@@ -47,16 +47,16 @@ router.post('/generate-encrypted-login-token', async (req, res) => {
     // Generate a secure, one-time token
     const loginToken = crypto.randomBytes(32).toString('hex');
 
-    // Encrypt token and email
+    // Encrypt token and auth_id
     const encryptedToken = encrypt(loginToken, req.keyBuffer);
-    const encryptedEmail = encrypt(email, req.keyBuffer);
+    const encryptedAuthId = encrypt(authUserId, req.keyBuffer);
 
-    // Save to session_builders table (field1 = encrypted token, field2 = encrypted email)
+    // Save to session_builders table (field1 = encrypted token, field2 = encrypted auth_id)
     const { error: insertError } = await req.supabase
       .from('session_builders')
       .insert({
         field1: encryptedToken,
-        field2: encryptedEmail
+        field2: encryptedAuthId
       });
 
     if (insertError) {
@@ -92,15 +92,22 @@ router.post('/auto-login-magiclink-enc', async (req, res) => {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
 
-    // Decrypt email from field2
-    const encryptedEmail = sessionRow.field2;
-    const email = decrypt(encryptedEmail, req.keyBuffer);
+    // Decrypt auth_id from field2
+    const encryptedAuthId = sessionRow.field2;
+    const authId = decrypt(encryptedAuthId, req.keyBuffer);
 
     // Delete the session entry after use
     await req.supabase
       .from('session_builders')
       .delete()
       .eq('field1', encryptedToken);
+
+    // Get user email for magic link
+    const { data: authUser, error: authError } = await req.supabase.auth.admin.getUserById(authId);
+    if (authError || !authUser?.user?.email) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const email = authUser.user.email;
 
     // Generate magic link
     const { data: linkData, error: linkError } = await req.supabase.auth.admin.generateLink({
@@ -159,9 +166,9 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
 
-    // Decrypt email from field2
-    const encryptedEmail = sessionRow.field2;
-    const email = decrypt(encryptedEmail, req.keyBuffer);
+    // Decrypt auth_id from field2
+    const encryptedAuthId = sessionRow.field2;
+    const authId = decrypt(encryptedAuthId, req.keyBuffer);
 
     // Delete the session entry after use
     await req.supabase
@@ -169,11 +176,11 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
       .delete()
       .eq('field1', encryptedToken);
 
-    // Find user by email
+    // Find user in users table by auth_id
     const { data: user, error: userError } = await req.supabase
       .from('users')
       .select('*')
-      .eq('email', email)
+      .eq('auth_id', authId)
       .single();
 
     if (userError || !user) {
@@ -198,6 +205,16 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
         error: 'Failed to add tokens'
       });
     }
+
+    // Get user email for magic link
+    const { data: authUser, error: authError } = await req.supabase.auth.admin.getUserById(authId);
+    if (authError || !authUser?.user?.email) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate magic link'
+      });
+    }
+    const email = authUser.user.email;
 
     // Generate magic link for auto-login
     const { data: linkData, error: linkError } = await req.supabase.auth.admin.generateLink({
