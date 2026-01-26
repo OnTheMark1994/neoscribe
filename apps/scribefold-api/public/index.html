@@ -22,7 +22,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
+      cursor: none;
     }
 
     .black-background {
@@ -41,29 +41,47 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: linear-gradient(
-        /* 135deg, */
-        90deg,
-        rgba(135, 206, 250, 0.6) 0%,
-        rgba(70, 130, 180, 0.55) 25%,
-        rgba(65, 105, 225, 0.6) 50%,
-        rgba(30, 58, 138, 0.55) 75%,
-        rgba(0, 0, 128, 0.6) 100%
+      background: radial-gradient(
+        circle at center,
+        rgba(135, 206, 250, 0.4) 0%,
+        rgba(70, 130, 180, 0.35) 25%,
+        rgba(65, 105, 225, 0.4) 50%,
+        rgba(30, 58, 138, 0.35) 75%,
+        rgba(0, 0, 128, 0.4) 100%
       );
-      background-size: 400% 400%;
-      animation: gradientMove 15s ease infinite;
       z-index: -1;
     }
 
-    @keyframes gradientMove {
-      0% {
-        background-position: 0% 50%;
+    .glow-effect {
+      position: absolute;
+      width: 0px;
+      height: 0px;
+      border-radius: 50%;
+      background: radial-gradient(
+        circle,
+        rgba(135, 206, 250, 0.3) 0%,
+        rgba(70, 130, 180, 0.2) 30%,
+        rgba(65, 105, 225, 0.1) 60%,
+        transparent 100%
+      );
+      animation: glowPulse 8s ease-in-out infinite;
+      z-index: -1;
+    }
+
+    @keyframes glowPulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.3;
+        box-shadow: 0 0 20px 10px rgba(135, 206, 250, 0.1),
+                    0 0 30px 15px rgba(70, 130, 180, 0.08),
+                    0 0 40px 20px rgba(65, 105, 225, 0.05);
       }
       50% {
-        background-position: 100% 50%;
-      }
-      100% {
-        background-position: 0% 50%;
+        transform: scale(12);
+        opacity: 0.5;
+        box-shadow: 0 0 60px 30px rgba(135, 206, 250, 0.2),
+                    0 0 90px 45px rgba(70, 130, 180, 0.15),
+                    0 0 120px 60px rgba(65, 105, 225, 0.1);
       }
     }
 
@@ -71,8 +89,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      animation: pulse 3s ease-in-out infinite;
+      animation: pulse 4s ease-in-out infinite;
       z-index: 1;
+      user-select: none;
     }
 
     .icon-container img {
@@ -97,6 +116,7 @@
   <div class="black-background"></div>
   <div class="blue-gradient-overlay"></div>
   <div class="icon-container">
+    <div class="glow-effect"></div>
     <img src="/images/scribefold-ai-icon-png.png" alt="ScribeFold AI" />
   </div>
 </body>

@@ -47,11 +47,12 @@ function createKeyBuffer(encryptionKey) {
 }
 
 /**
- * Encrypt text using AES-256-CBC with random IV
+ * Encrypt text using AES-256-CBC with fixed IV for deterministic encryption
  */
 function encrypt(text, keyBuffer) {
   const IV_LENGTH = 16;
-  const iv = crypto.randomBytes(IV_LENGTH);
+  // Use fixed IV (all zeros) for deterministic encryption
+  const iv = Buffer.alloc(IV_LENGTH, 0);
   const cipher = crypto.createCipheriv('aes-256-cbc', keyBuffer, iv);
   const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
   return iv.toString('hex') + ':' + encrypted.toString('hex');
@@ -78,17 +79,6 @@ function decrypt(text, keyBuffer) {
 function generateUniqueToken() {
   // Use crypto.randomBytes for cryptographically secure random values
   return crypto.randomBytes(32).toString('hex');
-}
-
-/**
- * Generate a signed JWT token for email confirmation
- */
-function generateConfirmationToken(userId, email, password, secret, expiry = '24h') {
-  return jwt.sign(
-    { userId, email, password },
-    secret,
-    { expiresIn: expiry }
-  );
 }
 
 /**
@@ -300,7 +290,6 @@ module.exports = {
   encrypt,
   decrypt,
   generateUniqueToken,
-  generateConfirmationToken,
   verifyConfirmationToken,
   sendConfirmationEmail,
   sendClaimTokenEmail,

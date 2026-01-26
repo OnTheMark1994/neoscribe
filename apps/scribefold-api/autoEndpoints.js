@@ -47,7 +47,7 @@ router.post('/generate-encrypted-login-token', async (req, res) => {
     // Generate a secure, one-time token
     const loginToken = crypto.randomBytes(32).toString('hex');
 
-    // Encrypt token and auth_id
+    // Encrypt token and auth_id (now deterministic with fixed IV)
     const encryptedToken = encrypt(loginToken, req.keyBuffer);
     const encryptedAuthId = encrypt(authUserId, req.keyBuffer);
 
@@ -80,7 +80,7 @@ router.post('/auto-login-magiclink-enc', async (req, res) => {
       return res.status(400).json({ error: 'No token provided' });
     }
 
-    // Look up in session_builders table by encrypted token
+    // Look up in session_builders table by encrypted token (now deterministic)
     const encryptedToken = encrypt(token, req.keyBuffer);
     const { data: sessionRow, error: findError } = await req.supabaseAdmin
       .from('session_builders')

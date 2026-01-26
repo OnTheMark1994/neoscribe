@@ -164,7 +164,10 @@ Phases:
     
     security
         supabase table rls (done)
-        scan through for vulnerabilities 
+        scan through for vulnerabilities (did some)
+            maybe add rate limiting for the account creation or magic links from same ip
+            also shold make it so go to web portal is not clickable while processing so multiples are not created 
+                (and maybe a processing message for that) 
 
 
     1 week
