@@ -10,7 +10,7 @@ router.post('/create-account', async (req, res) => {
   try {
     const { email, password } = req.body || {};
 
-    if (!req.supabase) {
+    if (!req.supabaseAdmin) {
       return res.status(503).json({
         success: false,
         error: 'Database not configured'
@@ -27,7 +27,7 @@ router.post('/create-account', async (req, res) => {
     console.log('[create-account] Creating account for email:', email);
 
     // Create Supabase auth user
-    const { data: authData, error: authError } = await req.supabase.auth.admin.createUser({
+    const { data: authData, error: authError } = await req.supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true, // Auto-confirm so user can sign in immediately
@@ -51,7 +51,7 @@ router.post('/create-account', async (req, res) => {
 
     // Send claim token email using the reusable function
     const emailResult = await sendClaimTokenEmail(
-      req.supabase,
+      req.supabaseAdmin,
       req.resend,
       email,
       authData.user.id,
@@ -130,7 +130,7 @@ router.post('/user-data', async (req, res) => {
       });
     }
 
-    if (!req.supabase) {
+    if (!req.supabaseAdmin) {
       console.log('[user-data] Database not configured');
       return res.status(503).json({
         success: false,
@@ -140,8 +140,22 @@ router.post('/user-data', async (req, res) => {
 
     console.log('[user-data] Fetching user data for:', userId);
 
-    // Find user by auth_id
-    const { data: user, error: fetchError } = await req.supabase
+    // Create Supabase client with user's JWT token for read-only access
+    const { createClient } = require('@supabase/supabase-js');
+    const supabaseUser = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SECRET_KEY, // Use regular key, not service role
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${userAccessToken}`
+          }
+        }
+      }
+    );
+
+    // Find user by auth_id using user's JWT token (read-only access)
+    const { data: user, error: fetchError } = await supabaseUser
       .from('users')
       .select('*')
       .eq('auth_id', userId)

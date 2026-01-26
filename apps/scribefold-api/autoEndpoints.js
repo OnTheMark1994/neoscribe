@@ -26,7 +26,7 @@ router.post('/generate-encrypted-login-token', async (req, res) => {
     const authUserId = decoded?.sub;
 
     // Get user's row in public.users table
-    const { data: userData, error: fetchError } = await req.supabase
+    const { data: userData, error: fetchError } = await req.supabaseAdmin
       .from('users')
       .select('id, auth_id')
       .eq('auth_id', authUserId)
@@ -37,7 +37,7 @@ router.post('/generate-encrypted-login-token', async (req, res) => {
     }
 
     // Get user email
-    const { data: user, error: userError } = await req.supabase.auth.admin.getUserById(userData.auth_id);
+    const { data: user, error: userError } = await req.supabaseAdmin.auth.admin.getUserById(userData.auth_id);
     if (userError || !user?.user?.email) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -52,7 +52,7 @@ router.post('/generate-encrypted-login-token', async (req, res) => {
     const encryptedAuthId = encrypt(authUserId, req.keyBuffer);
 
     // Save to session_builders table (field1 = encrypted token, field2 = encrypted auth_id)
-    const { error: insertError } = await req.supabase
+    const { error: insertError } = await req.supabaseAdmin
       .from('session_builders')
       .insert({
         field1: encryptedToken,
@@ -82,7 +82,7 @@ router.post('/auto-login-magiclink-enc', async (req, res) => {
 
     // Look up in session_builders table by encrypted token
     const encryptedToken = encrypt(token, req.keyBuffer);
-    const { data: sessionRow, error: findError } = await req.supabase
+    const { data: sessionRow, error: findError } = await req.supabaseAdmin
       .from('session_builders')
       .select('field1, field2')
       .eq('field1', encryptedToken)
@@ -97,20 +97,20 @@ router.post('/auto-login-magiclink-enc', async (req, res) => {
     const authId = decrypt(encryptedAuthId, req.keyBuffer);
 
     // Delete the session entry after use
-    await req.supabase
+    await req.supabaseAdmin
       .from('session_builders')
       .delete()
       .eq('field1', encryptedToken);
 
     // Get user email for magic link
-    const { data: authUser, error: authError } = await req.supabase.auth.admin.getUserById(authId);
+    const { data: authUser, error: authError } = await req.supabaseAdmin.auth.admin.getUserById(authId);
     if (authError || !authUser?.user?.email) {
       return res.status(404).json({ error: 'User not found' });
     }
     const email = authUser.user.email;
 
     // Generate magic link
-    const { data: linkData, error: linkError } = await req.supabase.auth.admin.generateLink({
+    const { data: linkData, error: linkError } = await req.supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: email,
       options: { redirectTo: `${process.env.REACT_APP_URL || 'http://localhost:3001'}/#/account` }
@@ -138,7 +138,7 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
   try {
     const { token } = req.body || {};
 
-    if (!req.supabase) {
+    if (!req.supabaseAdmin) {
       return res.status(503).json({
         success: false,
         error: 'Database not configured'
@@ -156,7 +156,7 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
     const encryptedToken = encrypt(token, req.keyBuffer);
 
     // Look up in session_builders table
-    const { data: sessionRow, error: findError } = await req.supabase
+    const { data: sessionRow, error: findError } = await req.supabaseAdmin
       .from('session_builders')
       .select('field1, field2')
       .eq('field1', encryptedToken)
@@ -171,13 +171,13 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
     const authId = decrypt(encryptedAuthId, req.keyBuffer);
 
     // Delete the session entry after use
-    await req.supabase
+    await req.supabaseAdmin
       .from('session_builders')
       .delete()
       .eq('field1', encryptedToken);
 
     // Find user in users table by auth_id
-    const { data: user, error: userError } = await req.supabase
+    const { data: user, error: userError } = await req.supabaseAdmin
       .from('users')
       .select('*')
       .eq('auth_id', authId)
@@ -192,7 +192,7 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
 
     // Add tokens to user
     const newTokensAdded = (Number(user.tokens_added) || 0) + FREE_TOKENS_GRANT;
-    const { error: updateError } = await req.supabase
+    const { error: updateError } = await req.supabaseAdmin
       .from('users')
       .update({
         tokens_added: newTokensAdded,
@@ -207,7 +207,7 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
     }
 
     // Get user email for magic link
-    const { data: authUser, error: authError } = await req.supabase.auth.admin.getUserById(authId);
+    const { data: authUser, error: authError } = await req.supabaseAdmin.auth.admin.getUserById(authId);
     if (authError || !authUser?.user?.email) {
       return res.status(500).json({
         success: false,
@@ -217,7 +217,7 @@ router.post('/claim-tokens-encrypted', async (req, res) => {
     const email = authUser.user.email;
 
     // Generate magic link for auto-login
-    const { data: linkData, error: linkError } = await req.supabase.auth.admin.generateLink({
+    const { data: linkData, error: linkError } = await req.supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: email,
       options: { redirectTo: `${process.env.WEB_PORTAL_URL || 'http://localhost:3001'}/#/account` }

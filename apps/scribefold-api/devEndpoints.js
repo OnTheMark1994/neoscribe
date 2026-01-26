@@ -16,7 +16,7 @@ router.post('/send-magiclink-email', async (req, res) => {
   try {
     const { userId } = req.body || {};
 
-    if (!req.supabase) {
+    if (!req.supabaseAdmin) {
       return res.status(503).json({
         success: false,
         error: 'Database not configured'
@@ -31,7 +31,7 @@ router.post('/send-magiclink-email', async (req, res) => {
     }
 
     // Find user by auth_id
-    const { data: user, error: fetchError } = await req.supabase
+    const { data: user, error: fetchError } = await req.supabaseAdmin
       .from('users')
       .select('id, auth_id')
       .eq('auth_id', userId)
@@ -45,7 +45,7 @@ router.post('/send-magiclink-email', async (req, res) => {
     }
 
     // Get user email
-    const { data: authUser, error: userError } = await req.supabase.auth.admin.getUserById(userId);
+    const { data: authUser, error: userError } = await req.supabaseAdmin.auth.admin.getUserById(userId);
     if (userError || !authUser?.user?.email) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -54,7 +54,7 @@ router.post('/send-magiclink-email', async (req, res) => {
 
     // Use the reusable function to send claim token email
     const result = await sendClaimTokenEmail(
-      req.supabase,
+      req.supabaseAdmin,
       req.resend,
       email,
       userId,

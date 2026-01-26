@@ -148,14 +148,14 @@ async function sendConfirmationEmail(resend, toEmail, confirmUrl, emailFrom) {
 /**
  * Send claim token email using encrypted magic link approach
  */
-async function sendClaimTokenEmail(supabase, resend, email, userId = null, webPortalUrl, freeTokensGrant, emailFrom, encrypt) {
+async function sendClaimTokenEmail(supabaseAdmin, resend, email, userId = null, webPortalUrl, freeTokensGrant, emailFrom, encrypt) {
   try {
     console.log('[sendClaimTokenEmail] Sending claim token email to:', email);
 
-    // If userId provided, find user and update their claim token
+    // If userId provided, find user
     let user = null;
     if (userId) {
-      const { data: userData, error: fetchError } = await supabase
+      const { data: userData, error: fetchError } = await supabaseAdmin
         .from('users')
         .select('id, auth_id')
         .eq('auth_id', userId)
@@ -176,7 +176,7 @@ async function sendClaimTokenEmail(supabase, resend, email, userId = null, webPo
     const encryptedAuthId = encrypt(userId);
 
     // Save to session_builders table
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from('session_builders')
       .insert({
         field1: encryptedClaimToken,

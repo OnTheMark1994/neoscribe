@@ -35,7 +35,7 @@ import './AiChatInputArea.css';
  * - Output: response text (string)
  */
 async function callChatApi(messages, userId) {
-  const endpoint = `${process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL}/chat`;
+  const endpoint = `${process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL}/api/chat`;
 
   // Build request debug info on the client.
   const requestBody = { messages, userId };

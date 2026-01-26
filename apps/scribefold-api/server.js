@@ -51,9 +51,12 @@ const { calculateAvailableTokens, estimateTokensUsed, updateUserTokens, createKe
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Set up supabase
-const supabase = createClient(process.env.SUPABASE_URL,  process.env.SUPABASE_SERVICE_ROLE_KEY_SECRET)
-if (!supabase) console.warn('⚠ Supabase not configured. Auth endpoints will be disabled.');
+// Set up Supabase clients
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY_SECRET
+);
+if (!supabaseAdmin) console.warn('⚠ Supabase admin not configured. Auth endpoints will be disabled.');
 
 // Initialize Resend client for email
 const resend = new Resend(process.env.RESEND_KEY);
@@ -79,19 +82,19 @@ app.use(express.json({ limit: '2mb' }));
 
 // Attach dependencies to request object for endpoints
 app.use('/dev', (req, res, next) => {
-  req.supabase = supabase;
+  req.supabaseAdmin = supabaseAdmin;
   req.resend = resend;
   req.keyBuffer = keyBuffer;
   next();
 });
 app.use('/auth', (req, res, next) => {
-  req.supabase = supabase;
+  req.supabaseAdmin = supabaseAdmin;
   req.resend = resend;
   req.keyBuffer = keyBuffer;
   next();
 });
 app.use('/auto', (req, res, next) => {
-  req.supabase = supabase;
+  req.supabaseAdmin = supabaseAdmin;
   req.resend = resend;
   req.keyBuffer = keyBuffer;
   next();
@@ -149,7 +152,7 @@ app.post('/api/chat', async (req, res) => {
     if (userId) {
       console.log('[chat] Loading user data for:', userId);
 
-      const { data: user, error: fetchError } = await supabase
+      const { data: user, error: fetchError } = await supabaseAdmin
         .from('users')
         .select('*')
         .eq('auth_id', userId)
@@ -231,7 +234,7 @@ app.post('/api/chat', async (req, res) => {
       });
 
       // Update user data
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from('users')
         .update({
           tokens_monthly: updatedTokens.tokens_monthly,
