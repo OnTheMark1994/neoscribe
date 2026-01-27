@@ -1,0 +1,11 @@
+.sf-topbar-left {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.sf-logo-icon {
+  height: 40px;
+  margin-right: 12px;
+  align-self: center; /* Ensures icon centers within flex container */
+}

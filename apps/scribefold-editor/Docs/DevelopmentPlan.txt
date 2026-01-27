@@ -160,6 +160,14 @@ Phases:
 
     web opps 
         the render.com from the correct apps/ folders 
+            project for each 
+            env variables for each 
+            test each 
+            
+            api 
+            web portal
+            editor 
+        
         the github build pipeline that places the downloadables onto the web portal 
     
     security

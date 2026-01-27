@@ -69,10 +69,11 @@ const keyBuffer = createKeyBuffer(ENCRYPTION_KEY);
 // Allow web portal and local dev clients to call this server
 app.use(cors({
   origin: [
-    'http://localhost:3001', // Web portal local dev
-    'http://localhost:3000', // Web portal local dev (alternate port)
+    'https://scribefold-editor.onrender.com', // Editor prod
     'https://scribefold-ai-monorepo.onrender.com', // Web portal prod
-    'http://localhost:8080', // API local dev
+    'http://localhost:3000', // Editor local dev
+    'http://localhost:3001', // Web portal local dev
+    'http://localhost:8080' // API local dev
   ],
   credentials: true
 }));

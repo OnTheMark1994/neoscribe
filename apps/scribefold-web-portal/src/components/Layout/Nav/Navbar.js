@@ -1,13 +1,22 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import AuthButton from './AuthButton';
+import "./Navbar.css"
 
 export default function Navbar() {
   return (
     <header className="sf-topbar">
       <div className="sf-topbar-left">
-        <NavLink to="/" className="sf-logo-text">
-          ScribeFold AI
+        <NavLink to="/" className="sf-logo-text" style={{ display: 'flex', justifyContent: 'center' }}>
+          <img 
+            src="/images/scribefold-ai-icon-png.png" 
+            alt="ScribeFold AI"
+            className="sf-logo-icon"
+            style={{ height: '40px', marginRight: '12px' }}
+          />
+          <div style={{marginTop:"10px"}}>
+            ScribeFold AI
+          </div>
         </NavLink>
       </div>
       <nav className="sf-nav">
