@@ -1,6 +1,6 @@
 {
   "name": "scribefold-editor",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "ScribeFold AI - A foldable section text editor with AI assistance built with Electron and React",
   "author": "",
   "private": true,
@@ -56,7 +56,8 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
-    "electron-builder": "^24.13.3",
+    "electron": "28.1.0",
+    "electron-builder": "24.13.3",
     "wait-on": "^9.0.3"
   },
   "eslintConfig": {
