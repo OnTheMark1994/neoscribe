@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd apps/scribefold-editor
-          npm ci
+          npm install
       - name: Verify version matches tag
         run: |
           $PKG_VERSION = node -p "require('./apps/scribefold-editor/package.json').version"
@@ -59,7 +59,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd apps/scribefold-editor
-          npm ci
+          npm install
       - name: Verify version matches tag
         run: |
           PKG_VERSION=$(node -p "require('./apps/scribefold-editor/package.json').version")
@@ -96,7 +96,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd apps/scribefold-editor
-          npm ci
+          npm install
       - name: Verify version matches tag
         run: |
           PKG_VERSION=$(node -p "require('./apps/scribefold-editor/package.json').version")
