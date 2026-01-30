@@ -19,10 +19,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Log environment (Windows)
+        run: |
+          echo "=== GitHub context (Windows) ==="
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Job: ${{ github.job }}"
+          echo "Ref: ${{ github.ref }} (name: ${{ github.ref_name }})"
+          echo "Actor: ${{ github.actor }}"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Node version:"
+          node -v
+          echo "NPM version:"
+          npm -v
       - name: Install dependencies
         run: |
+          echo "=== Before npm install (Windows) ==="
+          pwd
+          ls
           cd apps/scribefold-editor
+          echo "Now in:"
+          pwd
+          echo "Listing project files:"
+          ls
+          echo "NPM config:"
+          npm config list
+          echo "Running npm install..."
           npm install
+          echo "npm install exit code: $LASTEXITCODE"
+          echo "Top-level node_modules entries (if present):"
+          if (Test-Path "node_modules") { Get-ChildItem node_modules | Select-Object -First 20 }
       - name: Verify version matches tag
         run: |
           $PKG_VERSION = node -p "require('./apps/scribefold-editor/package.json').version"
@@ -33,19 +58,30 @@ jobs:
             Write-Error "Version mismatch! Git tag '$GIT_TAG' does not match package.json version 'v$PKG_VERSION'"
             exit 1
           }
-          echo "✓ Version verified: v$PKG_VERSION"
+          echo "Version verified: v$PKG_VERSION"
       - name: Build Windows
         env:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "=== Starting Windows build ==="
           cd apps/scribefold-editor
+          echo "PWD:"
+          pwd
+          echo "Listing release dir before build (if any):"
+          if (Test-Path "release") { Get-ChildItem release }
+          echo "Running npm run build:win..."
           npm run build:win
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+          echo "Build exit code: $LASTEXITCODE"
+          echo "Listing release dir after build (if present):"
+          if (Test-Path "release") { Get-ChildItem release }
+      - name: Upload Windows build to Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: windows-exe
-          path: apps/scribefold-editor/release/*.exe
+          files: apps/scribefold-editor/release/*.exe
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
     needs: build-windows  # Run after Windows
@@ -76,13 +112,23 @@ jobs:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "=== Starting macOS build ==="
           cd apps/scribefold-editor
+          echo "PWD: $(pwd)"
+          echo "Listing release dir before build (if any):"
+          [ -d release ] && ls -al release || echo "release directory does not exist yet"
+          echo "Running npm run build:mac..."
           npm run build:mac
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+          echo "Build exit code: $?"
+          echo "Listing release dir after build (if present):"
+          [ -d release ] && ls -al release || echo "release directory still missing"
+      - name: Upload macOS build to Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: macos-dmg
-          path: apps/scribefold-editor/release/*.dmg
+          files: apps/scribefold-editor/release/*.dmg
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-linux:
     needs: build-macos  # Run after macOS
@@ -113,33 +159,21 @@ jobs:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "=== Starting Linux build ==="
           cd apps/scribefold-editor
+          echo "PWD: $(pwd)"
+          echo "Listing release dir before build (if any):"
+          [ -d release ] && ls -al release || echo "release directory does not exist yet"
+          echo "Running npm run build:linux..."
           npm run build:linux
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-appimage
-          path: apps/scribefold-editor/release/*.AppImage
-
-  create-release:
-    needs: [build-windows, build-macos, build-linux]  # Require all builds to succeed
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - name: Create GitHub Release
+          echo "Build exit code: $?"
+          echo "Listing release dir after build (if present):"
+          [ -d release ] && ls -al release || echo "release directory still missing"
+      - name: Upload Linux build to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            artifacts/windows-exe/*
-            artifacts/macos-dmg/*
-            artifacts/linux-appimage/*
+          files: apps/scribefold-editor/release/*.AppImage
           generate_release_notes: false
-          body: ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
