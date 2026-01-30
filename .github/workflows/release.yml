@@ -84,7 +84,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-linux:
-    needs: build-macos  # Run after macOS
+    needs: build-windows  # Run after windows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +131,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
-    needs: build-windows  # Run after Windows
+    needs: build-linux  # Run after linux
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
