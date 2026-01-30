@@ -117,6 +117,10 @@ app.use('/auto', autoEndpoints);
 const healthEndpoints = require('./healthEndpoints');
 app.use('/', healthEndpoints);
 
+// Use releases endpoints router
+const dataEndpoints = require('./dataEndpoints');
+app.use('/data', dataEndpoints);
+
 // Serve static files from public folder (must be after custom routes)
 app.use(express.static('public'));
 

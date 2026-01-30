@@ -83,53 +83,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-macos:
-    needs: build-windows  # Run after Windows
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install dependencies
-        run: |
-          cd apps/scribefold-editor
-          npm install
-      - name: Verify version matches tag
-        run: |
-          PKG_VERSION=$(node -p "require('./apps/scribefold-editor/package.json').version")
-          GIT_TAG="${{ github.ref_name }}"
-          echo "Package version: $PKG_VERSION"
-          echo "Git tag: $GIT_TAG"
-          if [ "$GIT_TAG" != "v$PKG_VERSION" ]; then
-            echo "❌ Version mismatch! Git tag '$GIT_TAG' does not match package.json version 'v$PKG_VERSION'"
-            exit 1
-          fi
-          echo "✓ Version verified: v$PKG_VERSION"
-      - name: Build macOS
-        env:
-          CI: false
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "=== Starting macOS build ==="
-          cd apps/scribefold-editor
-          echo "PWD: $(pwd)"
-          echo "Listing release dir before build (if any):"
-          [ -d release ] && ls -al release || echo "release directory does not exist yet"
-          echo "Running npm run build:mac..."
-          npm run build:mac
-          echo "Build exit code: $?"
-          echo "Listing release dir after build (if present):"
-          [ -d release ] && ls -al release || echo "release directory still missing"
-      - name: Upload macOS build to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: apps/scribefold-editor/release/*.dmg
-          generate_release_notes: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   build-linux:
     needs: build-macos  # Run after macOS
     runs-on: ubuntu-latest
@@ -177,3 +130,49 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  build-macos:
+    needs: build-windows  # Run after Windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          cd apps/scribefold-editor
+          npm install
+      - name: Verify version matches tag
+        run: |
+          PKG_VERSION=$(node -p "require('./apps/scribefold-editor/package.json').version")
+          GIT_TAG="${{ github.ref_name }}"
+          echo "Package version: $PKG_VERSION"
+          echo "Git tag: $GIT_TAG"
+          if [ "$GIT_TAG" != "v$PKG_VERSION" ]; then
+            echo "❌ Version mismatch! Git tag '$GIT_TAG' does not match package.json version 'v$PKG_VERSION'"
+            exit 1
+          fi
+          echo "✓ Version verified: v$PKG_VERSION"
+      - name: Build macOS
+        env:
+          CI: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== Starting macOS build ==="
+          cd apps/scribefold-editor
+          echo "PWD: $(pwd)"
+          echo "Listing release dir before build (if any):"
+          [ -d release ] && ls -al release || echo "release directory does not exist yet"
+          echo "Running npm run build:mac..."
+          npm run build:mac
+          echo "Build exit code: $?"
+          echo "Listing release dir after build (if present):"
+          [ -d release ] && ls -al release || echo "release directory still missing"
+      - name: Upload macOS build to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: apps/scribefold-editor/release/*.dmg
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
