@@ -101,12 +101,12 @@
         "zip",
         "dir"
       ],
-      "icon": "public/icon.icns",
+      "icon": "public/icon.png",
       "artifactName": "${productName}-${version}.${ext}",
       "sign": null
     },
     "linux": {
-      "icon": "public/scribefold-ai-icon-256.png",
+      "icon": "public/icon.png",
       "target": "AppImage",
       "category": "Utility",
       "artifactName": "${productName}-${version}.${ext}"
