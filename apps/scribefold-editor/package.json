@@ -97,7 +97,7 @@
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "mac": {
-      "target": "dmg",
+      "target": ["zip", "dir"],
       "icon": "public/icon.icns",
       "artifactName": "${productName}-${version}.${ext}",
       "sign": null

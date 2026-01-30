@@ -172,7 +172,7 @@ jobs:
       - name: Upload macOS build to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: apps/scribefold-editor/release/*.dmg
+          files: apps/scribefold-editor/release/*.zip
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
