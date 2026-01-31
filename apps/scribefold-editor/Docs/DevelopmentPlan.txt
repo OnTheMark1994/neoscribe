@@ -97,7 +97,6 @@ Phases:
         ctrl f
         spell check
 
-
     connecting code mirror and ai chat responses (done)
         logging just shown parts with ids
         getting response based on that
@@ -117,27 +116,34 @@ Phases:
         little bugs like next/prev wrapping etc
 
     2 days
-    deployment environment
-    render.com 
-        api (done)
-            create web service from apps/scribefold-api with same settins as other api (done)
-            test in url (running)
-        web build
-            create static site with apps/scribefold-editor 
-        web portal
-            ensure it points to the correct web build 
-                test
-                    api (running)
-                    web build 
-            downloads 
-                from yaml and script 
-                windows, linux, mac  
-        web build 
-            working in web, linked from the web portal 
+    dev ops (todo: remove monorepo structure?, testing)
+        render.com 
+            api (done)
+                create web service from apps/scribefold-api with same settins as other api (done)
+                test in url (running)
+            web build
+                create static site with apps/scribefold-editor 
+            web portal
+                ensure it points to the correct web build 
+                    test
+                        api (running)
+                        web build 
+                downloads 
+                    from yaml and script 
+                    windows, linux, mac  
+            web build 
+                working in web, linked from the web portal 
+        testing (todo)
+            test installs:
+                windows 
+                linux
+                mac
+        github build pipeline that places the downloadables onto the web portal (done)
+            todo: test download installs on each os 
+        maybe move away from monorepo
         
-
     1 week
-    server functionality (partially done)
+    server functionality (todo: stripe webhooks)
         chat api (done)
             sends proper response 
             tokens 
@@ -157,33 +163,21 @@ Phases:
         stripe  (todo)
             montly  
             one time 
-
-    web opps 
-        the render.com from the correct apps/ folders 
-            project for each 
-            env variables for each 
-            test each 
-            
-            api 
-            web portal
-            editor 
         
-        the github build pipeline that places the downloadables onto the web portal 
-    
-    security
+    security (done, todo: re-check)
         supabase table rls (done)
-        scan through for vulnerabilities (did some)
+        scan through for vulnerabilities (do more of this)
             maybe add rate limiting for the account creation or magic links from same ip
             also shold make it so go to web portal is not clickable while processing so multiples are not created 
                 (and maybe a processing message for that) 
 
-
     1 week
     referrals feature
-        Tracking
+        Tracking referred by 
             when user downloads application referral id is tracked somehow
             maybe from their ip on download, and then if they use from that ip for first time around the same time with granted credits we can link that account to that ref id
             and then if they subscribe we will know where the referral came from
+            maybe save in the storage of the device then the first user to log in there is associated with that referrer by adding the ref id in the users data 
         Dashboard
             have referral accounts
             show 
@@ -204,6 +198,9 @@ Phases:
     
     cleanup 
         settings tabs orgaization
+        remoce logs 
+        unused files
+        clean up codebase  
 
     2 days
     the desktop on start reminder      

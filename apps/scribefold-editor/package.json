@@ -60,6 +60,10 @@
     "electron-builder": "24.13.3",
     "wait-on": "^9.0.3"
   },
+  "resolutions": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
   "eslintConfig": {
     "extends": [
       "react-app",
