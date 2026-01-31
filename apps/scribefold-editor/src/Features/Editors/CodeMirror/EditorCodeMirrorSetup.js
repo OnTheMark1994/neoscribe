@@ -2,9 +2,9 @@ import { foldGutter, foldService } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
 import { StateField, Facet } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
-import AiShowIcon from '../scribefold-ai-eye.png';           // Full color: actively shared
-import AiShowGreyIcon from '../scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
-import AiHideIcon from '../eye.ico';   // Dimmed: inherited hidden
+import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Full color: actively shared
+import AiShowGreyIcon from '../../../images/scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
+import AiHideIcon from '../../../images/scribefold-ai-eye-crossed-out.png';   // Explicitly hidden
 // import AiHideIcon from '../scribefold-ai-eye-slash.png';      // Explicitly hidden
 
 // Helper: count leading whitespace length

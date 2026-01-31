@@ -1,9 +1,14 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateSetting } from '../../Global/ReduxSlices/SettingsSlice';
-import AiEyeIcon from '../Editors/EditorMonaco/scribefold-ai-eye.png';
+import AiEyeIcon from '../../images/scribefold-ai-eye.png';
 import './AiChatToggle.css';
+/*
+  At the top right when ai chat is off 
+  does not show in full screen mode
+  its non intrusive but allows user to remember they can use the ai chat
 
+*/
 export default function AiChatToggle() {
   const dispatch = useDispatch();
   const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);

@@ -29,17 +29,8 @@ export default function RightClickWindow() {
 
     const handleClickOutside = (event) => {
       
-      // Skip if we're ignoring this click (the one that opened the window)
-      // if(ignoreNextClickRef.current){
-      //   ignoreNextClickRef.current = false
-      //   return
-      // }
-
-      // dispatch(closeRightClickWindow());
       if (elementRef.current && event.target !== elementRef.current){
         closeWindow()
-      }else{
-        console.log("not closing")
       }
     };
 

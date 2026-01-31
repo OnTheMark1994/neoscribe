@@ -27,11 +27,6 @@ export default function AiChatLoginBox() {
   // Redux state - single object for account created message
   const accountCreatedMessage = useSelector(state => state.userSlice.accountCreatedMessage);
 
-  // Debug logging
-  console.log('[AiChatLoginBox] Supabase client:', supabase ? 'AVAILABLE' : 'NULL');
-  console.log('[AiChatLoginBox] REACT_APP_SUPABASE_URL:', process.env.REACT_APP_SUPABASE_URL ? 'SET' : 'MISSING');
-  console.log('[AiChatLoginBox] REACT_APP_SUPABASE_ANON_KEY:', process.env.REACT_APP_SUPABASE_ANON_KEY ? 'SET' : 'MISSING');
-
   const handleLogin = async (e) => {
     e.preventDefault();
     
@@ -89,8 +84,6 @@ export default function AiChatLoginBox() {
         body: JSON.stringify({ email, password }),
       });
 
-      console.log("createa account response", response)
-
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -103,7 +96,6 @@ export default function AiChatLoginBox() {
         email,
         password,
       });
-      console.log("signInWithPassword: ", authData)
 
       if (signInError) {
         setStatus(`Error: ${signInError.message}`);

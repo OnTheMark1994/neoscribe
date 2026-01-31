@@ -329,7 +329,6 @@ export default function TopBar({ editorRef }) {
               <div className="topBarDropdown">
                 <button
                   onClick={() => {
-                    console.log("top bar click")
                     dispatch(updateSetting({key: "aiModeActive", value: !aiModeActive}));
                     closeMenu();
                   }}

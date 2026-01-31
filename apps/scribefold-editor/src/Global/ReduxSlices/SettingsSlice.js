@@ -96,17 +96,13 @@ mod the things a described in the ( areas
    name: 'settingsSlice',
    initialState,
    reducers: {
+    // Should not be using this, use updateSetting
      setSettingsObject(state, action) {
-      console.log("setSettingsObject", action.payload)
-       // Bulk replace settingsObject.
-       // This is useful for initialization, imports, or any future "load settings" flow.
-       // We persist immediately so localStorage stays in sync with redux state.
        const nextSettingsObject = action.payload ?? defaultSettingsObject;
        state.settingsObject = nextSettingsObject;
        saveSettingsObjectToLocalStorage(nextSettingsObject);
      },
      updateSetting(state, action) {
-        console.log("updateSetting", "x"+action.payload+"x")
        const { key, value } = action.payload || {};
        if (!key) return;
 

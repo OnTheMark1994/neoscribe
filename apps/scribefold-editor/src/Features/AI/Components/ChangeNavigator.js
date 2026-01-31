@@ -32,7 +32,6 @@ function ChangeNavigator() {
 
   // Hilights and scrolls to an index
   const selectIndex = (index) => {
-    console.log("selecging index", index)
     setCurrentIndex(index)
 
     // Clear all highlights

@@ -32,24 +32,16 @@ export default function SettingsDeveloper() {
     const key = Array.from(crypto.getRandomValues(new Uint8Array(32)))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
-    console.log('ENCRYPTION KEY:', key);
-    console.log('Add to .env: ENCRYPTION_KEY=' + key);
     setEncryptionKey(key);
   };
 
   const handleTestAutoLogin = async (method) => {
-    console.log('[AutoLogin Test] BUTTON CLICKED for method:', method);
-    console.log('[AutoLogin Test] Auth user:', authUser?.id);
-
     if (!authUser?.id) {
       console.error('[AutoLogin Test] You must be logged in to test auto-login');
       return;
     }
 
     try {
-      console.log('[AutoLogin Test] ENV API_BASE_URL:', API_BASE_URL);
-      console.log('[AutoLogin Test] ENV WEB_PORTAL_URL:', WEB_PORTAL_URL);
-      console.log('[AutoLogin Test] Getting session...');
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('Not logged in');
@@ -68,15 +60,10 @@ export default function SettingsDeveloper() {
         autoLoginPath = '/auto-login-magiclink-enc';
       }
 
-      console.log('[AutoLogin Test] Calling API endpoint:', `${API_BASE_URL}${apiEndpoint}`);
       const response = await fetch(`${API_BASE_URL}${apiEndpoint}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-
-      console.log('[AutoLogin Test] Response status:', response.status);
-      const cloned1 = response.clone();
-      try { console.log('[AutoLogin Test] Raw response text:', await cloned1.text()); } catch {}
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -85,25 +72,17 @@ export default function SettingsDeveloper() {
       }
 
       const data = await response.json();
-      console.log('[AutoLogin Test] API response data (parsed JSON):', JSON.stringify(data, null, 2));
-      console.log('[AutoLogin Test] API response keys:', Object.keys(data));
-      console.log('[AutoLogin Test] API response token:', data.token);
 
       const { token } = data;
 
       if (!token) {
-        console.error('[AutoLogin Test] No token in response:', data);
+        console.error('[AutoLogin Test] No token returned from API');
         return;
       }
 
-      console.log('[AutoLogin Test] Token generated, length:', token.length);
-
-      // Normalize base URL to ensure it includes a scheme (http://) to avoid browser launch errors
       const baseUrl = /^https?:\/\//i.test(WEB_PORTAL_URL) ? WEB_PORTAL_URL : `http://${WEB_PORTAL_URL}`;
       const url = `${baseUrl}/#${autoLoginPath}?token=${token}`;
-      console.log('[AutoLogin Test] Opening URL:', url);
       await openUrlInBrowser(url);
-      console.log('[AutoLogin Test] Window opened');
     } catch (error) {
       console.error('[AutoLogin Test] Error:', error.message);
     }
@@ -120,7 +99,6 @@ export default function SettingsDeveloper() {
     setSendTokenEmailMessage('Sending magic link email...');
 
     try {
-      console.log('[Send Token Email] Calling /dev/send-magiclink-email...');
       const emailResponse = await fetch(`${API_BASE_URL}/dev/send-magiclink-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

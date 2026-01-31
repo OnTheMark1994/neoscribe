@@ -22,8 +22,6 @@ export default function AiChatNoTokensBox() {
       return;
     }
 
-    console.log('[AiChatNoTokensBox] Getting current session from Supabase...');
-
     // Get current session from Supabase client
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
@@ -32,9 +30,6 @@ export default function AiChatNoTokensBox() {
     }
 
     const accessToken = session.access_token;
-    console.log('[AiChatNoTokensBox] Access token:', accessToken.substring(0, 20) + '...');
-
-    console.log('[AiChatNoTokensBox] Calling /auto/generate-encrypted-login-token...');
 
     try {
       const response = await fetch(`${API_BASE_URL}/auto/generate-encrypted-login-token`, {
@@ -45,7 +40,6 @@ export default function AiChatNoTokensBox() {
       });
 
       const data = await response.json();
-      console.log('[AiChatNoTokensBox] API response:', data);
 
       if (response.status !== 200) {
         const errorText = await response.text();
@@ -54,14 +48,11 @@ export default function AiChatNoTokensBox() {
       }
 
       const { token } = data;
-      console.log('[AiChatNoTokensBox] Token generated, length:', token?.length);
 
       // Normalize base URL to ensure it includes a scheme (http://) to avoid browser launch errors
       const baseUrl = /^https?:\/\//i.test(WEB_PORTAL_URL) ? WEB_PORTAL_URL : `http://${WEB_PORTAL_URL}`;
       const url = `${baseUrl}/#/auto-login-magiclink-enc?token=${token}`;
-      console.log('[AiChatNoTokensBox] Opening URL:', url);
       await openUrlInBrowser(url);
-      console.log('[AiChatNoTokensBox] Window opened');
     } catch (err) {
       console.error('[AiChatNoTokensBox] Error:', err);
     }

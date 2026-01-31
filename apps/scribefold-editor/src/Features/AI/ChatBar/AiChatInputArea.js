@@ -20,7 +20,7 @@ import { setShowSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import { toggleShowDiffView, setShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
 import { updateAvailableTokens } from '../../../Global/ReduxSlices/UserSlice';
 import { getAIVisibleLinesFromEditor } from '../../../Global/EditorRefHelpers';
-import { lineIdState } from '../../Editors/EditorMonaco/CodeMirror/EditorCodeMirrorSetup';
+import { lineIdState } from '../../Editors/CodeMirror/EditorCodeMirrorSetup';
 import { supabase } from '../../../Global/SupabaseClient';
 import './AiChatInputArea.css';
 
@@ -135,7 +135,6 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
     const content = String(inputRef.current?.value ?? '').trim();
     // Don't send empty messages.
     if (!content) {
-      console.log("No prompt text, returning.")
       return
     };
 
@@ -227,7 +226,6 @@ export default function AiChatInputArea({ editorRef, originalDocRef }) {
 
       // If there are no usable proposed changes, stop here.
       if (!Array.isArray(parsedResult?.changes) || parsedResult.changes.length === 0) {
-        console.log('[AI Chat] No proposed changes found in response');
         return;
       }
 

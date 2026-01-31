@@ -24,7 +24,6 @@ export default function SettingsAccount() {
 
   const handleLogout = async () => {
     if (!supabase) {
-      console.log("sign out error: !supabase")
       return;
     }
     try {
@@ -33,10 +32,10 @@ export default function SettingsAccount() {
       localStorage.removeItem(`sb-${process.env.REACT_APP_SUPABASE_PROJECT_REF}-auth-token`);
       window.location.reload();
       if (error) {
-        console.log("sign out error: ", error)
+        console.error('Sign out error:', error);
       }
     } catch (error) {
-      console.log("sign out error: ", error)
+      console.error('Sign out error:', error);
     }
   };
 

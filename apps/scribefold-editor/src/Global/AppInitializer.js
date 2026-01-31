@@ -36,21 +36,14 @@ export default function AppInitializer({ editorRef }) {
   // Load user data from database
   async function loadUserData() {
     if (!authUser?.id) {
-      console.log('[AppInitializer] No auth user, skipping user data load');
       return;
     }
 
     try {
-      console.log('[AppInitializer] Loading user data for:', authUser.id);
       dispatch(setUserDataLoading(true));
 
       // Get current session from Supabase client
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('[AppInitializer] Session check:', {
-        hasSession: !!session,
-        hasAccessToken: !!session?.access_token,
-        sessionError: sessionError?.message
-      });
 
       if (sessionError || !session) {
         console.error('[AppInitializer] No valid session:', sessionError);
@@ -59,10 +52,8 @@ export default function AppInitializer({ editorRef }) {
       }
 
       const accessToken = session.access_token;
-      console.log('[AppInitializer] Access token length:', accessToken?.length);
 
       const apiUrl = `${API_BASE_URL}/auth/user-data`;
-      console.log('[AppInitializer] POST URL:', apiUrl);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -72,8 +63,6 @@ export default function AppInitializer({ editorRef }) {
         },
       });
 
-      console.log('[AppInitializer] User data response status:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[AppInitializer] Failed to load user data:', response.status, errorText);
@@ -82,7 +71,6 @@ export default function AppInitializer({ editorRef }) {
       }
 
       const data = await response.json();
-      console.log('[AppInitializer] User data loaded:', data);
 
       if (data.success && data.userData) {
         dispatch(setUserData(data.userData));
@@ -113,7 +101,6 @@ export default function AppInitializer({ editorRef }) {
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, newSession) => {
-          console.log("onAuthStateChange: ", newSession)
           dispatch(setAuthUser(newSession?.user ?? null));
         });
 

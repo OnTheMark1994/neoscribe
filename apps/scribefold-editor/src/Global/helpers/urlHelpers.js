@@ -4,22 +4,15 @@
  * @param {string} url - The URL to open
  */
 export async function openUrlInBrowser(url) {
-  console.log('[openUrlInBrowser] Opening URL:', url);
-  console.log('[openUrlInBrowser] window.electronAPI available:', !!window.electronAPI);
-  console.log('[openUrlInBrowser] openExternal available:', !!window.electronAPI?.openExternal);
-
   // Use Electron's shell.openExternal if running in Electron, otherwise use window.open
   if (window.electronAPI?.openExternal) {
-    console.log('[openUrlInBrowser] Using electronAPI.openExternal to open in system browser');
     try {
       await window.electronAPI.openExternal(url);
-      console.log('[openUrlInBrowser] Successfully opened in system browser');
     } catch (err) {
       console.error('[openUrlInBrowser] Failed to open with electronAPI:', err);
       window.open(url, '_blank');
     }
   } else {
-    console.log('[openUrlInBrowser] electronAPI.openExternal not available, using window.open');
     window.open(url, '_blank');
   }
 }
@@ -54,8 +47,6 @@ export async function openWebPortalWithAutoLogin(supabase, authUser) {
     return false;
   }
 
-  console.log('[openWebPortalWithAutoLogin] Getting current session from Supabase...');
-
   // Get current session from Supabase client
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !session) {
@@ -64,9 +55,6 @@ export async function openWebPortalWithAutoLogin(supabase, authUser) {
   }
 
   const accessToken = session.access_token;
-  console.log('[openWebPortalWithAutoLogin] Access token:', accessToken.substring(0, 20) + '...');
-
-  console.log('[openWebPortalWithAutoLogin] Calling /auto/generate-encrypted-login-token...');
 
   try {
     const response = await fetch(`${API_BASE_URL}/auto/generate-encrypted-login-token`, {
@@ -77,7 +65,6 @@ export async function openWebPortalWithAutoLogin(supabase, authUser) {
     });
 
     const data = await response.json();
-    console.log('[openWebPortalWithAutoLogin] API response:', data);
 
     if (response.status !== 200) {
       const errorText = await response.text();
@@ -86,14 +73,11 @@ export async function openWebPortalWithAutoLogin(supabase, authUser) {
     }
 
     const { token } = data;
-    console.log('[openWebPortalWithAutoLogin] Token generated, length:', token?.length);
 
     // Normalize base URL to ensure it includes a scheme (http://) to avoid browser launch errors
     const baseUrl = /^https?:\/\//i.test(WEB_PORTAL_URL) ? WEB_PORTAL_URL : `http://${WEB_PORTAL_URL}`;
     const url = `${baseUrl}/#/auto-login-magiclink-enc?token=${token}`;
-    console.log('[openWebPortalWithAutoLogin] Opening URL:', url);
     await openUrlInBrowser(url);
-    console.log('[openWebPortalWithAutoLogin] Window opened');
     return true;
   } catch (err) {
     console.error('[openWebPortalWithAutoLogin] Error:', err);

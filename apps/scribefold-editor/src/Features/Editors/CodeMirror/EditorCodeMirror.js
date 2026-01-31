@@ -80,7 +80,7 @@
 
 import React, { useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { toggleShowDiffView, setShowDiffView, setModified } from '../../../../Global/ReduxSlices/EditorSlice';
+import { toggleShowDiffView, setShowDiffView, setModified } from '../../../Global/ReduxSlices/EditorSlice';
 import CodeMirror from '@uiw/react-codemirror';
 import { getOriginalDoc, unifiedMergeView } from '@codemirror/merge';
 import { EditorView } from '@codemirror/view';

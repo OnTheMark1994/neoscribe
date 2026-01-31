@@ -1,4 +1,4 @@
-import { lineIdState } from '../Features/Editors/EditorMonaco/CodeMirror/EditorCodeMirrorSetup';
+import { lineIdState } from '../Features/Editors/CodeMirror/EditorCodeMirrorSetup';
 
 export function getEditorText(editorRef) {
   console.log('[EditorRefHelpers] getEditorText called');
