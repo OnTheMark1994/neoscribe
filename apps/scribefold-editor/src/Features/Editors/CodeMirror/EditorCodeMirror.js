@@ -1,6 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { toggleShowDiffView, setShowDiffView, setModified } from '../../../Global/ReduxSlices/EditorSlice';
+import { openRightClickWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import CodeMirror from '@uiw/react-codemirror';
 import { getOriginalDoc, unifiedMergeView } from '@codemirror/merge';
 import { EditorView } from '@codemirror/view';
@@ -13,6 +14,16 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
   const dispatch = useDispatch();
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const showDiffView = useSelector(state => state.editorSlice.showDiffView);
+
+  // Handle context menu to show right-click window
+  const handleContextMenu = useCallback((event) => {
+    event.preventDefault();
+    dispatch(openRightClickWindow({
+      left: event.clientX,
+      top: event.clientY,
+      type: 'context'
+    }));
+  }, [dispatch]);
 
   // Listener to detect accept/reject actions in the merge view and exit diff mode
   const acceptRevertListener = EditorView.updateListener.of((update) => {
@@ -58,7 +69,7 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
   ];
 
   return (
-    <div className="scribefold-codemirror">
+    <div className="scribefold-codemirror" onContextMenu={handleContextMenu}>
       <MinimalSearchBar editorRef={editorRef} visible={true}></MinimalSearchBar>
       <CodeMirror
         basicSetup={false}

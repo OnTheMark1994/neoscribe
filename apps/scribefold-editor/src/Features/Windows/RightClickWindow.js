@@ -1,7 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import "./RightClickWindow.css"
-import { closeRightClickWindow } from '../../Global/ReduxSlices/WindowSlice';
+import { closeRightClickWindow, setShowSettingsWindow } from '../../Global/ReduxSlices/WindowSlice';
+
+// Default menu options to show when no custom options are provided
+const DEFAULT_OPTIONS = [
+  {
+    title: 'Settings',
+    onClick: (dispatch) => dispatch(setShowSettingsWindow(true))
+  },
+  {
+    title: 'Cancel',
+    onClick: (dispatch) => dispatch(closeRightClickWindow())
+  }
+];
 
 export default function RightClickWindow() {
   const dispatch = useDispatch();
@@ -13,8 +25,9 @@ export default function RightClickWindow() {
   const left = useSelector(state => state.windowSlice.rightClickWindowLeft) 
   const top = useSelector(state => state.windowSlice.rightClickWindowTop) 
   
-  // Get the array from the optionsArrays based on the redux.windowSlice.optionsType 
-  const options = []
+  // Get the menu options from Redux state, use defaults if null or empty
+  const options = useSelector(state => state.windowSlice.rightClickMenuOptions) || []
+  const displayOptions = options?.length > 0 ? options : DEFAULT_OPTIONS;
 
   function closeWindow(){
     ignoreNextClickRef.current = true
@@ -29,7 +42,7 @@ export default function RightClickWindow() {
 
     const handleClickOutside = (event) => {
       
-      if (elementRef.current && event.target !== elementRef.current){
+      if (elementRef.current && !elementRef.current.contains(event.target)){
         closeWindow()
       }
     };
@@ -74,7 +87,7 @@ export default function RightClickWindow() {
         e.stopPropagation();
       }}
     >
-      {options.map((option, i) => (
+      {displayOptions.map((option, i) => (
         <div 
           className="rightClickOption" 
           key={i}
@@ -82,9 +95,9 @@ export default function RightClickWindow() {
             e.preventDefault()
             e.stopPropagation();
             // Call option's onClick if it exists
-            if (option.onClick) option.onClick();
+            if (option.onClick) option.onClick(dispatch);
             // Close the window after action
-            dispatch({ type: 'windowSlice/closeRightClickMenu' });
+            dispatch(closeRightClickWindow());
           }}
         >
           {option.title}

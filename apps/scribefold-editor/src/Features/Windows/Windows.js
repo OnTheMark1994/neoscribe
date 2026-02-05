@@ -17,7 +17,7 @@ export default function Windows({ editorRef }) {
   return (
     <>
       <SettingsWindow/>
-      {/* <RightClickWindow/> */}
+      <RightClickWindow/>
       <SaveBeforeClosingWindow/>
       <HelpWindow/>
       <AiChatMessageDetail/>

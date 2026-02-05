@@ -19,6 +19,7 @@ const initialState = {
   rightClickWindowType: null,
   rightClickWindowLeft: 0,
   rightClickWindowTop: 0,
+  rightClickMenuOptions: [],
 
   // File encryption
   showFileEncryptionWindow: false,
@@ -72,16 +73,21 @@ const windowSlice = createSlice({
     },
     // Opens on mous click with event data for positioning
     openRightClickWindow(state, action) {
-      const { left = 0, top = 0, type = null } = action.payload || {};
+      const { left = 0, top = 0, type = null, options = [] } = action.payload || {};
       state.showRightClickWindow = true;
       state.rightClickWindowLeft = left;
       state.rightClickWindowTop = top;
       state.rightClickWindowType = type;
+      state.rightClickMenuOptions = options;
     },
     // Close the right click menu
     closeRightClickWindow(state) {
       state.showRightClickWindow = false;
       state.rightClickWindowType = null;
+    },
+    // Set right click menu options
+    setRightClickMenuOptions(state, action) {
+      state.rightClickMenuOptions = action.payload || [];
     },
 
     setShowFileEncryptionWindow(state, action) {
@@ -114,6 +120,7 @@ export const {
   setShowHelpWindow,
   openRightClickWindow,
   closeRightClickWindow,
+  setRightClickMenuOptions,
   setShowFileEncryptionWindow,
 } = windowSlice.actions;
 
