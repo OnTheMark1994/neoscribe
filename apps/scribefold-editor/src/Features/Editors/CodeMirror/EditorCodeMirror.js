@@ -43,6 +43,7 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
       settingsObject?.aiModeActive,
       {
         showLineNumbers: settingsObject?.showMonacoLineNumbers,
+        spellcheckEnabled: settingsObject?.spellcheckEnabled,
       }
     ),
     acceptRevertListener,

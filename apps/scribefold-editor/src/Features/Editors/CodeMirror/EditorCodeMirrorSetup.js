@@ -234,7 +234,13 @@ const aiShareGutter = gutter({
 export { lineIdState };
 export function buildExtensions(onChange, aiModeActive, options = {}) {
   const showLineNumbers = !!options.showLineNumbers;
-  return [
+  const spellcheckEnabled = options.spellcheckEnabled !== false;
+  const spellcheckExtension = spellcheckEnabled
+    ? EditorView.contentAttributes.of({ spellcheck: "true" })
+    : null;
+
+  const extensions = [
+    ...(spellcheckExtension ? [spellcheckExtension] : []),
     lineIdState,
     ...(aiModeActive ? [aiShareGutter] : []),
     foldGutter({
@@ -286,6 +292,8 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
       }
     }),
   ];
+
+  return extensions;
 }
 
 export function createEditorView({ container, state }) {

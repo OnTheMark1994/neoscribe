@@ -39,6 +39,7 @@ mod the things a described in the ( areas
     showPreviewBar: true,
     aiModeActive: true,
     autoJumpToNextChunk: true,
+    spellcheckEnabled: true,
   };
 
  // Saves the settings object to localStorage.

@@ -18,6 +18,7 @@ export default function SettingsDisplay() {
   const showMonacoLineNumbers = settingsObject?.showMonacoLineNumbers !== false;
   const monacoStickyTopBar = settingsObject?.monacoStickyTopBar !== false;
   const showPreviewBar = settingsObject?.showPreviewBar !== false;
+  const spellcheckEnabled = settingsObject?.spellcheckEnabled !== false;
 
   const themes = [
     { label: 'Space Dreams', value: '/theme-images/spacedreams.jpg' },
@@ -117,6 +118,21 @@ export default function SettingsDisplay() {
           <ToggleSwitch
             on={showPreviewBar}
             onClick={() => dispatch(updateSetting({ key: 'showPreviewBar', value: !showPreviewBar }))}
+          />
+        </div>
+      </div>
+
+      <div className="settingsSection">
+        <div className="settingsSectionTitle">Editor</div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Enable spellcheck</div>
+            <div className="settingsRowLabelSub">Underline misspelled words in the editor.</div>
+          </div>
+          <ToggleSwitch
+            on={spellcheckEnabled}
+            onClick={() => dispatch(updateSetting({ key: 'spellcheckEnabled', value: !spellcheckEnabled }))}
           />
         </div>
       </div>

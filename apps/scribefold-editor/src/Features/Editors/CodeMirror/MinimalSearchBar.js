@@ -261,53 +261,44 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
 
       {showExtendedOptions && (
         <div className="minimal-search-bar-row-extended">
-          <input
-            ref={replaceInputRef}
-            type="text"
-            placeholder="Replace with..."
-            className="replace-input"
-            onChange={handleReplaceInput}
-          />
-
-          <button
-            onClick={handleReplaceNext}
-            title="Replace"
-            className="nav-button nav-button-svg"
-          >
-
-
-<svg width="60" height="25" viewBox="0 0 90 60" xmlns="http://www.w3.org/2000/svg">
-    <text x="12" y="36" font-family="monospace" font-size="32" fill="currentColor">a</text>
-    <text x="62" y="38" font-family="monospace" font-size="32" fill="currentColor">b</text>
-    <path d="M36 30 L58 30 M56 28 L60 30 L56 32" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-  
-  
+            <input
+                ref={replaceInputRef}
+                type="text"
+                placeholder="Replace with..."
+                className="replace-input"
+                onChange={handleReplaceInput}
+            />
+            <button
+                onClick={handleReplaceNext}
+                title="Replace"
+                className="nav-button nav-button-svg"
+            >
+                <svg width="60" height="25" viewBox="0 0 90 60" xmlns="http://www.w3.org/2000/svg">
+                    <text x="12" y="36" font-family="monospace" font-size="32" fill="currentColor">a</text>
+                    <text x="62" y="38" font-family="monospace" font-size="32" fill="currentColor">b</text>
+                    <path d="M36 30 L58 30 M56 28 L60 30 L56 32" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
             </button>
-
-          <button
-            onClick={handleReplaceAll}
-            title="Replace All"
-            className="nav-button nav-button-svg"
-          >
-
-            <svg width="70" height="25" viewBox="0 0 110 80" xmlns="http://www.w3.org/2000/svg">
-                <text x="12" y="28" font-family="monospace" font-size="28" fill="currentColor" opacity="0.7">A</text>
-                <text x="12" y="56" font-family="monospace" font-size="28" fill="currentColor" opacity="0.7">A</text>
-                <text x="72" y="28" font-family="monospace" font-size="28" fill="currentColor">B</text>
-                <text x="72" y="56" font-family="monospace" font-size="28" fill="currentColor">B</text>
-                <path d="M40 35 L66 35 M64 32 L68 35 L64 38" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-
-         </button>
-
-          <button
-            onClick={closeSearchBar}
-            title="Close (Esc)"
-            className="close-button"
-          >
-            ×
-          </button>
+            <button
+                onClick={handleReplaceAll}
+                title="Replace All"
+                className="nav-button nav-button-svg"
+            >
+                <svg width="70" height="25" viewBox="0 0 110 80" xmlns="http://www.w3.org/2000/svg">
+                    <text x="12" y="28" font-family="monospace" font-size="28" fill="currentColor" opacity="0.7">A</text>
+                    <text x="12" y="56" font-family="monospace" font-size="28" fill="currentColor" opacity="0.7">A</text>
+                    <text x="72" y="28" font-family="monospace" font-size="28" fill="currentColor">B</text>
+                    <text x="72" y="56" font-family="monospace" font-size="28" fill="currentColor">B</text>
+                    <path d="M40 35 L66 35 M64 32 L68 35 L64 38" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button
+                onClick={closeSearchBar}
+                title="Close (Esc)"
+                className="close-button"
+            >
+                ×
+            </button>
         </div>
       )}
     </div>
