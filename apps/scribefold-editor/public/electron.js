@@ -32,6 +32,13 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 
+  // Log right-click context menu events and send to renderer
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    console.log('[electron.js] Context menu event detected');
+    console.log('[electron.js] Context menu params:', params);
+    mainWindow.webContents.send('context-menu-event', params);
+  });
+
   // Match desktop-app: disable native menu (we render our own TopBar)
   Menu.setApplicationMenu(null);
 
@@ -159,6 +166,12 @@ ipcMain.handle('open-external', async (event, url) => {
     console.error('[Main] Failed to open URL:', error);
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.on('right-click', (event, params) => {
+  console.log('[Main] right-click IPC invoked');
+  console.log('[Main] right-click event:', event);
+  console.log('[Main] right-click params:', params);
 });
 
 app.whenReady().then(() => {

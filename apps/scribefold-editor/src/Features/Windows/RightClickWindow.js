@@ -15,10 +15,10 @@ const DEFAULT_OPTIONS = [
   }
 ];
 
-export default function RightClickWindow() {
+export default function RightClickWindow({ editorRef }) {
   const dispatch = useDispatch();
   const ignoreNextClickRef = useRef(true);
-  const elementRef = useRef() 
+  const elementRef = useRef()
 
   // Determines if the right click window shows
   const showWindow = useSelector(state => state.windowSlice.showRightClickWindow) 
@@ -34,6 +34,39 @@ export default function RightClickWindow() {
     dispatch(closeRightClickWindow());
   }
 
+  // Handle option click - replace word if it's a spellcheck suggestion
+  const handleOptionClick = (option, index) => {
+    console.log('[RightClickWindow] Option clicked:', option);
+
+    // If it's a string (spellcheck suggestion), replace the word
+    if (typeof option === 'string' && editorRef?.current) {
+      const view = editorRef.current;
+      const state = view.state;
+
+      // Get the current cursor position
+      const pos = state.selection.main.head;
+
+      // Find the word at the cursor position
+      const word = state.wordAt(pos);
+      if (word) {
+        // Replace the word with the selected suggestion
+        view.dispatch({
+          changes: {
+            from: word.from,
+            to: word.to,
+            insert: option
+          }
+        });
+        console.log('[RightClickWindow] Replaced word with:', option);
+      }
+    } else if (option.onClick) {
+      // Handle default menu options
+      option.onClick(dispatch);
+    }
+
+    closeWindow();
+  };
+
   // Set up click-away detection with a delay
   useEffect(() => {
     if (!showWindow) return;
@@ -41,7 +74,11 @@ export default function RightClickWindow() {
 
 
     const handleClickOutside = (event) => {
-      
+      if (ignoreNextClickRef.current) {
+        ignoreNextClickRef.current = false;
+        return;
+      }
+
       if (elementRef.current && !elementRef.current.contains(event.target)){
         closeWindow()
       }
@@ -55,22 +92,22 @@ export default function RightClickWindow() {
     };
 
     // Prevents the browsers click menu showing over it on mouse up
-    const handleContextMenu = (event) => {
-      event.preventDefault()
-    }
+    // const handleContextMenu = (event) => {
+    //   event.preventDefault()
+    // }
 
     // Mousedown to close the right click menu when clicking outside of it
     document.addEventListener('mousedown', handleClickOutside);
     // Close right click menu on escape
     document.addEventListener('keydown', handleEscapeKey);
     // Prevents the browsers click menu showing over it on mouse up
-    elementRef.current?.addEventListener('contextmenu', handleContextMenu);
+    // elementRef.current?.addEventListener('contextmenu', handleContextMenu);
     
     // Cleanup
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscapeKey);
-      elementRef.current?.removeEventListener("contextmenu", handleContextMenu)
+      // elementRef.current?.removeEventListener("contextmenu", handleContextMenu)
     };
   }, [showWindow, dispatch]);
 
@@ -94,13 +131,10 @@ export default function RightClickWindow() {
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation();
-            // Call option's onClick if it exists
-            if (option.onClick) option.onClick(dispatch);
-            // Close the window after action
-            dispatch(closeRightClickWindow());
+            handleOptionClick(option, i);
           }}
         >
-          {option.title}
+          {typeof option === 'string' ? option : option.title}
         </div>
       ))}
     </div>

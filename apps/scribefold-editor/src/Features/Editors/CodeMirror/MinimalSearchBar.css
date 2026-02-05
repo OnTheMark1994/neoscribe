@@ -3,7 +3,7 @@
 .minimal-search-bar {
   display: block;
   padding: 2px 4px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 6px;
@@ -91,22 +91,7 @@
 
 .search-input:focus {
   outline: none;
-  border-color: rgba(0, 120, 212, 0.5);
-  background: rgba(255, 255, 255, 1);
-}
-
-.replace-input {
-  padding: 4px 8px;
-  width: 180px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-  font-size: 13px;
-  font-family: inherit;
-}
-
-.replace-input:focus {
-  outline: none;
-  border-color: rgba(0, 120, 212, 0.5);
+  /* border-color: rgba(0, 120, 212, 0.5); */
   background: rgba(255, 255, 255, 1);
 }
 

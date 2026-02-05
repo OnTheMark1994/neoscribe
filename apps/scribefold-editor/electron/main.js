@@ -89,6 +89,12 @@ ipcMain.handle('open-external', async (event, url) => {
   }
 });
 
+ipcMain.on('right-click', (event, params) => {
+  console.log('[Main.js] right-click IPC invoked');
+  console.log('[Main.js] right-click event:', event);
+  console.log('[Main.js] right-click params:', params);
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -100,6 +106,13 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Log right-click events (Electron only)
+  console.log('[MAIN] Setting up context-menu listener');
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    console.log('[MAIN] right click pressed');
+    console.log('[MAIN] params:', params);
   });
 
   mainWindow.maximize();

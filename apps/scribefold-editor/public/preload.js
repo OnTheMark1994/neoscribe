@@ -12,4 +12,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFile: (filePath, content) => ipcRenderer.invoke('save-file', { filePath, content }),
   saveFileAs: (payload) => ipcRenderer.invoke('save-file-as', payload),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  logRightClick: () => ipcRenderer.send('right-click'),
+  onContextMenuEvent: (callback) => ipcRenderer.on('context-menu-event', callback),
 });

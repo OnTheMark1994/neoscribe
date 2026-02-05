@@ -1,7 +1,7 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { toggleShowDiffView, setShowDiffView, setModified } from '../../../Global/ReduxSlices/EditorSlice';
-import { openRightClickWindow } from '../../../Global/ReduxSlices/WindowSlice';
+import { openRightClickWindow, closeRightClickWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import CodeMirror from '@uiw/react-codemirror';
 import { getOriginalDoc, unifiedMergeView } from '@codemirror/merge';
 import { EditorView } from '@codemirror/view';
@@ -15,15 +15,39 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const showDiffView = useSelector(state => state.editorSlice.showDiffView);
 
-  // Handle context menu to show right-click window
-  const handleContextMenu = useCallback((event) => {
-    event.preventDefault();
-    dispatch(openRightClickWindow({
-      left: event.clientX,
-      top: event.clientY,
-      type: 'context'
-    }));
+  // Listen for context menu events from main process
+  useEffect(() => {
+    const handleContextMenuEvent = (event, params) => {
+      console.log('[EditorCodeMirror] Context menu event received from main process');
+      console.log('[EditorCodeMirror] Context menu params:', params);
+      console.log('[EditorCodeMirror] Context menu params?.dictionarySuggestions:', params?.dictionarySuggestions);
+
+      // Store only the suggestion strings (not functions) in Redux
+      const options = params?.dictionarySuggestions || [];
+      console.log("options: ", options)
+
+      dispatch(openRightClickWindow({ left: params.x, top: params.y, options }));
+    };
+
+    if (window.electronAPI?.onContextMenuEvent) {
+      window.electronAPI.onContextMenuEvent(handleContextMenuEvent);
+    }
+
+    return () => {
+      // Cleanup listener if needed (ipcRenderer.removeListener would need to be exposed)
+    };
   }, [dispatch]);
+
+  // Handle context menu to log right-click via IPC
+  const handleContextMenu = useCallback(() => {
+    console.log("in handleContextMenu")
+    if (window.electronAPI?.logRightClick) {
+      console.log("EditorCodeMirror.js: window.electronAPI?.logRightClick")
+      window.electronAPI.logRightClick();
+    }else{
+      console.log("EditorCodeMirror.js: No window.electronAPI?.logRightClick")
+    }
+  }, []);
 
   // Listener to detect accept/reject actions in the merge view and exit diff mode
   const acceptRevertListener = EditorView.updateListener.of((update) => {

@@ -265,7 +265,7 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
                 ref={replaceInputRef}
                 type="text"
                 placeholder="Replace with..."
-                className="replace-input"
+                className="search-input"
                 onChange={handleReplaceInput}
             />
             <button

@@ -98,6 +98,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App controls (for WebMenuBar)
   quitApp: () => ipcRenderer.invoke('quit-app'),
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
+  logRightClick: () => ipcRenderer.invoke('log-right-click'),
 
   // Fullscreen state events (Electron only, for WebMenuBar hover behavior)
   onFullscreenChanged: (callback) => ipcRenderer.on('fullscreen-changed', (event, data) => {

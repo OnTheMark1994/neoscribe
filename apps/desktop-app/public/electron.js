@@ -142,44 +142,11 @@ function createWindow() {
     mainWindow.show();
   });
 
-  // Enable spell checker context menu similar to legacy app
+  // Log right-click events (Electron only)
+  console.log('[MAIN] Setting up context-menu listener');
   mainWindow.webContents.on('context-menu', (event, params) => {
-    const { Menu, MenuItem } = require('electron');
-    const menu = new Menu();
-
-    // Add spelling suggestions if there are any
-    if (params.misspelledWord) {
-      for (const suggestion of params.dictionarySuggestions) {
-        menu.append(new MenuItem({
-          label: suggestion,
-          click: () => mainWindow.webContents.replaceMisspelling(suggestion)
-        }));
-      }
-
-      if (params.dictionarySuggestions.length > 0) {
-        menu.append(new MenuItem({ type: 'separator' }));
-      }
-
-      menu.append(new MenuItem({
-        label: 'Add to Dictionary',
-        click: () => mainWindow.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
-      }));
-
-      menu.append(new MenuItem({ type: 'separator' }));
-    }
-
-    // Add standard editing options
-    if (params.isEditable) {
-      menu.append(new MenuItem({ label: 'Cut', role: 'cut', enabled: params.editFlags.canCut }));
-      menu.append(new MenuItem({ label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy }));
-      menu.append(new MenuItem({ label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste }));
-      menu.append(new MenuItem({ type: 'separator' }));
-      menu.append(new MenuItem({ label: 'Select All', role: 'selectAll' }));
-    }
-
-    if (menu.items.length > 0) {
-      menu.popup();
-    }
+    console.log('[MAIN] right click pressed');
+    console.log('[MAIN] params:', params);
   });
 
   // Handle close using custom in-app Unsaved Changes dialog
@@ -616,6 +583,14 @@ ipcMain.handle('open-external', async (event, url) => {
 // Quit application (for WebMenuBar Exit button)
 ipcMain.handle('quit-app', async () => {
   app.quit();
+});
+
+// Log right click press
+ipcMain.handle('log-right-click', async (event, params) => {
+
+  console.log('right click pressed');
+  console.log('right click pressed event, params:', event, params);
+  return { success: true };
 });
 
 // Toggle fullscreen (for WebMenuBar Fullscreen button)

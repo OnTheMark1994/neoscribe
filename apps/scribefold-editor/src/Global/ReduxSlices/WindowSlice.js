@@ -73,7 +73,9 @@ const windowSlice = createSlice({
     },
     // Opens on mous click with event data for positioning
     openRightClickWindow(state, action) {
+      console.log("in openRightClickWindow")
       const { left = 0, top = 0, type = null, options = [] } = action.payload || {};
+      console.log("left", left, "top", top, "type", type, "options", options)
       state.showRightClickWindow = true;
       state.rightClickWindowLeft = left;
       state.rightClickWindowTop = top;
