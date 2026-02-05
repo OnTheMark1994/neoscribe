@@ -6,6 +6,66 @@ import { closeRightClickWindow, setShowSettingsWindow } from '../../Global/Redux
 // Default menu options to show when no custom options are provided
 const DEFAULT_OPTIONS = [
   {
+    title: 'Cut',
+    onClick: (dispatch, editorRef) => {
+      if (editorRef?.current) {
+        const view = editorRef.current;
+        const state = view.state;
+        const selection = state.selection.main;
+        const text = state.doc.sliceString(selection.from, selection.to);
+
+        // Copy to clipboard
+        navigator.clipboard.writeText(text).then(() => {
+          // Delete the selection
+          view.dispatch({
+            changes: {
+              from: selection.from,
+              to: selection.to,
+              insert: ''
+            }
+          });
+          console.log('[RightClickWindow] Cut:', text);
+        });
+      }
+    }
+  },
+  {
+    title: 'Copy',
+    onClick: (dispatch, editorRef) => {
+      if (editorRef?.current) {
+        const view = editorRef.current;
+        const state = view.state;
+        const selection = state.selection.main;
+        const text = state.doc.sliceString(selection.from, selection.to);
+
+        navigator.clipboard.writeText(text).then(() => {
+          console.log('[RightClickWindow] Copied:', text);
+        });
+      }
+    }
+  },
+  {
+    title: 'Paste',
+    onClick: (dispatch, editorRef) => {
+      if (editorRef?.current) {
+        navigator.clipboard.readText().then(text => {
+          const view = editorRef.current;
+          const state = view.state;
+          const pos = state.selection.main.head;
+
+          view.dispatch({
+            changes: {
+              from: pos,
+              to: pos,
+              insert: text
+            }
+          });
+          console.log('[RightClickWindow] Pasted:', text);
+        });
+      }
+    }
+  },
+  {
     title: 'Settings',
     onClick: (dispatch) => dispatch(setShowSettingsWindow(true))
   },
@@ -27,7 +87,8 @@ export default function RightClickWindow({ editorRef }) {
   
   // Get the menu options from Redux state, use defaults if null or empty
   const options = useSelector(state => state.windowSlice.rightClickMenuOptions) || []
-  const displayOptions = options?.length > 0 ? options : DEFAULT_OPTIONS;
+  // Merge dictionary suggestions with default options
+  const displayOptions = options?.length > 0 ? [...options, ...DEFAULT_OPTIONS] : DEFAULT_OPTIONS;
 
   function closeWindow(){
     ignoreNextClickRef.current = true
@@ -60,8 +121,8 @@ export default function RightClickWindow({ editorRef }) {
         console.log('[RightClickWindow] Replaced word with:', option);
       }
     } else if (option.onClick) {
-      // Handle default menu options
-      option.onClick(dispatch);
+      // Handle default menu options - pass editorRef if needed
+      option.onClick(dispatch, editorRef);
     }
 
     closeWindow();
