@@ -2,6 +2,7 @@ import { foldGutter, foldService } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
 import { StateField, Facet } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
+import { search, searchKeymap } from '@codemirror/search';
 import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Full color: actively shared
 import AiShowGreyIcon from '../../../images/scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
 import AiHideIcon from '../../../images/scribefold-ai-eye-crossed-out.png';   // Explicitly hidden
@@ -248,31 +249,33 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
     }),
     foldService.of(customOutlineFolding),
     keymap.of([indentWithTab]),
+    search(),
+    keymap.of(searchKeymap),
     EditorView.theme({
-      '&': {
-        backgroundColor: 'transparent',
-        height: '100%',
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-      },
-      '.cm-scroller': {
-        backgroundColor: 'transparent',
-        flex: 1,
-        minHeight: '0',
-        overflow: 'auto',
-      },
-      '.cm-gutters': {
-        backgroundColor: 'transparent',
-        border: 'none',
-        display: 'flex',
-      },
-      '.cm-lineNumbers': {
-        display: showLineNumbers ? 'block' : 'none',
-      },
-      '.cm-activeLineGutter': {
-        backgroundColor: 'transparent',
-      },
+    '&': {
+      backgroundColor: 'transparent',
+      height: '100%',
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+    },
+    '.cm-scroller': {
+      backgroundColor: 'transparent',
+      flex: 1,
+      minHeight: '0',
+      overflow: 'auto',
+    },
+    '.cm-gutters': {
+      backgroundColor: 'transparent',
+      border: 'none',
+      display: 'flex',
+    },
+    '.cm-lineNumbers': {
+      display: showLineNumbers ? 'block' : 'none',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: 'transparent',
+    },
     }),
     EditorView.updateListener.of((update) => {
       if (update.docChanged && typeof onChange === 'function') {

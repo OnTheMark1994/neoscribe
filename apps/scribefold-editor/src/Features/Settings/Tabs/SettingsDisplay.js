@@ -6,7 +6,7 @@ import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateSetting } from '../../../Global/ReduxSlices/SettingsSlice';
 import ToggleSwitch from '../../Util/ToggleSwitch';
-import '../SettingsTabs.css';
+import './SettingsTabs.css';
 
 export default function SettingsDisplay() {
   const dispatch = useDispatch();

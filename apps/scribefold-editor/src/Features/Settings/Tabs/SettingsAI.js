@@ -6,7 +6,7 @@ import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearMessages } from '../../../Global/ReduxSlices/AiSlice';
 import ToggleSwitch from '../../Util/ToggleSwitch';
-import '../SettingsTabs.css';
+import './SettingsTabs.css';
 import { updateSetting } from '../../../Global/ReduxSlices/SettingsSlice';
 
 export default function SettingsAI() {

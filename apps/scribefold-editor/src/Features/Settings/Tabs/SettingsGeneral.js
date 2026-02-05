@@ -5,7 +5,7 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setShowFileEncryptionWindow } from '../../../Global/ReduxSlices/WindowSlice';
-import '../SettingsTabs.css';
+import './SettingsTabs.css';
 
 export default function SettingsSecurity() {
   const dispatch = useDispatch();

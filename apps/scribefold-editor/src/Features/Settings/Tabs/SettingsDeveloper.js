@@ -9,7 +9,7 @@ import { toggleShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
 import { supabase } from '../../../Global/SupabaseClient';
 import { openUrlInBrowser } from '../../../Global/helpers/urlHelpers';
 import ToggleSwitch from '../../Util/ToggleSwitch';
-import '../SettingsTabs.css';
+import './SettingsTabs.css';
 
 const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL || 'http://localhost:8080';
 const WEB_PORTAL_URL = process.env.REACT_APP_WEB_PORTAL_URL || 'http://localhost:3001';

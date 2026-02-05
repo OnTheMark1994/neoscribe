@@ -13,8 +13,11 @@ import ChangeNavigator from './Features/AI/Components/ChangeNavigator';
 
 export default function App() {
 
+  // Reference to editor instance for cross-component access
   const editorRef = useRef(null)
+  // Stores original document content for diff comparison
   const originalDocRef = useRef('')
+  // Controls whether diff view/change navigator is shown
   const showDiffView = useSelector(state => state.editorSlice.showDiffView);
 
   // We are retreiving this so we can display the correct backgroundImageUri
