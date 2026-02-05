@@ -6,6 +6,8 @@ import { getOriginalDoc, unifiedMergeView } from '@codemirror/merge';
 import { EditorView } from '@codemirror/view';
 import { buildExtensions } from './EditorCodeMirrorSetup';
 import './EditorCodeMirror.css';
+import './EditorCodeMirrorSearch.css';
+import MinimalSearchBar from './MinimalSearchBar';
 
 export default function EditorCodeMirror({ editorRef, originalDocRef }) {
   const dispatch = useDispatch();
@@ -56,6 +58,7 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
 
   return (
     <div className="scribefold-codemirror">
+      <MinimalSearchBar editorRef={editorRef} visible={true}></MinimalSearchBar>
       <CodeMirror
         basicSetup={false}
         height="100%"

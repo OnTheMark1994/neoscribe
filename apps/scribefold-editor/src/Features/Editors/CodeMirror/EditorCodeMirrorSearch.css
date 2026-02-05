@@ -1,0 +1,241 @@
+/* CodeMirror Search Panel Custom Styling - VS Code Style */
+
+/* Search Panel Container */
+.scribefold-codemirror .cm-panels.cm-panels-bottom {
+  background: #252526;
+  border-top: 1px solid #3c3c3c;
+  display: none;
+  height: 0px;
+  width: 0px;
+}
+
+/* Main Search Panel - Use Grid for stacked layout */
+.cm-search.cm-panel {
+  background: transparent;
+  padding: 4px 8px;
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+/* First row: Search input + navigation buttons */
+.cm-search.cm-panel > input[type="text"]:first-of-type {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.cm-search.cm-panel > button:nth-of-type(1),
+.cm-search.cm-panel > button:nth-of-type(2) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.cm-search.cm-panel > button:nth-of-type(3) {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+/* Second row: Replace input + replace buttons */
+.cm-search.cm-panel > input[type="text"]:nth-of-type(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.cm-search.cm-panel > button:nth-of-type(4),
+.cm-search.cm-panel > button:nth-of-type(5) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* Third row: Checkboxes */
+.cm-search.cm-panel > label {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  gap: 12px;
+}
+
+/* Search Input Field */
+.scribefold-codemirror .cm-textfield {
+  background: #3c3c3c;
+  border: 1px solid #3c3c3c;
+  border-radius: 2px;
+  padding: 4px 8px;
+  color: #cccccc;
+  font-size: 13px;
+  min-width: 200px;
+}
+
+.scribefold-codemirror .cm-textfield:focus {
+  outline: none;
+  border-color: #007acc;
+  background: #3c3c3c;
+}
+
+.scribefold-codemirror .cm-textfield::placeholder {
+  color: #858585;
+}
+
+/* Search Panel Buttons - Icon-based like VS Code */
+.scribefold-codemirror .cm-button {
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  color: #cccccc;
+  padding: 2px;
+  font-size: 0;
+  cursor: pointer;
+  transition: background 150ms;
+  min-width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.scribefold-codemirror .cm-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scribefold-codemirror .cm-button:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.scribefold-codemirror .cm-button.cm-button-active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Add icons using ::before pseudo-element */
+.scribefold-codemirror .cm-button::before {
+  content: '';
+  position: absolute;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Previous button icon */
+.scribefold-codemirror .cm-button:nth-of-type(1)::before {
+  content: '▲';
+  font-size: 12px;
+}
+
+/* Next button icon */
+.scribefold-codemirror .cm-button:nth-of-type(2)::before {
+  content: '▼';
+  font-size: 12px;
+}
+
+/* Close button icon */
+.scribefold-codemirror .cm-button:nth-of-type(3)::before {
+  content: '×';
+  font-size: 18px;
+  font-weight: bold;
+}
+
+/* Replace button icon */
+.scribefold-codemirror .cm-button:nth-of-type(4)::before {
+  content: '↳';
+  font-size: 14px;
+}
+
+/* Replace All button icon */
+.scribefold-codemirror .cm-button:nth-of-type(5)::before {
+  content: '⇓';
+  font-size: 14px;
+}
+
+/* Search Panel Checkboxes */
+.scribefold-codemirror .cm-search.cm-panel label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #cccccc;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scribefold-codemirror .cm-search.cm-panel input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #007acc;
+}
+
+/* Search Panel Separator */
+.scribefold-codemirror .cm-search.cm-panel .cm-separator {
+  width: 1px;
+  height: 20px;
+  background: #3c3c3c;
+  margin: 0 4px;
+}
+
+/* Search Query Input - Highlight when active */
+.scribefold-codemirror .cm-textfield.cm-active {
+  border-color: #007acc;
+  background: #3c3c3c;
+}
+
+/* Replace Input Field */
+.scribefold-codemirror .cm-replaceField {
+  background: #3c3c3c;
+  border: 1px solid #3c3c3c;
+  border-radius: 2px;
+  padding: 4px 8px;
+  color: #cccccc;
+  font-size: 13px;
+  min-width: 200px;
+}
+
+.scribefold-codemirror .cm-replaceField:focus {
+  outline: none;
+  border-color: #007acc;
+  background: #3c3c3c;
+}
+
+/* Search Panel Header */
+.scribefold-codemirror .cm-search.cm-panel .cm-search-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Search Panel Body (for extended options) */
+.scribefold-codemirror .cm-search.cm-panel .cm-search-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #3c3c3c;
+}
+
+/* Search Panel Hidden State */
+.scribefold-codemirror .cm-search.cm-panel.cm-collapsed .cm-search-body {
+  display: none;
+}
+
+/* Match Count Display */
+.scribefold-codemirror .cm-search.cm-panel .cm-match-count {
+  color: #858585;
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+/* Navigation Buttons (Up/Down) */
+.scribefold-codemirror .cm-button.cm-search-next,
+.scribefold-codemirror .cm-button.cm-search-prev {
+  min-width: 24px;
+  padding: 4px 6px;
+}
+
+/* Extended Options Button */
+.scribefold-codemirror .cm-button.cm-search-extended {
+  background: transparent;
+  border: none;
+}
+
+.scribefold-codemirror .cm-button.cm-search-extended:hover {
+  background: rgba(255, 255, 255, 0.1);
+}

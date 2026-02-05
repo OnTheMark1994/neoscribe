@@ -2,6 +2,7 @@ import { foldGutter, foldService } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
 import { StateField, Facet } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
+// This is for the default ctrl f search (leave it here for reference) 
 import { search, searchKeymap } from '@codemirror/search';
 import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Full color: actively shared
 import AiShowGreyIcon from '../../../images/scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
@@ -249,6 +250,7 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
     }),
     foldService.of(customOutlineFolding),
     keymap.of([indentWithTab]),
+    // This is for the default ctrl f search (leave it here for reference) 
     search(),
     keymap.of(searchKeymap),
     EditorView.theme({
