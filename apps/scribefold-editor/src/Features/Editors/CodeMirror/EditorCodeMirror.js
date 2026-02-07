@@ -22,6 +22,23 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
       console.log('[EditorCodeMirror] Context menu params:', params);
       console.log('[EditorCodeMirror] Context menu params?.dictionarySuggestions:', params?.dictionarySuggestions);
 
+      // Log what was clicked on
+      if (params?.srcURL) {
+        console.log('[EditorCodeMirror] CLICKED ON IMAGE:', params.srcURL);
+        if (params.srcURL.includes('scribefold-ai-eye')) {
+          console.log('[EditorCodeMirror] CLICKED ON EYE IMAGE');
+        }
+      }
+      if (params?.mediaType) {
+        console.log('[EditorCodeMirror] Media type:', params.mediaType);
+      }
+      if (params?.selectionText) {
+        console.log('[EditorCodeMirror] Selected text:', params.selectionText);
+      }
+      if (params?.misspelledWord) {
+        console.log('[EditorCodeMirror] Misspelled word:', params.misspelledWord);
+      }
+
       // Store only the suggestion strings (not functions) in Redux
       const options = params?.dictionarySuggestions || [];
       console.log("options: ", options)

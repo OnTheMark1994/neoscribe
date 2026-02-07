@@ -65,6 +65,10 @@ const DEFAULT_OPTIONS = [
       }
     }
   },
+  // Shows a seperator
+  {
+    title: "#seperator"
+  },
   {
     title: 'Settings',
     onClick: (dispatch) => dispatch(setShowSettingsWindow(true))
@@ -77,7 +81,6 @@ const DEFAULT_OPTIONS = [
 
 export default function RightClickWindow({ editorRef }) {
   const dispatch = useDispatch();
-  const ignoreNextClickRef = useRef(true);
   const elementRef = useRef()
 
   // Determines if the right click window shows
@@ -87,11 +90,12 @@ export default function RightClickWindow({ editorRef }) {
   
   // Get the menu options from Redux state, use defaults if null or empty
   const options = useSelector(state => state.windowSlice.rightClickMenuOptions) || []
+  // Convert string suggestions to objects with title property
+  const formattedOptions = options.map(opt => typeof opt === 'string' ? { title: opt } : opt);
   // Merge dictionary suggestions with default options
-  const displayOptions = options?.length > 0 ? [...options, ...DEFAULT_OPTIONS] : DEFAULT_OPTIONS;
+  const displayOptions = formattedOptions?.length > 0 ? [...formattedOptions, ...DEFAULT_OPTIONS] : DEFAULT_OPTIONS;
 
   function closeWindow(){
-    ignoreNextClickRef.current = true
     dispatch(closeRightClickWindow());
   }
 
@@ -99,8 +103,8 @@ export default function RightClickWindow({ editorRef }) {
   const handleOptionClick = (option, index) => {
     console.log('[RightClickWindow] Option clicked:', option);
 
-    // If it's a string (spellcheck suggestion), replace the word
-    if (typeof option === 'string' && editorRef?.current) {
+    // If it's a spellcheck suggestion (no onClick property), replace the word
+    if (!option.onClick && editorRef?.current) {
       const view = editorRef.current;
       const state = view.state;
 
@@ -115,10 +119,10 @@ export default function RightClickWindow({ editorRef }) {
           changes: {
             from: word.from,
             to: word.to,
-            insert: option
+            insert: option.title
           }
         });
-        console.log('[RightClickWindow] Replaced word with:', option);
+        console.log('[RightClickWindow] Replaced word with:', option.title);
       }
     } else if (option.onClick) {
       // Handle default menu options - pass editorRef if needed
@@ -132,14 +136,7 @@ export default function RightClickWindow({ editorRef }) {
   useEffect(() => {
     if (!showWindow) return;
 
-
-
     const handleClickOutside = (event) => {
-      if (ignoreNextClickRef.current) {
-        ignoreNextClickRef.current = false;
-        return;
-      }
-
       if (elementRef.current && !elementRef.current.contains(event.target)){
         closeWindow()
       }
@@ -185,19 +182,31 @@ export default function RightClickWindow({ editorRef }) {
         e.stopPropagation();
       }}
     >
-      {displayOptions.map((option, i) => (
-        <div 
-          className="rightClickOption" 
-          key={i}
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation();
-            handleOptionClick(option, i);
-          }}
-        >
-          {typeof option === 'string' ? option : option.title}
-        </div>
-      ))}
+      {displayOptions.map((option, i) => {
+        // Check if this is a separator option
+        const isSeparator = typeof option === 'object' && option.title === '#seperator';
+        // Check if this is the first default option after spelling suggestions
+        const isAfterSpellingSuggestions = options?.length > 0 && i === options.length;
+
+        return (
+          <React.Fragment key={i}>
+            {isSeparator || isAfterSpellingSuggestions? (
+              <div className="rightClickSeparator"></div>
+            ) : (
+              <div 
+                className="rightClickOption" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation();
+                  handleOptionClick(option, i);
+                }}
+              >
+                {option.title}
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }

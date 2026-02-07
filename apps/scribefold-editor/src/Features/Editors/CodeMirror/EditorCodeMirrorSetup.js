@@ -222,9 +222,17 @@ const aiShareGutter = gutter({
     mousedown(view, lineBlock, event) {
       const target = event.target;
       if (target && target.tagName === 'IMG') {
-        event.preventDefault();
-        toggleAIShareMetadata(view, lineBlock.from);
-        return true;
+        // Left click (button 0) - toggle
+        if (event.button === 0) {
+          event.preventDefault();
+          toggleAIShareMetadata(view, lineBlock.from);
+          return true;
+        }
+        // Right click (button 2) - prevent default but don't toggle
+        if (event.button === 2) {
+          event.preventDefault();
+          return true;
+        }
       }
       return false;
     }
