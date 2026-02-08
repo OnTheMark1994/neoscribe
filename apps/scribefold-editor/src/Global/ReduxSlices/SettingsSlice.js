@@ -33,13 +33,11 @@ mod the things a described in the ( areas
  const defaultSettingsObject = {
     backgroundImageUri: '/theme-images/spacedreams.jpg',      // The image that shows as the background of the entire application
     devMode: true,
-    showArrayLineNumbers: true,
-    showMonacoLineNumbers: true,
-    monacoStickyTopBar: true,
-    showPreviewBar: true,
     aiModeActive: true,
     autoJumpToNextChunk: true,
     spellcheckEnabled: true,
+    lineWrapEnabled: false,
+    showMiniKeyboard: false,
   };
 
  // Saves the settings object to localStorage.

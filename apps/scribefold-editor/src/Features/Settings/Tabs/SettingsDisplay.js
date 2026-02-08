@@ -5,6 +5,7 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateSetting } from '../../../Global/ReduxSlices/SettingsSlice';
+import { toggleFullscreenActive } from '../../../Global/ReduxSlices/MenuSlice';
 import ToggleSwitch from '../../Util/ToggleSwitch';
 import './SettingsTabs.css';
 
@@ -13,12 +14,9 @@ export default function SettingsDisplay() {
 
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const backgroundImageUri = settingsObject?.backgroundImageUri;
-  const showMiniKeyboard = settingsObject?.showMiniKeyboard === true;
-  const showArrayLineNumbers = settingsObject?.showArrayLineNumbers !== false;
-  const showMonacoLineNumbers = settingsObject?.showMonacoLineNumbers !== false;
-  const monacoStickyTopBar = settingsObject?.monacoStickyTopBar !== false;
-  const showPreviewBar = settingsObject?.showPreviewBar !== false;
   const spellcheckEnabled = settingsObject?.spellcheckEnabled !== false;
+  const lineWrapEnabled = settingsObject?.lineWrapEnabled === true;
+  const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
 
   const themes = [
     { label: 'Space Dreams', value: '/theme-images/spacedreams.jpg' },
@@ -56,74 +54,29 @@ export default function SettingsDisplay() {
       </div>
 
       <div className="settingsSection">
-        <div className="settingsSectionTitle">Keyboard</div>
-
-        <div className="settingsRow">
-          <div className="settingsRowLabel">
-            <div className="settingsRowLabelTitle">Show mini keyboard</div>
-            <div className="settingsRowLabelSub">Shows a draggable on-screen keyboard window.</div>
-          </div>
-          <ToggleSwitch
-            on={showMiniKeyboard}
-            onClick={() => dispatch(updateSetting({ key: 'showMiniKeyboard', value: !showMiniKeyboard }))}
-          />
-        </div>
-      </div>
-
-      <div className="settingsSection">
-        <div className="settingsSectionTitle">Array View</div>
-
-        <div className="settingsRow">
-          <div className="settingsRowLabel">
-            <div className="settingsRowLabelTitle">Show line indexes</div>
-            <div className="settingsRowLabelSub">Display line index numbers in the Array editor.</div>
-          </div>
-          <ToggleSwitch
-            on={showArrayLineNumbers}
-            onClick={() => dispatch(updateSetting({ key: 'showArrayLineNumbers', value: !showArrayLineNumbers }))}
-          />
-        </div>
-      </div>
-
-      <div className="settingsSection">
-        <div className="settingsSectionTitle">Monaco View</div>
-
-        <div className="settingsRow">
-          <div className="settingsRowLabel">
-            <div className="settingsRowLabelTitle">Sticky top bar</div>
-            <div className="settingsRowLabelSub">Keep the current header pinned while scrolling.</div>
-          </div>
-          <ToggleSwitch
-            on={monacoStickyTopBar}
-            onClick={() => dispatch(updateSetting({ key: 'monacoStickyTopBar', value: !monacoStickyTopBar }))}
-          />
-        </div>
-
-        <div className="settingsRow">
-          <div className="settingsRowLabel">
-            <div className="settingsRowLabelTitle">Show line indexes</div>
-            <div className="settingsRowLabelSub">Show line numbers in the Monaco editor gutter.</div>
-          </div>
-          <ToggleSwitch
-            on={showMonacoLineNumbers}
-            onClick={() => dispatch(updateSetting({ key: 'showMonacoLineNumbers', value: !showMonacoLineNumbers }))}
-          />
-        </div>
-
-        <div className="settingsRow">
-          <div className="settingsRowLabel">
-            <div className="settingsRowLabelTitle">Show preview bar</div>
-            <div className="settingsRowLabelSub">Show the right-side preview panel.</div>
-          </div>
-          <ToggleSwitch
-            on={showPreviewBar}
-            onClick={() => dispatch(updateSetting({ key: 'showPreviewBar', value: !showPreviewBar }))}
-          />
-        </div>
-      </div>
-
-      <div className="settingsSection">
         <div className="settingsSectionTitle">Editor</div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Line wrap</div>
+            <div className="settingsRowLabelSub">Wrap long lines instead of scrolling horizontally</div>
+          </div>
+          <ToggleSwitch
+            on={lineWrapEnabled}
+            onClick={() => dispatch(updateSetting({ key: 'lineWrapEnabled', value: !lineWrapEnabled }))}
+          />
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Full screen</div>
+            <div className="settingsRowLabelSub">Toggle full screen mode (F11)</div>
+          </div>
+          <ToggleSwitch
+            on={fullscreenActive}
+            onClick={() => dispatch(toggleFullscreenActive())}
+          />
+        </div>
 
         <div className="settingsRow">
           <div className="settingsRowLabel">

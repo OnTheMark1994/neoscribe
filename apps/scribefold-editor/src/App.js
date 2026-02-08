@@ -4,12 +4,13 @@ import './App.css';
 import TopBar from './Global/TopBar';
 import AppInitializer from './Global/AppInitializer';
 import KeypressListeners from './Global/KeypressListeners';
-import Editor from './Features/Editors/Editor';
 import AiChatBar from './Features/AI/ChatBar/AiChatBar';
 import AiChatToggle from './Features/AI/AiChatToggle';
 import Windows from './Features/Windows/Windows';
 import KeyboardWindow from './Features/Windows/KeyboardWindow';
 import ChangeNavigator from './Features/AI/Components/ChangeNavigator';
+import EditorCodeMirror from './Features/Editors/CodeMirror/Editor';
+import Editor from './Features/Editors/CodeMirror/Editor';
 
 export default function App() {
 
@@ -31,10 +32,10 @@ export default function App() {
       style={{ backgroundImage: settingsObject?.backgroundImageUri ? `url(${settingsObject.backgroundImageUri})` : undefined }}
     >
 
-      {/* Global key listeners like F11 fullscreen toggle */}
+      {/* Global key listener (really just F11 fullscreen toggle) */}
       <KeypressListeners/>
 
-      {/* Contains auth listener and loads initial data like user table data */}
+      {/* Auth listener, user data, open last file */}
       <AppInitializer editorRef={editorRef}/>
 
       {/* Left side: top bar + centered page */}
@@ -53,7 +54,8 @@ export default function App() {
               <Editor editorRef={editorRef} originalDocRef={originalDocRef}/>
           
           </div>
-      {showDiffView && <ChangeNavigator/>}
+
+          {showDiffView && <ChangeNavigator/>}
 
         </div>
 

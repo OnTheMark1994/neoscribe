@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setFullscreenActive, toggleFullscreenActive } from './ReduxSlices/MenuSlice';
 
+// This all seems to be related to the F11 full screen on off functionality
 export default function KeypressListeners() {
   const dispatch = useDispatch();
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
 
+  // Full screen on off listener
   useEffect(() => {
     const handleFullscreenChange = () => {
       const fullscreenElement =

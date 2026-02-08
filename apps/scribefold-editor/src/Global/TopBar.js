@@ -50,7 +50,7 @@
 
 */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleFullscreenActive } from './ReduxSlices/MenuSlice';
 import { setShowFileEncryptionWindow, setShowHelpWindow, setShowSettingsWindow } from './ReduxSlices/WindowSlice';

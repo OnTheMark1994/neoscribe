@@ -1,53 +1,90 @@
 File Structure.
-Created during planning.
+Current structure as of cleanup.
 
 App.js                          // Starting point for the application
 App.css                         // High level non-specific css classes like the background, page, etc
 Global
-    TopBar.js                   // The top bar that shows file optoins (like open, save, etc), View options, etc. Like a normal window top bar of an application
-    AppInitializer.js           // Handles getting user auth id from supabase, loading user data from tables into redux global store, and other setup 
-    ReduxStore.js                  // Combines the slices for use in the application
+    TopBar.js                   // The top bar that shows file options (like open, save, etc), View options, etc. Like a normal window top bar of an application
+    AppInitializer.js           // Handles getting user auth id from supabase, loading user data from tables into redux global store, and other setup
+    ReduxStore.js               // Combines the slices for use in the application
     ReduxSlices
-        SettingsSlice.js        // Global state for showing settgins window, selecting tab, loading and updating settings, holsing settingsObject with all settigns values 
+        SettingsSlice.js        // Global state for showing settings window, selecting tab, loading and updating settings, holding settingsObject with all settings values
         UserSlice.js            // Stores data related to user auth object, user data object, and other user related variables
-        EditorSlice.js          // Related to editor content, proposedChanges array, and other editor specific global state
+        EditorSlice.js          // Related to editor content, filepath, modified state, diff view
+        WindowSlice.js          // Window visibility and positioning state
+        AiSlice.js              // AI chat messages and state
+        MenuSlice.js            // Menu state (fullscreen, etc.)
+    EditorRefHelpers.js         // Helper functions for editor operations (getEditorText, setEditorText, etc.)
+    FileIO.js                   // File I/O operations (open, save, save as, etc.)
+    CryptoIO.js                 // Encryption/decryption operations
+    SupabaseClient.js           // Supabase client configuration
+    KeypressListeners.js        // Global keyboard event handling (F11 fullscreen toggle)
+    helpers/
+        urlHelpers.js           // URL helper functions (openUrlInBrowser, openWebPortalWithAutoLogin)
 Features
     Editors
-        Editor.js               // Choose which editor to display
-        EditorArray
-            EditorEngine.js     // Stores the lines in a global variable to avoid using react overhead
-            EditorArray.js      // The editor array base component, put in the page, displays array of lines
-            EditorArrayLine.js  // Each line is displayed in one of these
-            SearchBox.js        // For ctrl+f shows in top right
-            ProposedChangeBox (missing, maybe not needd tho)  // A line that shows a proposed change from the ai in array view mode
-        EditorMonaco
-            EditorMonaco.js         // Monaco editor for alternate display (better in many ways if can make the ai propsed changes show, did not work in prototype though)
+        Editor.js               // Wrapper for editor implementations (currently only EditorCodeMirror)
+        CodeMirror/
+            EditorCodeMirror.js         // CodeMirror 6 editor implementation
+            EditorCodeMirrorSetup.js    // Builds editor extensions
+            EditorCodeMirrorSearch.css  // Search bar styles
+            MinimalSearchBar.js         // Search bar component
+            MinimalSearchBar.css        // Search bar styles
     AI
-        ChatBar
+        AiChatToggle.js          // Floating button to show AI chat when hidden
+        ChatBar/
             AiChatBar.js        // The side bar that allows the user to interact with the ai writing tool
-            Message.js          // The messages from the user or the ai assistant will show in these
-            InputArea.js        // Where the user will type and sent messages 
-            TokenDisplay.js     // Shows number of tokens the prompt will use, that the user has, etc 
-            MessageDetail.js    // Shows all message data (for developer use)
-        Components
-            ChangeNavigator.js     // Allows user to scroll up or down scroling to proposed changes, accept or recect all with 2 buttons
-            AcceptRejectButtons.js // UI for the accept and reject buttons on the proposed changes (used in editor array within proposed change line and editor monaco inserted between lines with a viewarea)
+            AiChatInputArea.js  // Where the user will type and send messages
+            AiChatInputArea.css
+            AiChatMessage.js    // The messages from the user or the ai assistant will show in these
+            AiChatMessage.css
+            AiChatLoginBox.js   // Login/signup UI for AI chat
+            AiChatLoginBox.css
+            AiChatNoTokensBox.js // Shown when user has no tokens
+            AiChatNoTokensBox.css
+            AiChatTokenDisplay.js // Shows number of tokens the prompt will use, that the user has, etc
+            AiChatTokenDisplay.css
+            AiChatMessageDetail.js // Shows all message data (for developer use)
+            AiChatMessageDetail.css
+        Components/
+            ChangeNavigator.js  // Allows user to scroll up or down scrolling to proposed changes, accept or reject all with 2 buttons
+            ChangeNavigator.css
     Settings
-        Settings.js             // Settings window that shows when opened, has several tabs
-        Settings.css            // Styles for settings page (that only occur here)
-        Tabs
+        SettingsWindow.js        // Settings window that shows when opened, has several tabs
+        SettingsWindow.css
+        Tabs/
             SettingsGeneral.js  // General settings (displays when the settings tab is in general(default))
-            SettingsDisplay.js  // Display settings  
+            SettingsDisplay.js  // Display settings
+            SettingsDisplay.css
             SettingsAccount.js  // Create account, log in, account stats like used tokens, remaining tokens, email, password reset, etc
-            SettingsAI.js       // Related to how the ai behaves 
+            SettingsAccount.css
+            SettingsAI.js       // Related to how the ai behaves
             SettingsDeveloper.js// Settings tab that only show if developer mode is active
-    Util
-        Window.js               // A window wrapper with a topbar with a title and close bar, custom styles can be sent into it, whatever it is wrapped arond is displayed as a window
-        RefreshButton.js        // A refresh button that calls a refresh function and shows when loading is occuring
-        FoldableSection.js      // Foldable section, 100% width, opens or closes to show content on top right button press
-    Windows
-        HelpWindow.js             // Shows information about the application for user learning
-        RightClickWindow.js       // The window that shows when the user right clicks on the +- or up down buttons or eye glyph to show related options
-        SaveBeforeClosingWindow.js// A window that shows to ask the user to save or disgard 
-        Windows.js                // Contains all conditional windows in this file
+            SettingsTabs.css    // Tab styles
+    Util/
+        Window.js               // A window wrapper with a topbar with a title and close bar, custom styles can be sent into it, whatever it is wrapped around is displayed as a window
+        Window.css
+        WindowMoveable.js      // Draggable modal window
+        WindowMoveable.css
+        RefreshButton.js       // A refresh button that calls a refresh function and shows when loading is occurring
+        RefreshButton.css
+        InfoButton.js          // Circular info button
+        InfoButton.css
+        Keyboard.js            // On-screen keyboard
+        Keyboard.css
+        ToggleSwitch.js        // Toggle switch UI component
+        ToggleSwitch.css
+        FoldableSection.js    // Foldable section, 100% width, opens or closes to show content on top right button press
+        FoldableSection.css
+    Windows/
+        HelpWindow.js          // Shows information about the application for user learning
+        HelpWindow.css
+        HelpMenu.css
+        RightClickWindow.js    // The window that shows when the user right clicks on the +- or up down buttons or eye glyph to show related options
+        RightClickWindow.css
+        SaveBeforeClosingWindow.js // A window that shows to ask the user to save or discard
+        FileEncryptionWindow.js // Encrypt/decrypt files
+        FileEncryptionWindow.css
+        KeyboardWindow.js      // Draggable on-screen keyboard window
+        Windows.js             // Contains all conditional windows in this file
 

@@ -17,16 +17,16 @@
     if there is other data that loads on initilazation we will add it here
  
  */
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fileOpened, setModified } from './ReduxSlices/EditorSlice';
 import { setShowFileEncryptionWindow } from './ReduxSlices/WindowSlice';
 import { openLastFile } from './FileIO';
 import { setEditorText } from './EditorRefHelpers';
-import { setAuthUser, setUserData, setUserDataLoading, triggerReloadUserData } from './ReduxSlices/UserSlice';
+import { setAuthUser, setUserData, setUserDataLoading } from './ReduxSlices/UserSlice';
 import { supabase } from './SupabaseClient';
 
-const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL;
 
 export default function AppInitializer({ editorRef }) {
   const dispatch = useDispatch();
@@ -46,7 +46,6 @@ export default function AppInitializer({ editorRef }) {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError || !session) {
-        console.error('[AppInitializer] No valid session:', sessionError);
         dispatch(setUserDataLoading(false));
         return;
       }
@@ -74,11 +73,9 @@ export default function AppInitializer({ editorRef }) {
 
       if (data.success && data.userData) {
         dispatch(setUserData(data.userData));
-      } else {
-        console.warn('[AppInitializer] No user data returned');
       }
     } catch (e) {
-      console.error('[AppInitializer] Error loading user data:', e);
+      // Error handled silently
     } finally {
       dispatch(setUserDataLoading(false));
     }
@@ -93,7 +90,6 @@ export default function AppInitializer({ editorRef }) {
     async function initAuth() {
       try {
         if (!supabase) {
-          console.warn('[AppInitializer] Supabase client not available');
           return;
         }
 
@@ -107,7 +103,6 @@ export default function AppInitializer({ editorRef }) {
         authSubscription = subscription;
       } catch (e) {
         // Non-fatal: editor still works in anonymous mode
-        console.warn('[AppInitializer] Supabase auth init failed:', e?.message || e);
       }
     }
 
@@ -151,7 +146,7 @@ export default function AppInitializer({ editorRef }) {
         }
         dispatch(setModified(false));
       } catch (e) {
-        console.error('[AppInitializer] openLastFile failed', e);
+        // Error handled silently
       }
     }
 

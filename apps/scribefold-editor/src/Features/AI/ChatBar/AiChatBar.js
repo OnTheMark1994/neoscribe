@@ -17,7 +17,7 @@
     - This file is intentionally kept as a thin layout component. Most logic is pushed into
       small subcomponents (token row, message renderer, input area).
 */
-import React, { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import AiChatInputArea from './AiChatInputArea';
 import AiChatMessage from './AiChatMessage';

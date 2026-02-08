@@ -1,16 +1,16 @@
-import React, { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { toggleShowDiffView, setShowDiffView, setModified } from '../../../Global/ReduxSlices/EditorSlice';
-import { openRightClickWindow, closeRightClickWindow } from '../../../Global/ReduxSlices/WindowSlice';
+import { setShowDiffView, setModified } from '../../../Global/ReduxSlices/EditorSlice';
+import { openRightClickWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import CodeMirror from '@uiw/react-codemirror';
 import { getOriginalDoc, unifiedMergeView } from '@codemirror/merge';
 import { EditorView } from '@codemirror/view';
-import { buildExtensions } from './EditorCodeMirrorSetup';
-import './EditorCodeMirror.css';
-import './EditorCodeMirrorSearch.css';
+import { buildExtensions } from './EditorSetup';
+import './Editor.css';
+import './EditorSearch.css';
 import MinimalSearchBar from './MinimalSearchBar';
 
-export default function EditorCodeMirror({ editorRef, originalDocRef }) {
+export default function Editor({ editorRef, originalDocRef }) {
   const dispatch = useDispatch();
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const showDiffView = useSelector(state => state.editorSlice.showDiffView);
@@ -18,30 +18,18 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
   // Listen for context menu events from main process
   useEffect(() => {
     const handleContextMenuEvent = (event, params) => {
-      console.log('[EditorCodeMirror] Context menu event received from main process');
-      console.log('[EditorCodeMirror] Context menu params:', params);
-      console.log('[EditorCodeMirror] Context menu params?.dictionarySuggestions:', params?.dictionarySuggestions);
 
-      // Log what was clicked on
+      // We can see if it was a eye icon that was right clicked on here
       if (params?.srcURL) {
-        console.log('[EditorCodeMirror] CLICKED ON IMAGE:', params.srcURL);
         if (params.srcURL.includes('scribefold-ai-eye')) {
-          console.log('[EditorCodeMirror] CLICKED ON EYE IMAGE');
+          // we can log the params and use some of them to decide tho show different right click menu options if we want to
         }
       }
-      if (params?.mediaType) {
-        console.log('[EditorCodeMirror] Media type:', params.mediaType);
-      }
-      if (params?.selectionText) {
-        console.log('[EditorCodeMirror] Selected text:', params.selectionText);
-      }
-      if (params?.misspelledWord) {
-        console.log('[EditorCodeMirror] Misspelled word:', params.misspelledWord);
-      }
+
+
 
       // Store only the suggestion strings (not functions) in Redux
       const options = params?.dictionarySuggestions || [];
-      console.log("options: ", options)
 
       dispatch(openRightClickWindow({ left: params.x, top: params.y, options }));
     };
@@ -57,12 +45,8 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
 
   // Handle context menu to log right-click via IPC
   const handleContextMenu = useCallback(() => {
-    console.log("in handleContextMenu")
     if (window.electronAPI?.logRightClick) {
-      console.log("EditorCodeMirror.js: window.electronAPI?.logRightClick")
       window.electronAPI.logRightClick();
-    }else{
-      console.log("EditorCodeMirror.js: No window.electronAPI?.logRightClick")
     }
   }, []);
 
@@ -94,8 +78,8 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
       ()=>{dispatch(setModified(true))}, 
       settingsObject?.aiModeActive,
       {
-        showLineNumbers: settingsObject?.showMonacoLineNumbers,
         spellcheckEnabled: settingsObject?.spellcheckEnabled,
+        lineWrapEnabled: settingsObject?.lineWrapEnabled,
       }
     ),
     acceptRevertListener,
@@ -111,15 +95,11 @@ export default function EditorCodeMirror({ editorRef, originalDocRef }) {
 
   return (
     <div className="scribefold-codemirror" onContextMenu={handleContextMenu}>
-      <MinimalSearchBar editorRef={editorRef} visible={true}></MinimalSearchBar>
+      <MinimalSearchBar editorRef={editorRef}></MinimalSearchBar>
       <CodeMirror
         basicSetup={false}
-        height="100%"
-        width="100%"
-        style={{ height: '100%', width: '100%' }}
         extensions={extensions}
         onCreateEditor={handleCreateEditor}
-        onChange={() => {}}
       />
     </div>
   );

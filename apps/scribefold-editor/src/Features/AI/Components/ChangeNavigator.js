@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import './ChangeNavigator.css';
 import { setShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
@@ -28,7 +28,6 @@ function ChangeNavigator() {
     setNChunks(buttons.length);
     return buttons;
   };
-
 
   // Hilights and scrolls to an index
   const selectIndex = (index) => {

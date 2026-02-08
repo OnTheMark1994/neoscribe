@@ -24,7 +24,6 @@ const DEFAULT_OPTIONS = [
               insert: ''
             }
           });
-          console.log('[RightClickWindow] Cut:', text);
         });
       }
     }
@@ -39,7 +38,7 @@ const DEFAULT_OPTIONS = [
         const text = state.doc.sliceString(selection.from, selection.to);
 
         navigator.clipboard.writeText(text).then(() => {
-          console.log('[RightClickWindow] Copied:', text);
+          // Success
         });
       }
     }
@@ -60,7 +59,6 @@ const DEFAULT_OPTIONS = [
               insert: text
             }
           });
-          console.log('[RightClickWindow] Pasted:', text);
         });
       }
     }
@@ -101,8 +99,6 @@ export default function RightClickWindow({ editorRef }) {
 
   // Handle option click - replace word if it's a spellcheck suggestion
   const handleOptionClick = (option, index) => {
-    console.log('[RightClickWindow] Option clicked:', option);
-
     // If it's a spellcheck suggestion (no onClick property), replace the word
     if (!option.onClick && editorRef?.current) {
       const view = editorRef.current;
@@ -122,7 +118,6 @@ export default function RightClickWindow({ editorRef }) {
             insert: option.title
           }
         });
-        console.log('[RightClickWindow] Replaced word with:', option.title);
       }
     } else if (option.onClick) {
       // Handle default menu options - pass editorRef if needed

@@ -1,42 +1,31 @@
-import { lineIdState } from '../Features/Editors/CodeMirror/EditorCodeMirrorSetup';
+import { lineIdState } from '../Features/Editors/CodeMirror/EditorSetup';
 
 export function getEditorText(editorRef) {
-  console.log('[EditorRefHelpers] getEditorText called');
   const view = editorRef?.current;
-  console.log('[EditorRefHelpers] editorRef.current:', view);
   if (!view?.state?.doc) {
-    console.log('[EditorRefHelpers] No view or doc found, returning empty string');
     return '';
   }
   const text = view.state.doc.toString();
-  console.log('[EditorRefHelpers] Retrieved text length:', text.length);
   return text;
 }
 
 export function setEditorText(editorRef, content) {
-  console.log('[EditorRefHelpers] setEditorText called with content length:', content?.length);
   const view = editorRef?.current;
-  console.log('[EditorRefHelpers] editorRef.current:', view);
   
   if (!view?.dispatch || !view?.state?.doc) {
-    console.log('[EditorRefHelpers] No view or dispatch available, returning false');
     return false;
   }
 
   const next = String(content ?? '');
   const current = view.state.doc.toString();
-  console.log('[EditorRefHelpers] Current text length:', current.length, 'New text length:', next.length);
   
   if (next === current) {
-    console.log('[EditorRefHelpers] Text is the same, no update needed');
     return true;
   }
 
-  console.log('[EditorRefHelpers] Dispatching text update');
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: next },
   });
-  console.log('[EditorRefHelpers] Text update dispatched successfully');
   return true;
 }
 
@@ -233,11 +222,6 @@ export function applyProposedChanges(editorRef, proposedChanges) {
   }
 
   const resultText = resultLines.join('\n');
-
-  // Minimal, focused logging for debugging the new flow.
-  console.log('[AI Apply] Original text:', originalText);
-  console.log('[AI Apply] Proposed changes:', JSON.stringify(proposedChanges, null, 2));
-  console.log('[AI Apply] Resulting text:', resultText);
 
   return resultText;
 }

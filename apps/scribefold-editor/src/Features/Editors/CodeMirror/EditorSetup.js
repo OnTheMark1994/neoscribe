@@ -243,6 +243,7 @@ export { lineIdState };
 export function buildExtensions(onChange, aiModeActive, options = {}) {
   const showLineNumbers = !!options.showLineNumbers;
   const spellcheckEnabled = options.spellcheckEnabled !== false;
+  const lineWrapEnabled = options.lineWrapEnabled === true;
   const spellcheckExtension = spellcheckEnabled
     ? EditorView.contentAttributes.of({ spellcheck: "true" })
     : null;
@@ -251,6 +252,7 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
     ...(spellcheckExtension ? [spellcheckExtension] : []),
     lineIdState,
     ...(aiModeActive ? [aiShareGutter] : []),
+    ...(lineWrapEnabled ? [EditorView.lineWrapping] : []),
     foldGutter({
       markerDOM: (open) => {
         const span = document.createElement('span');

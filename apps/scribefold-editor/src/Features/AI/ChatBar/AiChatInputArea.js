@@ -20,7 +20,7 @@ import { setShowSettingsWindow } from '../../../Global/ReduxSlices/WindowSlice';
 import { toggleShowDiffView, setShowDiffView } from '../../../Global/ReduxSlices/EditorSlice';
 import { updateAvailableTokens } from '../../../Global/ReduxSlices/UserSlice';
 import { getAIVisibleLinesFromEditor } from '../../../Global/EditorRefHelpers';
-import { lineIdState } from '../../Editors/CodeMirror/EditorCodeMirrorSetup';
+import { lineIdState } from '../../Editors/CodeMirror/EditorSetup';
 import { supabase } from '../../../Global/SupabaseClient';
 import './AiChatInputArea.css';
 
