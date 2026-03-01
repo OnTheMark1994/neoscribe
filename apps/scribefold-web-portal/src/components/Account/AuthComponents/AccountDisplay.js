@@ -115,7 +115,7 @@ const AccountDisplay = () => {
   const handleSubscribeWithStripe = async () => {
     if (!authUser) return;
 
-    const selectedPlanData = PLANS.find((plan) => plan.id === selectedPlanId);
+    const selectedPlanData = PLANS.find((plan) => plan?.id === selectedPlanId);
     if (!selectedPlanData) {
       setSubscriptionStatusMsg('Plan not found');
       return;
@@ -131,7 +131,7 @@ const AccountDisplay = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           authId: authUser.id,
-          priceId: selectedPlanData.stripe_price_id
+          priceId: selectedPlanData?.stripe_price_id
         }),
       });
 
@@ -160,8 +160,8 @@ const AccountDisplay = () => {
           </div>
           <div className="sf-plans-grid">
             {PLANS.map((plan) => {
-              const numericTokens = Number(plan.tokens);
-              const numericPrice = Number(plan.monthlyPrice);
+              const numericTokens = Number(plan?.tokens);
+              const numericPrice = Number(plan?.monthlyPrice);
               const hasNumericTokens = Number.isFinite(numericTokens);
               const hasNumericPrice = Number.isFinite(numericPrice);
               const pricePerThousand =
@@ -170,14 +170,14 @@ const AccountDisplay = () => {
                   : null;
               const isCurrentPlan =
                 userData?.tier_id != null &&
-                Number(plan.tier_id) === Number(userData.tier_id);
-              const isSelected = selectedPlanId === plan.id;
+                Number(plan?.tier_id) === Number(userData.tier_id);
+              const isSelected = selectedPlanId === plan?.id;
               return (
                 <button
-                  key={plan.id}
+                  key={plan?.id}
                   type="button"
                   className={`sf-plan-card ${isSelected ? 'sf-plan-card-selected' : ''}`}
-                  onClick={() => setSelectedPlanId(plan.id)}
+                  onClick={() => setSelectedPlanId(plan?.id)}
                 >
                   {isCurrentPlan && (
                     <div className="sf-plan-current-badge">
@@ -187,7 +187,7 @@ const AccountDisplay = () => {
                   )}
                   <div className="sf-plan-header-row">
                     <span className="sf-plan-name">
-                      {plan.name}
+                      {plan?.name}
                     </span>
                   </div>
                   <div className="sf-plan-body">
@@ -205,7 +205,7 @@ const AccountDisplay = () => {
                         : 'Loading...'}
                     </div>
                     <div className="sf-plan-description" style={{ textAlign: 'center' }}>
-                      {plan.description}
+                      {plan?.description}
                     </div>
                   </div>
                 </button>
@@ -254,7 +254,7 @@ const AccountDisplay = () => {
               <span className="sf-stat-value">
                 {userDataLoading
                   ? 'Loading...'
-                  : formatTokens(userData.tokens || userData.tokens_monthly + userData.tokens_added)}
+                  : formatTokens(userData?.tokens || (userData?.tokens_monthly || 0) + (userData?.tokens_added || 0))}
               </span>
             </div>
             <div className="sf-stat-card">
@@ -262,7 +262,7 @@ const AccountDisplay = () => {
               <span className="sf-stat-value">
                 {userDataLoading
                   ? 'Loading...'
-                  : formatTokens(userData.tokens_used_this_month)}
+                  : formatTokens(userData?.tokens_used_this_month)}
               </span>
             </div>
             <div className="sf-stat-card">
@@ -278,7 +278,7 @@ const AccountDisplay = () => {
               <span className="sf-stat-value">
                 {userDataLoading
                   ? 'Loading...'
-                  : formatTokens(userData.tokens_added)}
+                  : formatTokens(userData?.tokens_added)}
               </span>
             </div>
             <div className="sf-stat-card">
@@ -286,7 +286,7 @@ const AccountDisplay = () => {
               <span className="sf-stat-value">
                 {userDataLoading
                   ? 'Loading...'
-                  : formatTokens(userData.tokens_used_all_time)}
+                  : formatTokens(userData?.tokens_used_all_time)}
               </span>
             </div>
             <div className="sf-stat-card">
@@ -294,7 +294,7 @@ const AccountDisplay = () => {
               <span className="sf-stat-value">
                 {userDataLoading
                   ? 'Loading...'
-                  : formatTokens(userData.tokens_monthly)}
+                  : formatTokens(userData?.tokens_monthly)}
               </span>
               {userData?.next_billing_date && (
                 <div style={{ fontSize: '0.8em', opacity: 0.8, marginTop: '4px' }}>
@@ -398,15 +398,15 @@ const AccountDisplay = () => {
               <span>
                 {userDataLoading
                   ? 'Loading...'
-                  : userData.subscription_tier_name
-                    ? `${userData.subscription_tier_name} (${userData.subscription_status || 'active'})`
+                  : userData?.subscription_tier_name
+                    ? `${userData?.subscription_tier_name} (${userData?.subscription_status || 'active'})`
                     : 'No active subscription'}
               </span>
             </div>
             {userData?.stripe_subscription_id && (
               <div className="sf-account-detail-row">
                 <span>Subscription ID</span>
-                <span style={{ fontSize: '0.8em', opacity: 0.7 }}>{userData.stripe_subscription_id}</span>
+                <span style={{ fontSize: '0.8em', opacity: 0.7 }}>{userData?.stripe_subscription_id}</span>
               </div>
             )}
             <div className="sf-account-detail-row">
@@ -414,8 +414,8 @@ const AccountDisplay = () => {
               <span>
                 {userDataLoading
                   ? 'Loading...'
-                  : userData.next_billing_date
-                    ? new Date(userData.next_billing_date).toLocaleDateString('en-US', {
+                  : userData?.next_billing_date
+                    ? new Date(userData?.next_billing_date).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
