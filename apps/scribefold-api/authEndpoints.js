@@ -140,22 +140,8 @@ router.post('/user-data', async (req, res) => {
 
     console.log('[user-data] Fetching user data for:', userId);
 
-    // Create Supabase client with user's JWT token for read-only access
-    const { createClient } = require('@supabase/supabase-js');
-    const supabaseUser = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SECRET_KEY, // Use regular key, not service role
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${userAccessToken}`
-          }
-        }
-      }
-    );
-
-    // Find user by auth_id using user's JWT token (read-only access)
-    const { data: user, error: fetchError } = await supabaseUser
+    // Find user by auth_id using admin client
+    const { data: user, error: fetchError } = await req.supabaseAdmin
       .from('users')
       .select('*')
       .eq('auth_id', userId)

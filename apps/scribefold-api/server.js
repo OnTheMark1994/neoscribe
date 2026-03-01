@@ -51,6 +51,8 @@ const { calculateAvailableTokens, estimateTokensUsed, updateUserTokens, createKe
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+console.log("process.env.SUPABASE_URL: ", process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 10):"not found")
+console.log("process.env.SUPABASE_SERVICE_ROLE_KEY_SECRET: ", process.env.SUPABASE_SERVICE_ROLE_KEY_SECRET ? process.env.SUPABASE_SERVICE_ROLE_KEY_SECRET.substring(0, 5):"not found")
 // Set up Supabase clients
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
@@ -61,7 +63,7 @@ if (!supabaseAdmin) console.warn('⚠ Supabase admin not configured. Auth endpoi
 // Initialize Resend client for email
 const resend = new Resend(process.env.RESEND_KEY);
 
-// Encryption utilities for session_builders table, must be 64 hex characters (32 bytes)
+// (todo: maybe cycle this) Encryption utilities for session_builders table, must be 64 hex characters (32 bytes)
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 // Create key buffer for encryption/decryption
 const keyBuffer = createKeyBuffer(ENCRYPTION_KEY);

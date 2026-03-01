@@ -15,6 +15,7 @@ const PLANS = [
 const AccountDisplay = () => {
   const authUser = useSelector(state => state.userSlice.authUser);
   const userData = useSelector(state => state.userSlice.userData);
+  const userDataLoading = useSelector(state => state.userSlice.userDataLoading);
   const [selectedAddonTokens, setSelectedAddonTokens] = useState(2_000_000);
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
@@ -60,7 +61,7 @@ const AccountDisplay = () => {
   };
 
   const formatTokens = (value) => {
-    if (!Number.isFinite(value)) return 'n/a';
+    if (!Number.isFinite(value)) return '-';
     return value.toLocaleString();
   };
 
@@ -251,7 +252,7 @@ const AccountDisplay = () => {
             <div className="sf-stat-card">
               <span className="sf-stat-label">Available Tokens</span>
               <span className="sf-stat-value">
-                {!userData
+                {userDataLoading
                   ? 'Loading...'
                   : formatTokens(userData.tokens || userData.tokens_monthly + userData.tokens_added)}
               </span>
@@ -259,7 +260,7 @@ const AccountDisplay = () => {
             <div className="sf-stat-card">
               <span className="sf-stat-label">Tokens Used This Month</span>
               <span className="sf-stat-value">
-                {!userData
+                {userDataLoading
                   ? 'Loading...'
                   : formatTokens(userData.tokens_used_this_month)}
               </span>
@@ -267,7 +268,7 @@ const AccountDisplay = () => {
             <div className="sf-stat-card">
               <span className="sf-stat-label">Monthly Tokens Remaining</span>
               <span className="sf-stat-value">
-                {!userData
+                {userDataLoading
                   ? 'Loading...'
                   : formatTokens(userData.tokens_monthly)}
               </span>
@@ -275,7 +276,7 @@ const AccountDisplay = () => {
             <div className="sf-stat-card">
               <span className="sf-stat-label">Added Tokens Remaining</span>
               <span className="sf-stat-value">
-                {!userData
+                {userDataLoading
                   ? 'Loading...'
                   : formatTokens(userData.tokens_added)}
               </span>
@@ -283,7 +284,7 @@ const AccountDisplay = () => {
             <div className="sf-stat-card">
               <span className="sf-stat-label">Tokens Used All Time</span>
               <span className="sf-stat-value">
-                {!userData
+                {userDataLoading
                   ? 'Loading...'
                   : formatTokens(userData.tokens_used_all_time)}
               </span>
@@ -291,7 +292,7 @@ const AccountDisplay = () => {
             <div className="sf-stat-card">
               <span className="sf-stat-label">Tokens Added Monthly</span>
               <span className="sf-stat-value">
-                {!userData
+                {userDataLoading
                   ? 'Loading...'
                   : formatTokens(userData.tokens_monthly)}
               </span>
@@ -395,7 +396,7 @@ const AccountDisplay = () => {
             <div className="sf-account-detail-row">
               <span>Current Plan</span>
               <span>
-                {!userData
+                {userDataLoading
                   ? 'Loading...'
                   : userData.subscription_tier_name
                     ? `${userData.subscription_tier_name} (${userData.subscription_status || 'active'})`
@@ -411,7 +412,7 @@ const AccountDisplay = () => {
             <div className="sf-account-detail-row">
               <span>Next Billing Date</span>
               <span>
-                {!userData
+                {userDataLoading
                   ? 'Loading...'
                   : userData.next_billing_date
                     ? new Date(userData.next_billing_date).toLocaleDateString('en-US', {
