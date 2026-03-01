@@ -172,9 +172,8 @@ router.post('/user-data', async (req, res) => {
     return res.json({
       success: true,
       userData: {
-        id: user.id,
-        auth_id: user.auth_id,
         email: user.email,
+        tier_id: user.tier_id,
         tokens: availableTokens, // Calculated available tokens
         tokens_added: user.tokens_added || 0,
         tokens_monthly: user.tokens_monthly || 0,

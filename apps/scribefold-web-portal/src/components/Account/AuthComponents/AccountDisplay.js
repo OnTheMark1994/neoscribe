@@ -227,7 +227,7 @@ const AccountDisplay = () => {
                 onClick={handleSubscribeWithStripe}
                 disabled={!selectedPlanId || subscriptionLoading}
               >
-                {subscriptionLoading ? 'Processing...' : (userData?.tier_id ? 'Change Plan' : 'Subscribe')}
+                {subscriptionLoading ? 'Processing...' : (!selectedPlanId ? 'Choose A Plan' : (userData?.tier_id ? 'Change Plan' : 'Subscribe'))}
               </button>
               {subscriptionStatusMsg && (
                 <div style={{ marginTop: '8px', fontSize: '0.9em', opacity: 0.8 }}>
