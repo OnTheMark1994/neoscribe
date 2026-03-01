@@ -125,7 +125,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'checkout.session.completed': {
         const session = event.data.object;
-        console.log('[STRIPE WEBHOOK] checkout.session.completed:', JSON.stringify(session, null, 2));
+        console.log('[STRIPE WEBHOOK] checkout.session.completed - Session ID:', session.id, 'Customer:', session.customer);
 
         if (session.subscription) {
           const authId = session.metadata?.authId;
@@ -198,7 +198,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
-        console.log('[STRIPE WEBHOOK] customer.subscription.updated:', JSON.stringify(subscription, null, 2));
+        console.log('[STRIPE WEBHOOK] customer.subscription.updated - Subscription ID:', subscription.id, 'Customer:', subscription.customer);
 
         // Get plan from subscription items
         const priceId = subscription.items.data[0]?.price?.id;
@@ -253,7 +253,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
-        console.log('[STRIPE WEBHOOK] customer.subscription.deleted:', JSON.stringify(subscription, null, 2));
+        console.log('[STRIPE WEBHOOK] customer.subscription.deleted - Subscription ID:', subscription.id, 'Customer:', subscription.customer);
 
         // Get user by stripe_customer_id
         const { data: users } = await req.supabaseAdmin
@@ -294,7 +294,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
-        console.log('[STRIPE WEBHOOK] invoice.payment_succeeded:', JSON.stringify(invoice, null, 2));
+        console.log('[STRIPE WEBHOOK] invoice.payment_succeeded - Invoice ID:', invoice.id, 'Customer:', invoice.customer);
 
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
@@ -354,7 +354,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
-        console.log('[STRIPE WEBHOOK] invoice.payment_failed:', JSON.stringify(invoice, null, 2));
+        console.log('[STRIPE WEBHOOK] invoice.payment_failed - Invoice ID:', invoice.id, 'Customer:', invoice.customer);
 
         if (invoice.subscription) {
           // Get user by stripe_customer_id

@@ -56,10 +56,10 @@ const FREE_TOKENS_GRANT = 15000;
 // IMPORTANT: If you update this PLANS array, you must also update the PLANS array
 // in apps/scribefold-web-portal/src/components/Account/AuthComponents/AccountDisplay.js
 const PLANS = [
-  { id: 'light', name: 'Light', tokens: 1000000, tier_id: 1 },
-  { id: 'basic', name: 'Basic', tokens: 2500000, tier_id: 2 },
-  { id: 'full', name: 'Standard', tokens: 8500000, tier_id: 3 },
-  { id: 'heavy', name: 'Heavy', tokens: 85000000, tier_id: 4 },
+  { id: 'light', name: 'Light', tokens: 1000000, tier_id: 1, stripe_price_id: process.env.STRIPE_PRICE_ID_LIGHT },
+  { id: 'basic', name: 'Basic', tokens: 2500000, tier_id: 2, stripe_price_id: process.env.STRIPE_PRICE_ID_BASIC },
+  { id: 'full', name: 'Standard', tokens: 8500000, tier_id: 3, stripe_price_id: process.env.STRIPE_PRICE_ID_FULL },
+  { id: 'heavy', name: 'Heavy', tokens: 85000000, tier_id: 4, stripe_price_id: process.env.STRIPE_PRICE_ID_HEAVY },
 ];
 
 module.exports = {
