@@ -107,8 +107,8 @@ router.post('/create-checkout', async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${webPortalUrl}/account?checkout=success`,
-      cancel_url: `${webPortalUrl}/account?checkout=cancel`,
+      success_url: `${webPortalUrl}/#/account?checkout=success`,
+      cancel_url: `${webPortalUrl}/#/account?checkout=cancel`,
       metadata: { authId }
     });
 

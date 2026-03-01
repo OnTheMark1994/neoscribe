@@ -19,11 +19,11 @@ router.use((req, res, next) => {
  * POST /s/webhook
  * Handles subscription lifecycle events with detailed logging
  */
-router.post('/webhook', async (req, res) => {
+router.post('/webhook', async (req, res, next) => {
   console.log('\n========================================');
   console.log('[STRIPE WEBHOOK] Incoming webhook request');
   console.log('========================================');
-  
+
   if (!stripe) {
     console.error('[STRIPE WEBHOOK] ERROR: Stripe not configured');
     return res.status(503).json({ error: 'Stripe not configured' });
@@ -31,7 +31,7 @@ router.post('/webhook', async (req, res) => {
 
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  
+
   console.log('[STRIPE WEBHOOK] Signature present:', !!sig);
   console.log('[STRIPE WEBHOOK] Webhook secret configured:', !!webhookSecret);
 
@@ -39,7 +39,9 @@ router.post('/webhook', async (req, res) => {
 
   try {
     if (webhookSecret) {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      // Use raw body for signature verification
+      const rawBody = req.rawBody || req.body;
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
       console.log('[STRIPE WEBHOOK] Signature verified successfully');
     } else {
       // For testing without webhook signature verification
@@ -48,7 +50,7 @@ router.post('/webhook', async (req, res) => {
     }
   } catch (err) {
     console.error('[STRIPE WEBHOOK] ERROR: Signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    return res.status(400).json({ error: 'Webhook signature verification failed' });
   }
 
   console.log('[STRIPE WEBHOOK] Event type:', event.type);

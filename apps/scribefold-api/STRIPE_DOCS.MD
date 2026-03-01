@@ -60,3 +60,14 @@ click a product
 where it says products on that page click it
 and on the pricing area there is a row with 3 dots on the right, click that 
 click copy price id
+
+somwhow I have a product with 4 prices so gonna use those
+copied the price id with the 3 dot menu and put in env variables and it is working
+
+in workbench (clicke w in strip web portal)
+can click webhooks
+then one of them
+then to event deliveries
+and it shows all of the events that delivered and the status
+
+in the webhook overview there is a edit destination button at the top right that you can use to change the url

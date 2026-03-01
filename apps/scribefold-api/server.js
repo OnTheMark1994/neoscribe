@@ -80,8 +80,20 @@ app.use(cors({
   credentials: true
 }));
 
-// Parse JSON request bodies.
-app.use(express.json({ limit: '2mb' }));
+// Capture raw body for Stripe webhook signature verification
+app.use('/s/webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
+  req.rawBody = req.body;
+  next();
+});
+
+// Parse JSON request bodies (except for webhook endpoint)
+app.use((req, res, next) => {
+  if (req.path === '/s/webhook') {
+    next();
+  } else {
+    express.json({ limit: '2mb' })(req, res, next);
+  }
+});
 
 // Attach dependencies to request object for endpoints
 app.use('/dev', (req, res, next) => {
