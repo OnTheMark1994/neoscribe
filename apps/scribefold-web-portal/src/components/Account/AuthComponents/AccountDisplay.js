@@ -4,7 +4,9 @@ import { supabase } from '../../../Global/SupabaseClient';
 import RefreshUserData from '../../Util/RefreshUserData';
 import './AccountDisplay.css';
 
-// Plan definitions - may be moved to server later
+// Plan definitions - MUST match server PLANS in constants.js
+// IMPORTANT: If you update this PLANS array, you must also update the PLANS array
+// in apps/scribefold-api/constants.js
 const PLANS = [
   { id: 'light', name: 'Light', description: 'Good for occasional writing and small projects.', tokens: 1000000, monthlyPrice: 8.5, tier_id: 1, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_LIGHT },
   { id: 'basic', name: 'Basic', description: 'Good for regular use and active editing sessions.', tokens: 2500000, monthlyPrice: 14.5, tier_id: 2, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_BASIC },

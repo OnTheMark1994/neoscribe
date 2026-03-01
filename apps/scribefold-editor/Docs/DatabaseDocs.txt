@@ -1,0 +1,42 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+
+Used for auto login links 
+CREATE TABLE public.session_builders (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  field1 text,
+  field2 text,
+  CONSTRAINT session_builders_pkey PRIMARY KEY (id)
+);
+
+Currently unused but will be used
+CREATE TABLE public.token_log (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  tokens bigint,
+  user_id text,
+  note text,
+  tokens_monthly bigint,
+  tokens_added bigint,
+  CONSTRAINT token_log_pkey PRIMARY KEY (id)
+);
+
+Users table used as primary data source
+CREATE TABLE public.users (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,     // user id (primary key)
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  auth_id text UNIQUE,              // supabase auth id
+  tokens_used_this_month bigint,    // tokens the user has used this month (just for viewing, not used in calculation)
+  tokens_used_all_time bigint,      // tokens the user has used all time (just for viewing, not used in calculation)
+  tokens_added bigint,              // carry over between billing cycles, added with free grants and one time purchases, used only when tokens_monthly are used up 
+  tokens_monthly bigint,            // Added through subscriptions 
+  tier_id text,                     // For the subscription tier, maps to PLANS object constant 
+  stripe_customer_id text,          // Stripe 
+  stripe_subscription_id text,      // Stripe 
+  subscription_status text,         // Stripe 
+  subscription_end_date text,       // Stripe (just for viewing, currently not viewd but is set) 
+  next_billing_date text,           // Stripe (just for viewing, currently not set or viewed) 
+  CONSTRAINT users_pkey PRIMARY KEY (id) // just saying the id is the primary key
+);

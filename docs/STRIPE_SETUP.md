@@ -53,6 +53,9 @@ om the top right the go to test mode is now in the "enter sandbox" option hover 
 
 now in the normal account page can press w or clicke the bottom developer bar and workbench comes up
 can click webhook option
+then one of them
+then to event deliveries
+and it shows all of the events that delivered and the status
 
 to get price ids
 go to product catalogue on the left
@@ -71,38 +74,3 @@ then to event deliveries
 and it shows all of the events that delivered and the status
 
 in the webhook overview there is a edit destination button at the top right that you can use to change the url
-
----
-
-## All Actions and Webhooks Called
-
-### New Subscription (first-time signup)
-**Webhooks Called:** checkout.session.completed, customer.subscription.created
-**Should Use:** checkout.session.completed (has authId in metadata, sets up subscription and tokens)
-**Should NOT Use:** customer.subscription.created (no authId, would cause duplicate token grants)
-
-### Upgrade (user changes to higher tier)
-**Webhooks Called:** checkout.session.completed, customer.subscription.updated
-**Should Use:** checkout.session.completed for tokens (has authId, handles upgrade top-up)
-**Should NOT Use:** customer.subscription.updated for tokens (would duplicate - only update metadata like tier_id, status)
-
-### Downgrade (user changes to lower tier)
-**Webhooks Called:** customer.subscription.updated
-**Should Use:** customer.subscription.updated for metadata only (tier_id, status)
-**Should NOT Use:** Any token changes (keep existing tokens_monthly until next renewal)
-
-### Monthly Renewal
-**Webhooks Called:** invoice.payment_succeeded, customer.subscription.updated
-**Should Use:** invoice.payment_succeeded for tokens (tops up tokens_monthly to tier limit, resets tokens_used_this_month)
-**Should NOT Use:** customer.subscription.updated for tokens (would duplicate - only update metadata)
-
-### Cancellation
-**Webhooks Called:** customer.subscription.deleted
-**Should Use:** customer.subscription.deleted (sets tokens_monthly to 0, preserves tokens_added)
-**Should NOT Use:** -
-
-### Payment Failure
-**Webhooks Called:** invoice.payment_failed
-**Should Use:** invoice.payment_failed (sets subscription_status to 'past_due', no token changes)
-**Should NOT Use:** -
-

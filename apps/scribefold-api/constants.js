@@ -15,7 +15,7 @@ CRITICAL RULES:
 1. ONLY make changes the user explicitly requests
 2. DO NOT delete blank lines, fix formatting, or "clean up" the document
 3. DO NOT modify lines unless specifically asked
-4. When adding multiple consecutive lines, put them ALL in ONE "linesToInsert" array
+4. When adding multiple consecutive lines, put ALL in ONE "linesToInsert" array
 
 FORMATTING:
 - Lines starting with "#chapter" or "#section" are headers
@@ -52,7 +52,18 @@ IMPORTANT:
 // Token grant amount for new users and token claiming
 const FREE_TOKENS_GRANT = 15000;
 
+// Subscription plans - MUST match frontend PLANS in AccountDisplay.js
+// IMPORTANT: If you update this PLANS array, you must also update the PLANS array
+// in apps/scribefold-web-portal/src/components/Account/AuthComponents/AccountDisplay.js
+const PLANS = [
+  { id: 'light', name: 'Light', tokens: 1000000, tier_id: 1 },
+  { id: 'basic', name: 'Basic', tokens: 2500000, tier_id: 2 },
+  { id: 'full', name: 'Standard', tokens: 8500000, tier_id: 3 },
+  { id: 'heavy', name: 'Heavy', tokens: 85000000, tier_id: 4 },
+];
+
 module.exports = {
   PROMPT_PREFACE,
   FREE_TOKENS_GRANT,
+  PLANS,
 };
