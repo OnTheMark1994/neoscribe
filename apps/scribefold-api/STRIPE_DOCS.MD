@@ -74,35 +74,27 @@ in the webhook overview there is a edit destination button at the top right that
 
 ---
 
-## All Actions and Webhooks Called
+## Webhook Flow
 
-### New Subscription (first-time signup)
-**Webhooks Called:** checkout.session.completed, customer.subscription.created
-**Should Use:** checkout.session.completed (has authId in metadata, sets up subscription and tokens)
-**Should NOT Use:** customer.subscription.created (no authId, would cause duplicate token grants)
+### stripe_customer_id Set
+When: `/s/create-checkout` is called (before user enters payment details)
+Where: Saved to users table
 
-### Upgrade (user changes to higher tier)
-**Webhooks Called:** checkout.session.completed, customer.subscription.updated
-**Should Use:** checkout.session.completed for tokens (has authId, handles upgrade top-up)
-**Should NOT Use:** customer.subscription.updated for tokens (would duplicate - only update metadata like tier_id, status)
+### Webhooks and Updates
 
-### Downgrade (user changes to lower tier)
-**Webhooks Called:** customer.subscription.updated
-**Should Use:** customer.subscription.updated for metadata only (tier_id, status)
-**Should NOT Use:** Any token changes (keep existing tokens_monthly until next renewal)
+**invoice.payment_succeeded**
+- When: Successful payment (new subscription AND monthly renewal)
+- Updates: tokens_monthly, tokens_used_this_month
 
-### Monthly Renewal
-**Webhooks Called:** invoice.payment_succeeded, customer.subscription.updated
-**Should Use:** invoice.payment_succeeded for tokens (tops up tokens_monthly to tier limit, resets tokens_used_this_month)
-**Should NOT Use:** customer.subscription.updated for tokens (would duplicate - only update metadata)
+**customer.subscription.updated**
+- When: Plan changes (new subscription, upgrade, downgrade)
+- Updates: tier_id, subscription_status, stripe_subscription_id
 
-### Cancellation
-**Webhooks Called:** customer.subscription.deleted
-**Should Use:** customer.subscription.deleted (sets tokens_monthly to 0, preserves tokens_added)
-**Should NOT Use:** -
+**customer.subscription.deleted**
+- When: Cancellation
+- Updates: tier_id to null, tokens_monthly to 0
 
-### Payment Failure
-**Webhooks Called:** invoice.payment_failed
-**Should Use:** invoice.payment_failed (sets subscription_status to 'past_due', no token changes)
-**Should NOT Use:** -
+**invoice.payment_failed**
+- When: Payment failure
+- Updates: subscription_status to 'past_due'
 

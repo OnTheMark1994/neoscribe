@@ -83,8 +83,8 @@ router.post('/webhook', async (req, res, next) => {
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  console.log('[STRIPE WEBHOOK] Signature present:', !!sig);
-  console.log('[STRIPE WEBHOOK] Webhook secret configured:', !!webhookSecret);
+  // console.log('[STRIPE WEBHOOK] Signature present:', !!sig);
+  // console.log('[STRIPE WEBHOOK] Webhook secret configured:', !!webhookSecret);
 
   let event;
 
@@ -93,7 +93,7 @@ router.post('/webhook', async (req, res, next) => {
       // Use raw body for signature verification
       const rawBody = req.rawBody || req.body;
       event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-      console.log('[STRIPE WEBHOOK] Signature verified successfully');
+      // console.log('[STRIPE WEBHOOK] Signature verified successfully');
     } else {
       // For testing without webhook signature verification
       console.warn('[STRIPE WEBHOOK] WARNING: No webhook secret configured, parsing body directly');
@@ -105,96 +105,24 @@ router.post('/webhook', async (req, res, next) => {
   }
 
   console.log('[STRIPE WEBHOOK] Event type:', event.type);
-  console.log('[STRIPE WEBHOOK] Event ID:', event.id);
-  console.log('[STRIPE WEBHOOK] Event created:', new Date(event.created * 1000).toISOString());
+  // console.log('[STRIPE WEBHOOK] Event ID:', event.id);
+  // console.log('[STRIPE WEBHOOK] Event created:', new Date(event.created * 1000).toISOString());
+  console.log('========================================');
 
   try {
     switch (event.type) {
       // ============================================================================
-      // CHECKOUT SESSION COMPLETED
-      // ============================================================================
-      // TRIGGER: User completes Stripe checkout (first-time subscription or upgrade)
-      // PURPOSE: Sets up new subscription with initial tokens
-      // ACTIONS:
-      //   - Updates tier_id, stripe_subscription_id, stripe_customer_id, subscription_status
-      //   - Sets tokens_monthly to max(current, tierLimit) - tops up if user had less
-      //   - Resets tokens_used_this_month to 0 (new billing period)
-      // WHY THIS IS SOURCE OF TRUTH:
-      //   - customer.subscription.created also fires but we skip it to avoid duplicate tokens
-      //   - This webhook has authId in metadata, allowing us to identify the user
-      // ============================================================================
-      case 'checkout.session.completed': {
-        const session = event.data.object;
-        console.log('[STRIPE WEBHOOK] checkout.session.completed - Session ID:', session.id, 'Customer:', session.customer);
-
-        if (session.subscription) {
-          const authId = session.metadata?.authId;
-          if (!authId) {
-            console.error('[STRIPE WEBHOOK] ERROR: No authId in metadata');
-            break;
-          }
-
-          const subscription = await stripe.subscriptions.retrieve(session.subscription);
-          const priceId = subscription.items.data[0]?.price?.id;
-          const plan = getPlanByPriceId(priceId);
-
-          if (!plan) {
-            console.error('[STRIPE WEBHOOK] ERROR: Plan not found for price_id:', priceId);
-            break;
-          }
-
-          // Get current user data
-          const { data: user } = await req.supabaseAdmin
-            .from('users')
-            .select('*')
-            .eq('auth_id', authId)
-            .single();
-
-          if (!user) {
-            console.error('[STRIPE WEBHOOK] ERROR: User not found');
-            break;
-          }
-
-          // Update subscription data
-          await updateUserSubscription(req.supabaseAdmin, authId, {
-            tier_id: plan.tier_id,
-            subscription_tier_name: plan.name,
-            subscription_status: subscription.status,
-            stripe_subscription_id: subscription.id,
-            stripe_customer_id: session.customer,
-            next_billing_date: new Date(subscription.current_period_end * 1000).toISOString(),
-          });
-          console.log('[STRIPE WEBHOOK] Setting tier_id to', plan.tier_id, '(', plan.name, ')');
-
-          // Set tokens_monthly to tier limit, reset tokens_used to 0
-          const currentMonthly = user.tokens_monthly || 0;
-          const tierLimit = plan.tokens;
-          const newMonthly = Math.max(currentMonthly, tierLimit);
-
-          await req.supabaseAdmin
-            .from('users')
-            .update({
-              tokens_monthly: newMonthly,
-              tokens_used_this_month: 0,
-            })
-            .eq('auth_id', authId);
-          console.log('[STRIPE WEBHOOK] Setting tokens_monthly to', newMonthly, ', tokens_used_this_month to 0');
-        }
-        break;
-      }
-
-      // ============================================================================
       // CUSTOMER SUBSCRIPTION UPDATED
       // ============================================================================
-      // TRIGGER: Plan changes (upgrade/downgrade) or customer updates subscription
-      // PURPOSE: Handles metadata updates only - NO token changes here
+      // TRIGGER: Plan changes (new subscription, upgrade, downgrade)
+      // PURPOSE: Handles ALL tier_id changes - single source of truth for subscription metadata
       // ACTIONS:
-      //   - Updates tier_id, stripe_subscription_id, subscription_status
-      //   - For upgrades/downgrades: only updates metadata (tier_id, status)
-      //   - NO token changes - checkout.session.completed handles all token updates
+      //   - Updates tier_id, subscription_status, stripe_subscription_id
+      //   - NO token changes - invoice.payment_succeeded handles tokens
       // WHY THIS IS SOURCE OF TRUTH:
-      //   - checkout.session.completed handles all token updates (new subscriptions AND upgrades)
-      //   - This webhook only updates metadata to avoid duplicate token grants
+      //   - Fires on new subscription, upgrade, downgrade
+      //   - stripe_customer_id always available (created in checkout before payment)
+      //   - Consolidates all tier_id changes in one place to avoid duplication
       // ============================================================================
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
@@ -222,18 +150,13 @@ router.post('/webhook', async (req, res, next) => {
 
         const user = users[0];
 
-        // Update subscription metadata only (NO token changes)
+        // Update subscription metadata (tier_id, status, subscription_id)
         await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
           tier_id: plan.tier_id,
-          subscription_tier_name: plan.name,
           subscription_status: subscription.status,
           stripe_subscription_id: subscription.id,
-          next_billing_date: new Date(subscription.current_period_end * 1000).toISOString(),
         });
-
-        // NOTE: checkout.session.completed handles all token updates (new subscriptions AND upgrades)
-        // This webhook only updates metadata to avoid duplicate token grants
-        console.log('[STRIPE WEBHOOK] Metadata updated, no token changes (checkout.session.completed handles tokens)');
+        console.log('[STRIPE WEBHOOK] Setting tier_id to', plan.tier_id, '(', plan.name, '), subscription_status to', subscription.status);
 
         console.log('[STRIPE WEBHOOK] User subscription updated successfully');
         break;
@@ -272,7 +195,6 @@ router.post('/webhook', async (req, res, next) => {
         await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
           tier_id: null,
           subscription_status: 'canceled',
-          next_billing_date: null,
           tokens_monthly: 0,
         });
         console.log('[STRIPE WEBHOOK] Setting tier_id to null, subscription_status to canceled, tokens_monthly to 0');
@@ -321,7 +243,7 @@ router.post('/webhook', async (req, res, next) => {
 
           // Update next billing date
           await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
-            next_billing_date: new Date(subscription.current_period_end * 1000).toISOString(),
+            next_billing_date: null,
           });
 
           // Top up tokens_monthly to tier limit, reset tokens_used to 0
