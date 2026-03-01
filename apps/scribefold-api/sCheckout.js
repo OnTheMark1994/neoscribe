@@ -97,9 +97,9 @@ router.post('/create-checkout', async (req, res) => {
     }
 
     // Determine success/cancel URLs
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const webPortalUrl = process.env.WEB_PORTAL_URL || 'http://localhost:3001';
 
-    console.log('[STRIPE CHECKOUT] Frontend URL:', frontendUrl);
+    console.log('[STRIPE CHECKOUT] Web Portal URL:', webPortalUrl);
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
@@ -107,8 +107,8 @@ router.post('/create-checkout', async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${frontendUrl}#/account?checkout=success`,
-      cancel_url: `${frontendUrl}#/account?checkout=cancel`,
+      success_url: `${webPortalUrl}/account?checkout=success`,
+      cancel_url: `${webPortalUrl}/account?checkout=cancel`,
       metadata: { authId }
     });
 
