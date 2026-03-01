@@ -116,7 +116,7 @@ Phases:
         little bugs like next/prev wrapping etc
 
     2 days
-    dev ops (todo: remove monorepo structure?, testing)
+    dev ops (done)
         render.com 
             api (done)
                 create web service from apps/scribefold-api with same settins as other api (done)
@@ -143,7 +143,7 @@ Phases:
         maybe move away from monorepo
         
     1 week
-    server functionality (todo: stripe webhooks)
+    server basic functionality 
         chat api (done)
             sends proper response 
             tokens 
@@ -164,13 +164,52 @@ Phases:
             montly  
             one time 
         
-    security (done, todo: re-check)
-        supabase table rls (done)
-        scan through for vulnerabilities (do more of this)
-            maybe add rate limiting for the account creation or magic links from same ip
-            also shold make it so go to web portal is not clickable while processing so multiples are not created 
-                (and maybe a processing message for that) 
+    stripe subscriptions
+        working on 
+            get stripe set up 
+            get env variables 
+              check the env examples, 
+              make sure all there, 
+              organize and comment, 
+              keep only necessary ones
+            checkout flow (working)
+            push and test webhook calling 
+        checkout
+            actions:
+                add a subscription
+                canel a subscription
+                downgrade 
+                upgrade
+            flows:
+                user goes to the portal, loggs in, adds a subscription for the first time
+                the payment is successful and then the webhook triggers the points being added
+                a month later the payment is auto charged and that webhook is triggered to add the tokens again 
+                the user decides to upgrade 
+                they can upgrade, pay only the difference, and only the difference in tokens is added 
+                a month later it auto charges and adds the proper tokesn for that 
+                later they downgrade again 
+                it does not charge or takes tokens but next billing cycle it will charge the lower amount and add the proper tokens amount 
+                they can cancel this 
+            adds the proper number of tokens in each case 
+            shows their current subscription status right away in web portal 
+                the api will respond with information to update it
+            shows in the electron app (after refresh is ok)
+            steps:
+                create and setup stripe
+                    create account (done)
+                    go into test mode (done)
+                    add webhook endpoint (done)
+                    add products (done)
+                    other things?
+                gather env variables and urls 
+                    url, public and private keys, product ids, ?
+                link web portal to work with stripe
+                    maybe create an endpoint and use that  
+                create code to update supabase properly in each situation 
 
+
+
+ 
     1 week
     referrals feature
         Tracking referred by 
@@ -201,6 +240,14 @@ Phases:
         remoce logs 
         unused files
         clean up codebase  
+   
+    security
+        supabase table rls (done)
+        scan through for vulnerabilities (do more of this)
+            maybe add rate limiting for the account creation or magic links from same ip
+            also shold make it so go to web portal is not clickable while processing so multiples are not created 
+                (and maybe a processing message for that) 
+
 
     2 days
     the desktop on start reminder      

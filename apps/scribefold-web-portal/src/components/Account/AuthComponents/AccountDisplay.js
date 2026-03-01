@@ -6,10 +6,10 @@ import './AccountDisplay.css';
 
 // Plan definitions - may be moved to server later
 const PLANS = [
-  { id: 'light', name: 'Light', description: 'Good for occasional writing and small projects.', tokens: 1000000, monthlyPrice: 8.5, tier_id: 1 },
-  { id: 'basic', name: 'Basic', description: 'Good for regular use and active editing sessions.', tokens: 2500000, monthlyPrice: 14.5, tier_id: 2 },
-  { id: 'full', name: 'Standard', description: 'Great for creating stories and books.', tokens: 8500000, monthlyPrice: 28.5, tier_id: 3 },
-  { id: 'heavy', name: 'Heavy', description: 'Dare you to use them all.', tokens: 85000000, monthlyPrice: 89.5, tier_id: 4 },
+  { id: 'light', name: 'Light', description: 'Good for occasional writing and small projects.', tokens: 1000000, monthlyPrice: 8.5, tier_id: 1, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_LIGHT },
+  { id: 'basic', name: 'Basic', description: 'Good for regular use and active editing sessions.', tokens: 2500000, monthlyPrice: 14.5, tier_id: 2, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_BASIC },
+  { id: 'full', name: 'Standard', description: 'Great for creating stories and books.', tokens: 8500000, monthlyPrice: 28.5, tier_id: 3, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_FULL },
+  { id: 'heavy', name: 'Heavy', description: 'Dare you to use them all.', tokens: 85000000, monthlyPrice: 89.5, tier_id: 4, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_HEAVY },
 ];
 
 const AccountDisplay = () => {
@@ -17,6 +17,8 @@ const AccountDisplay = () => {
   const userData = useSelector(state => state.userSlice.userData);
   const [selectedAddonTokens, setSelectedAddonTokens] = useState(2_000_000);
   const [selectedPlanId, setSelectedPlanId] = useState(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [subscriptionStatusMsg, setSubscriptionStatusMsg] = useState('');
   const dispatch = useDispatch();
 
   // Check for token on mount
@@ -108,6 +110,46 @@ const AccountDisplay = () => {
     }
   };
 
+  // Handle Stripe checkout for subscriptions using Checkout Sessions
+  const handleSubscribeWithStripe = async () => {
+    if (!authUser) return;
+
+    const selectedPlanData = PLANS.find((plan) => plan.id === selectedPlanId);
+    if (!selectedPlanData) {
+      setSubscriptionStatusMsg('Plan not found');
+      return;
+    }
+
+    setSubscriptionLoading(true);
+    setSubscriptionStatusMsg('Creating checkout session...');
+
+    try {
+      // Call the server to create a checkout session
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/s/create-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authId: authUser.id,
+          priceId: selectedPlanData.stripe_price_id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[WEB] Checkout error:', err);
+      setSubscriptionStatusMsg(`Failed to redirect to checkout: ${err.message}`);
+      setSubscriptionLoading(false);
+    }
+  };
+
   return (
     <div className="sf-page sf-account-page">
       <div className="sf-account-inner">
@@ -179,9 +221,16 @@ const AccountDisplay = () => {
                   const selectedTierId = selectedPlan?.tier_id;
                   return (selectedPlanId && (!currentTierId || selectedTierId > currentTierId)) ? 'sf-plans-subscribe-btn-glow' : '';
                 })()}`}
+                onClick={handleSubscribeWithStripe}
+                disabled={!selectedPlanId || subscriptionLoading}
               >
-                {userData?.tier_id ? 'Change Plan' : 'Subscribe'}
+                {subscriptionLoading ? 'Processing...' : (userData?.tier_id ? 'Change Plan' : 'Subscribe')}
               </button>
+              {subscriptionStatusMsg && (
+                <div style={{ marginTop: '8px', fontSize: '0.9em', opacity: 0.8 }}>
+                  {subscriptionStatusMsg}
+                </div>
+              )}
             </div>
           </div>
         </section>

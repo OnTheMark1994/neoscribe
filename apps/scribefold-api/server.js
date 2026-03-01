@@ -100,6 +100,12 @@ app.use('/auto', (req, res, next) => {
   req.keyBuffer = keyBuffer;
   next();
 });
+app.use('/s', (req, res, next) => {
+  req.supabaseAdmin = supabaseAdmin;
+  req.resend = resend;
+  req.keyBuffer = keyBuffer;
+  next();
+});
 
 // Use dev endpoints router
 const devEndpoints = require('./devEndpoints');
@@ -112,6 +118,14 @@ app.use('/auth', authEndpoints);
 // Use auto endpoints router
 const autoEndpoints = require('./autoEndpoints');
 app.use('/auto', autoEndpoints);
+
+// Use Stripe endpoints router
+const sEndpoints = require('./sEndpoints');
+app.use('/s', sEndpoints);
+
+// Use Stripe checkout router
+const sCheckout = require('./sCheckout');
+app.use('/s', sCheckout);
 
 // Use health endpoints router
 const healthEndpoints = require('./healthEndpoints');
