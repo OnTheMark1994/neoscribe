@@ -161,23 +161,40 @@
   border-color: #38bdf8;
   box-shadow: 0 10px 26px rgba(56, 189, 248, 0.4);
   background: radial-gradient(circle at top, rgba(56,189,248,0.16), rgba(15,23,42,0.95));
+}
+
+.sf-plan-card-current {
+  border-color: rgba(56,189,248,0.9);
+  box-shadow: 0 10px 26px rgba(56, 189, 248, 0.4);
+  background: radial-gradient(circle at top, rgba(56,189,248,0.16), rgba(15,23,42,0.95));
+  color: #e5e7eb;
+}
+
+.sf-plan-card-current:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 10px 26px rgba(56, 189, 248, 0.4);
+  background: radial-gradient(circle at top, rgba(56,189,248,0.16), rgba(15,23,42,0.95));
   transform: translateY(-1px);
+}
+
+.sf-plan-card-text-grey {
+  color: #9ca3af;
 }
 
 .sf-plans-subscribe-btn-glow {
   border-color: #fbbf24 !important;
   border-width: 2px !important;
   color: #fbbf24 !important;
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
-  animation: glow-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+  animation: glow-pulse 4s ease-in-out infinite;
 }
 
 @keyframes glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
   }
   50% {
-    box-shadow: 0 0 35px rgba(251, 191, 36, 0.9);
+    box-shadow: 0 0 25px rgba(251, 191, 36, 0.7);
   }
 }
 
@@ -186,7 +203,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 0px;
 }
 
 .sf-plan-name {
@@ -213,7 +230,6 @@
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #9ca3af;
 }
 
 .sf-plan-body {
@@ -224,9 +240,21 @@
   line-height: 1.5;
 }
 
+.sf-plan-body .sf-plan-card-text-grey {
+  color: #9ca3af;
+}
+
 .sf-plan-tokens {
   font-weight: 500;
   color: #e5e7eb;
+  margin-top: 8px;
+}
+
+.sf-plan-current-label {
+  font-size: 0.7rem;
+  opacity: 0.8;
+  margin-top: 4px;
+  margin-bottom: 0;
 }
 
 .sf-plan-description {
@@ -400,6 +428,12 @@
   background: #4ade80;
   border-color: #fbbf24;
   box-shadow: 0 0 0 1px #fbbf24, 0 0 18px rgba(251, 191, 36, 0.85);
+}
+
+.sf-plans-subscribe-btn:not(.sf-plans-subscribe-btn-glow):hover {
+  background: #4ade80;
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 1px #fbbf24, 0 0 8px rgba(251, 191, 36, 0.4);
 }
 
 .sf-secondary-btn {
