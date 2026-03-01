@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Stripe = require('stripe');
+const { PLANS } = require('./constants');
 
 // Stripe client will be initialized in server.js and passed via middleware
 let stripe = null;
@@ -124,17 +125,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'checkout.session.completed': {
         const session = event.data.object;
-        console.log('\n--- CHECKOUT SESSION COMPLETED ---');
-        console.log('[STRIPE WEBHOOK] Session ID:', session.id);
-        console.log('[STRIPE WEBHOOK] Customer:', session.customer);
-        console.log('[STRIPE WEBHOOK] Customer email:', session.customer_email);
-        console.log('[STRIPE WEBHOOK] Subscription:', session.subscription);
-        console.log('[STRIPE WEBHOOK] Client reference ID:', session.client_reference_id);
-        console.log('[STRIPE WEBHOOK] Metadata:', JSON.stringify(session.metadata, null, 2));
-        console.log('[STRIPE WEBHOOK] Amount total:', session.amount_total);
-        console.log('[STRIPE WEBHOOK] Currency:', session.currency);
-        console.log('[STRIPE WEBHOOK] Payment status:', session.payment_status);
-        console.log('[STRIPE WEBHOOK] Mode:', session.mode);
+        console.log('[STRIPE WEBHOOK] checkout.session.completed:', JSON.stringify(session, null, 2));
 
         if (session.subscription) {
           const authId = session.metadata?.authId;
@@ -173,9 +164,9 @@ router.post('/webhook', async (req, res, next) => {
             stripe_customer_id: session.customer,
             next_billing_date: new Date(subscription.current_period_end * 1000).toISOString(),
           });
+          console.log('[STRIPE WEBHOOK] Setting tier_id to', plan.tier_id, '(', plan.name, ')');
 
           // Set tokens_monthly to tier limit, reset tokens_used to 0
-          // Per TOKEN_TRACKING.md Section 3.1
           const currentMonthly = user.tokens_monthly || 0;
           const tierLimit = plan.tokens;
           const newMonthly = Math.max(currentMonthly, tierLimit);
@@ -187,9 +178,7 @@ router.post('/webhook', async (req, res, next) => {
               tokens_used_this_month: 0,
             })
             .eq('auth_id', authId);
-
-          console.log('[STRIPE WEBHOOK] New subscription: tokens_monthly set to', newMonthly, ', tokens_used reset to 0');
-          console.log('[STRIPE WEBHOOK] User subscription updated successfully');
+          console.log('[STRIPE WEBHOOK] Setting tokens_monthly to', newMonthly, ', tokens_used_this_month to 0');
         }
         break;
       }
@@ -209,22 +198,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
-        console.log('\n--- SUBSCRIPTION UPDATED ---');
-        console.log('[STRIPE WEBHOOK] Subscription ID:', subscription.id);
-        console.log('[STRIPE WEBHOOK] Customer:', subscription.customer);
-        console.log('[STRIPE WEBHOOK] Status:', subscription.status);
-        console.log('[STRIPE WEBHOOK] Current period start:', subscription.current_period_start, '->', new Date(subscription.current_period_start * 1000).toISOString());
-        console.log('[STRIPE WEBHOOK] Current period end:', subscription.current_period_end, '->', new Date(subscription.current_period_end * 1000).toISOString());
-        console.log('[STRIPE WEBHOOK] Cancel at period end:', subscription.cancel_at_period_end);
-        console.log('[STRIPE WEBHOOK] Items:', JSON.stringify(subscription.items.data.map(item => ({
-          price_id: item.price.id,
-          price_amount: item.price.unit_amount / 100,
-          quantity: item.quantity
-        })), null, 2));
-
-        if (subscription.schedule) {
-          console.log('[STRIPE WEBHOOK] Scheduled changes:', JSON.stringify(subscription.schedule, null, 2));
-        }
+        console.log('[STRIPE WEBHOOK] customer.subscription.updated:', JSON.stringify(subscription, null, 2));
 
         // Get plan from subscription items
         const priceId = subscription.items.data[0]?.price?.id;
@@ -279,11 +253,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
-        console.log('\n--- SUBSCRIPTION DELETED ---');
-        console.log('[STRIPE WEBHOOK] Subscription ID:', subscription.id);
-        console.log('[STRIPE WEBHOOK] Customer:', subscription.customer);
-        console.log('[STRIPE WEBHOOK] Status:', subscription.status);
-        console.log('[STRIPE WEBHOOK] Ended at:', subscription.ended_at, '->', new Date(subscription.ended_at * 1000).toISOString());
+        console.log('[STRIPE WEBHOOK] customer.subscription.deleted:', JSON.stringify(subscription, null, 2));
 
         // Get user by stripe_customer_id
         const { data: users } = await req.supabaseAdmin
@@ -305,8 +275,7 @@ router.post('/webhook', async (req, res, next) => {
           next_billing_date: null,
           tokens_monthly: 0,
         });
-
-        console.log('[STRIPE WEBHOOK] Subscription cancelled, tokens_monthly set to 0, tokens_added preserved');
+        console.log('[STRIPE WEBHOOK] Setting tier_id to null, subscription_status to canceled, tokens_monthly to 0');
         break;
       }
 
@@ -325,20 +294,10 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
-        console.log('\n--- INVOICE PAYMENT SUCCEEDED ---');
-        console.log('[STRIPE WEBHOOK] Invoice ID:', invoice.id);
-        console.log('[STRIPE WEBHOOK] Customer:', invoice.customer);
-        console.log('[STRIPE WEBHOOK] Subscription:', invoice.subscription);
-        console.log('[STRIPE WEBHOOK] Amount paid:', invoice.amount_paid);
-        console.log('[STRIPE WEBHOOK] Currency:', invoice.currency);
-        console.log('[STRIPE WEBHOOK] Status:', invoice.status);
-        console.log('[STRIPE WEBHOOK] Period start:', invoice.period_start, '->', new Date(invoice.period_start * 1000).toISOString());
-        console.log('[STRIPE WEBHOOK] Period end:', invoice.period_end, '->', new Date(invoice.period_end * 1000).toISOString());
+        console.log('[STRIPE WEBHOOK] invoice.payment_succeeded:', JSON.stringify(invoice, null, 2));
 
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
-          console.log('[STRIPE WEBHOOK] Subscription status:', subscription.status);
-          console.log('[STRIPE WEBHOOK] Subscription current_period_end:', subscription.current_period_end, '->', new Date(subscription.current_period_end * 1000).toISOString());
 
           // Get user by stripe_customer_id
           const { data: users } = await req.supabaseAdmin
@@ -366,7 +325,6 @@ router.post('/webhook', async (req, res, next) => {
           });
 
           // Top up tokens_monthly to tier limit, reset tokens_used to 0
-          // Per TOKEN_TRACKING.md Section 3.2
           const currentMonthly = user.tokens_monthly || 0;
           const tierLimit = plan.tokens;
           const newMonthly = Math.max(currentMonthly, tierLimit);
@@ -378,8 +336,7 @@ router.post('/webhook', async (req, res, next) => {
               tokens_used_this_month: 0,
             })
             .eq('auth_id', user.auth_id);
-
-          console.log('[STRIPE WEBHOOK] Monthly renewal: tokens_monthly topped up to', newMonthly, ', tokens_used reset to 0');
+          console.log('[STRIPE WEBHOOK] Monthly renewal: Setting tokens_monthly to', newMonthly, ', tokens_used_this_month to 0');
         }
         break;
       }
@@ -397,14 +354,7 @@ router.post('/webhook', async (req, res, next) => {
       // ============================================================================
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
-        console.log('\n--- INVOICE PAYMENT FAILED ---');
-        console.log('[STRIPE WEBHOOK] Invoice ID:', invoice.id);
-        console.log('[STRIPE WEBHOOK] Customer:', invoice.customer);
-        console.log('[STRIPE WEBHOOK] Subscription:', invoice.subscription);
-        console.log('[STRIPE WEBHOOK] Amount due:', invoice.amount_due);
-        console.log('[STRIPE WEBHOOK] Currency:', invoice.currency);
-        console.log('[STRIPE WEBHOOK] Status:', invoice.status);
-        console.log('[STRIPE WEBHOOK] Reason:', invoice.last_payment_failure?.message || 'Unknown');
+        console.log('[STRIPE WEBHOOK] invoice.payment_failed:', JSON.stringify(invoice, null, 2));
 
         if (invoice.subscription) {
           // Get user by stripe_customer_id
@@ -424,8 +374,7 @@ router.post('/webhook', async (req, res, next) => {
           await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
             subscription_status: 'past_due',
           });
-
-          console.log('[STRIPE WEBHOOK] Payment failed: subscription_status set to past_due, tokens unchanged');
+          console.log('[STRIPE WEBHOOK] Setting subscription_status to past_due, no token changes');
         }
         break;
       }
