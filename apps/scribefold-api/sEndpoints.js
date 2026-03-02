@@ -374,55 +374,70 @@ router.post('/webhook', async (req, res, next) => {
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
         console.log('[STRIPE WEBHOOK] invoice.payment_succeeded - Invoice ID:', invoice.id, 'Customer:', invoice.customer);
+        console.log('[STRIPE WEBHOOK] Has subscription:', !!invoice.subscription);
 
-        if (invoice.subscription) {
-          const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+        // Always get all subscriptions for the customer and use the most recent one
+        // This handles cases where invoice.subscription is missing or there are multiple subscriptions
+        console.log('[STRIPE WEBHOOK] Getting all subscriptions for customer...');
+        const subscriptions = await stripe.subscriptions.list({
+          customer: invoice.customer,
+          status: 'active',
+        });
 
-          // Get price_id from invoice lines (more reliable than subscription items)
-          const priceId = invoice.lines.data[0]?.price?.id;
-          console.log('[STRIPE WEBHOOK] priceId from invoice:', priceId);
+        console.log('[STRIPE WEBHOOK] Found', subscriptions.data.length, 'active subscription(s) for customer');
+        subscriptions.data.forEach((sub, index) => {
+          console.log(`[STRIPE WEBHOOK]   Subscription ${index + 1}: ID=${sub.id}, Created=${sub.created}, Status=${sub.status}`);
+        });
 
-          const plan = getPlanByPriceId(priceId);
-          console.log('[STRIPE WEBHOOK] Found plan:', plan ? plan.name : 'null');
-
-          if (!plan) {
-            console.error('[STRIPE WEBHOOK] ERROR: Plan not found for price_id:', priceId);
-            console.error('[STRIPE WEBHOOK] Available price IDs:', Object.values(PLANS).map(p => p.stripe_price_id));
-            break;
-          }
-
-          // Get user by stripe_customer_id
-          const { data: users } = await req.supabaseAdmin
-            .from('users')
-            .select('*')
-            .eq('stripe_customer_id', invoice.customer);
-
-          if (!users || users.length === 0) {
-            console.error('[STRIPE WEBHOOK] ERROR: User not found for customer:', invoice.customer);
-            break;
-          }
-
-          const user = users[0];
-
-          // Update next billing date
-          await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
-            next_billing_date: null,
-          });
-
-          // ADD tokens from the paid plan's tier (user paid, they get the tokens)
-          const tierLimit = plan.tokens;
-          const currentMonthly = user.tokens_monthly || 0;
-          const newMonthly = currentMonthly + tierLimit;
-
-          await req.supabaseAdmin
-            .from('users')
-            .update({
-              tokens_monthly: newMonthly,
-              tokens_used_this_month: 0,
-            })
-            .eq('auth_id', user.auth_id);
-          console.log('[STRIPE WEBHOOK] Payment succeeded: Adding', tierLimit, 'tokens for plan', plan.name, '- Setting tokens_monthly to', newMonthly, ', tokens_used_this_month to 0');
+        if (subscriptions.data.length === 0) {
+          console.error('[STRIPE WEBHOOK] ERROR: No active subscriptions found for customer');
+          break;
         }
+
+        // Use the most recent subscription
+        const sortedSubscriptions = subscriptions.data.sort((a, b) => b.created - a.created);
+        const subscription = sortedSubscriptions[0];
+        console.log('[STRIPE WEBHOOK] Using most recent subscription:', subscription.id, '(created:', subscription.created + ')');
+
+        // Get price_id from subscription items
+        const priceId = subscription.items.data[0]?.price?.id;
+        console.log('[STRIPE WEBHOOK] priceId from subscription:', priceId);
+
+        const plan = getPlanByPriceId(priceId);
+        console.log('[STRIPE WEBHOOK] Found plan:', plan ? plan.name : 'null');
+
+        if (!plan) {
+          console.error('[STRIPE WEBHOOK] ERROR: Plan not found for price_id:', priceId);
+          console.error('[STRIPE WEBHOOK] Available price IDs:', Object.values(PLANS).map(p => p.stripe_price_id));
+          break;
+        }
+
+        // Get user by stripe_customer_id
+        const { data: users } = await req.supabaseAdmin
+          .from('users')
+          .select('*')
+          .eq('stripe_customer_id', invoice.customer);
+
+        if (!users || users.length === 0) {
+          console.error('[STRIPE WEBHOOK] ERROR: User not found for customer:', invoice.customer);
+          break;
+        }
+
+        const user = users[0];
+
+        // ADD tokens from the paid plan's tier (user paid, they get the tokens)
+        const tierLimit = plan.tokens;
+        const currentMonthly = user.tokens_monthly || 0;
+        const newMonthly = currentMonthly + tierLimit;
+
+        await req.supabaseAdmin
+          .from('users')
+          .update({
+            tokens_monthly: newMonthly,
+            tokens_used_this_month: 0,
+          })
+          .eq('auth_id', user.auth_id);
+        console.log('[STRIPE WEBHOOK] Payment succeeded: Adding', tierLimit, 'tokens for plan', plan.name, '- Setting tokens_monthly to', newMonthly, ', tokens_used_this_month to 0');
         break;
       }
 
