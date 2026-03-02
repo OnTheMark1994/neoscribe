@@ -267,7 +267,8 @@ router.post('/webhook', async (req, res, next) => {
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
         console.log('[STRIPE WEBHOOK] customer.subscription.updated - Subscription ID:', subscription.id, 'Customer:', subscription.customer);
-
+        console.log("subscription: ", subscription)
+        
         // Get plan from subscription items
         const priceId = subscription.items.data[0]?.price?.id;
         console.log('[STRIPE WEBHOOK] priceId from subscription:', priceId);
@@ -295,12 +296,14 @@ router.post('/webhook', async (req, res, next) => {
         const user = users[0];
 
         // Update subscription metadata (tier_id, status, subscription_id, next_billing_date)
-        await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
+        const updateData = {
           tier_id: plan.tier_id,
           subscription_status: subscription.status,
           stripe_subscription_id: subscription.id,
           next_billing_date: subscription.current_period_end,
-        });
+        };
+        console.log('[STRIPE WEBHOOK] Updating user subscription with:', updateData);
+        await updateUserSubscription(req.supabaseAdmin, user.auth_id, updateData);
         console.log('[STRIPE WEBHOOK] Setting tier_id to', plan.tier_id, '(', plan.name, '), subscription_status to', subscription.status, ', next_billing_date to', subscription.current_period_end);
 
         console.log('[STRIPE WEBHOOK] User subscription updated successfully');
