@@ -1,16 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const Stripe = require('stripe');
+const jwt = require('jsonwebtoken');
 const { PLANS } = require('./constants');
 
 // Stripe client will be initialized in server.js and passed via middleware
 let stripe = null;
 
 // Helper: Get plan by price_id
-const getPlanByPriceId = (priceId) => PLANS.find(plan => plan.stripe_price_id === priceId);
+const getPlanByPriceId = (priceId) => Object.values(PLANS).find(plan => plan.stripe_price_id === priceId);
 
 // Helper: Get plan by tier_id
-const getPlanByTierId = (tierId) => PLANS.find(plan => plan.tier_id === tierId);
+const getPlanByTierId = (tierId) => Object.values(PLANS).find(plan => plan.tier_id === tierId);
+
+// Helper: Get plan by id
+const getPlanById = (planId) => PLANS[planId];
 
 // Helper: Update user subscription data
 const updateUserSubscription = async (supabase, userId, subscriptionData) => {
@@ -20,6 +24,90 @@ const updateUserSubscription = async (supabase, userId, subscriptionData) => {
     .eq('auth_id', userId);
   if (error) console.error('[STRIPE WEBHOOK] Failed to update subscription:', error);
 };
+
+/**
+ * Create Stripe Customer Portal Session
+ * POST /s/create-portal-session
+ * Body: { authId }
+ */
+router.post('/create-portal-session', async (req, res) => {
+  console.log('\n========================================');
+  console.log('[STRIPE PORTAL] Creating portal session');
+  console.log('========================================');
+
+  try {
+    const { authId } = req.body;
+
+    if (!authId) {
+      console.error('[STRIPE PORTAL] ERROR: No authId provided');
+      return res.status(400).json({ error: 'No authId provided' });
+    }
+
+    console.log('[STRIPE PORTAL] authId:', authId);
+
+    // Verify JWT token and extract user ID
+    const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!userAccessToken) {
+      console.error('[STRIPE PORTAL] ERROR: No access token provided');
+      return res.status(401).json({ error: 'No access token provided' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(userAccessToken, process.env.SUPABASE_JWT_SECRET);
+      console.log('[STRIPE PORTAL] JWT verified successfully, user ID:', decoded?.sub);
+    } catch (e) {
+      console.error('[STRIPE PORTAL] ERROR: JWT verification failed:', e.message);
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const userId = decoded?.sub;
+    if (!userId) {
+      console.error('[STRIPE PORTAL] ERROR: No user ID in decoded token');
+      return res.status(401).json({ error: 'Invalid token: no user ID found' });
+    }
+
+    // Ensure authId matches the authenticated user
+    if (authId !== userId) {
+      console.error('[STRIPE PORTAL] ERROR: authId does not match authenticated user');
+      return res.status(403).json({ error: 'Forbidden: authId does not match authenticated user' });
+    }
+
+    // Get user by authId
+    const { data: users } = await req.supabaseAdmin
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('auth_id', authId);
+
+    if (!users || users.length === 0) {
+      console.error('[STRIPE PORTAL] ERROR: User not found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = users[0];
+    const customerId = user.stripe_customer_id;
+
+    if (!customerId) {
+      console.error('[STRIPE PORTAL] ERROR: No stripe_customer_id for user');
+      return res.status(400).json({ error: 'No stripe_customer_id found' });
+    }
+
+    console.log('[STRIPE PORTAL] Customer ID:', customerId);
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: process.env.WEB_PORTAL_URL || 'https://scribefold-ai-monorepo.onrender.com/',
+    });
+
+    console.log('[STRIPE PORTAL] Portal session created:', session.id);
+    console.log('[STRIPE PORTAL] Portal URL:', session.url);
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error('[STRIPE PORTAL] ERROR:', error);
+    res.status(500).json({ error: 'Failed to create portal session' });
+  }
+});
 
 // Helper: Add tokens based on subscription scenario
 const addTokensForSubscription = async (supabase, userId, oldTierId, newTierId, isNewSubscription) => {

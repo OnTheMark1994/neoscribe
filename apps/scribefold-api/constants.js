@@ -52,15 +52,15 @@ IMPORTANT:
 // Token grant amount for new users and token claiming
 const FREE_TOKENS_GRANT = 15000;
 
-// Subscription plans - MUST match frontend PLANS in AccountDisplay.js
-// IMPORTANT: If you update this PLANS array, you must also update the PLANS array
-// in apps/scribefold-web-portal/src/components/Account/AuthComponents/AccountDisplay.js
-const PLANS = [
-  { id: 'light', name: 'Light', tokens: 1000000, tier_id: 1, stripe_price_id: process.env.STRIPE_PRICE_ID_LIGHT },
-  { id: 'basic', name: 'Basic', tokens: 2500000, tier_id: 2, stripe_price_id: process.env.STRIPE_PRICE_ID_BASIC },
-  { id: 'full', name: 'Standard', tokens: 8500000, tier_id: 3, stripe_price_id: process.env.STRIPE_PRICE_ID_FULL },
-  { id: 'heavy', name: 'Heavy', tokens: 85000000, tier_id: 4, stripe_price_id: process.env.STRIPE_PRICE_ID_HEAVY },
-];
+// Subscription plans - server-only data with plan id as key
+// IMPORTANT: If you update this PLANS object, you must also update the PLANS array
+// in apps/scribefold-web-portal/src/Global/constants.js
+const PLANS = {
+  light: { tier_id: 1, tokens: 1000000, stripe_price_id: process.env.STRIPE_PRICE_ID_LIGHT },
+  basic: { tier_id: 2, tokens: 2500000, stripe_price_id: process.env.STRIPE_PRICE_ID_BASIC },
+  full: { tier_id: 3, tokens: 8500000, stripe_price_id: process.env.STRIPE_PRICE_ID_FULL },
+  heavy: { tier_id: 4, tokens: 85000000, stripe_price_id: process.env.STRIPE_PRICE_ID_HEAVY },
+};
 
 module.exports = {
   PROMPT_PREFACE,

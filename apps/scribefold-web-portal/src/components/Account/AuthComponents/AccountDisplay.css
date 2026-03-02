@@ -103,12 +103,24 @@
   font-size: 0.95rem;
 }
 
+.sf-plans-header-center {
+  text-align: center;
+}
+
 .sf-plans-status-message {
   margin-top: 9px;
   margin-bottom: 10px;
   text-align: center;
   font-size: 0.85rem;
   color: #e5e7eb;
+}
+
+.sf-account-status-message {
+  font-size: 0.9em;
+  opacity: 0.8;
+  color: #e5e7eb;
+  margin-bottom: 5px;
+  text-align: center;
 }
 
 .sf-plans-grid {
@@ -240,8 +252,12 @@
   line-height: 1.5;
 }
 
-.sf-plan-body .sf-plan-card-text-grey {
-  color: #9ca3af;
+.sf-plan-body .sf-plans-status-message {
+  margin-top: 9px;
+  margin-bottom: 10px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #e5e7eb;
 }
 
 .sf-plan-tokens {
@@ -259,6 +275,26 @@
 
 .sf-plan-description {
   color: #9ca3af;
+}
+
+.sf-plan-description-center {
+  text-align: center;
+}
+
+.sf-divider {
+  border-top: 1px solid var(--sf-border-color, #333);
+  margin: 24px 0;
+}
+
+.sf-subscription-id {
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.sf-billing-date {
+  font-size: 0.8em;
+  opacity: 0.8;
+  margin-top: 4px;
 }
 
 .sf-plan-current-badge {

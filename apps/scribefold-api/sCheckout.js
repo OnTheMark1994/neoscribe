@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Stripe = require('stripe');
+const jwt = require('jsonwebtoken');
+const { PLANS } = require('./constants');
 
 // Stripe client will be initialized in server.js and passed via middleware
 let stripe = null;
@@ -17,7 +19,7 @@ router.use((req, res, next) => {
 /**
  * Create Stripe Checkout Session
  * POST /s/create-checkout
- * Body: { authId, priceId }
+ * Body: { authId, planId }
  */
 router.post('/create-checkout', async (req, res) => {
   console.log('\n========================================');
@@ -25,7 +27,7 @@ router.post('/create-checkout', async (req, res) => {
   console.log('========================================');
   
   try {
-    const { authId, priceId } = req.body;
+    const { authId, planId } = req.body;
 
     if (!stripe) {
       console.error('[STRIPE CHECKOUT] ERROR: Stripe not configured');
@@ -37,13 +39,51 @@ router.post('/create-checkout', async (req, res) => {
       return res.status(400).json({ error: 'authId is required' });
     }
 
-    if (!priceId) {
-      console.error('[STRIPE CHECKOUT] ERROR: priceId is required');
-      return res.status(400).json({ error: 'priceId is required' });
+    if (!planId) {
+      console.error('[STRIPE CHECKOUT] ERROR: planId is required');
+      return res.status(400).json({ error: 'planId is required' });
     }
 
     console.log('[STRIPE CHECKOUT] authId:', authId);
+    console.log('[STRIPE CHECKOUT] planId:', planId);
+
+    // Get plan from PLANS object using planId
+    const plan = PLANS[planId];
+    if (!plan) {
+      console.error('[STRIPE CHECKOUT] ERROR: Invalid planId:', planId);
+      return res.status(400).json({ error: 'Invalid planId' });
+    }
+
+    const priceId = plan.stripe_price_id;
     console.log('[STRIPE CHECKOUT] priceId:', priceId);
+
+    // Verify JWT token and extract user ID
+    const userAccessToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!userAccessToken) {
+      console.error('[STRIPE CHECKOUT] ERROR: No access token provided');
+      return res.status(401).json({ error: 'No access token provided' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(userAccessToken, process.env.SUPABASE_JWT_SECRET);
+      console.log('[STRIPE CHECKOUT] JWT verified successfully, user ID:', decoded?.sub);
+    } catch (e) {
+      console.error('[STRIPE CHECKOUT] ERROR: JWT verification failed:', e.message);
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const userId = decoded?.sub;
+    if (!userId) {
+      console.error('[STRIPE CHECKOUT] ERROR: No user ID in decoded token');
+      return res.status(401).json({ error: 'Invalid token: no user ID found' });
+    }
+
+    // Ensure authId matches the authenticated user
+    if (authId !== userId) {
+      console.error('[STRIPE CHECKOUT] ERROR: authId does not match authenticated user');
+      return res.status(403).json({ error: 'Forbidden: authId does not match authenticated user' });
+    }
 
     // Get user from database
     const { data: users, error: userError } = await req.supabaseAdmin

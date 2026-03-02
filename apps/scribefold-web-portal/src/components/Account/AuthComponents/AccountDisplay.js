@@ -2,17 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { supabase } from '../../../Global/SupabaseClient';
 import RefreshUserData from '../../Util/RefreshUserData';
+import { PLANS } from '../../../Global/constants';
 import './AccountDisplay.css';
-
-// Plan definitions - MUST match server PLANS in constants.js
-// IMPORTANT: If you update this PLANS array, you must also update the PLANS array
-// in apps/scribefold-api/constants.js
-const PLANS = [
-  { id: 'light', name: 'Light', description: 'Good for occasional writing and small projects.', tokens: 1000000, monthlyPrice: 8.5, tier_id: 1, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_LIGHT },
-  { id: 'basic', name: 'Basic', description: 'Good for regular use and active editing sessions.', tokens: 2500000, monthlyPrice: 14.5, tier_id: 2, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_BASIC },
-  { id: 'full', name: 'Standard', description: 'Great for creating stories and books.', tokens: 8500000, monthlyPrice: 28.5, tier_id: 3, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_FULL },
-  { id: 'heavy', name: 'Heavy', description: 'Dare you to use them all.', tokens: 85000000, monthlyPrice: 89.5, tier_id: 4, stripe_price_id: process.env.REACT_APP_STRIPE_PRICE_ID_HEAVY },
-];
 
 const AccountDisplay = () => {
   const authUser = useSelector(state => state.userSlice.authUser);
@@ -117,23 +108,44 @@ const AccountDisplay = () => {
   const handleSubscribeWithStripe = async () => {
     if (!authUser) return;
 
-    const selectedPlanData = PLANS.find((plan) => plan?.id === selectedPlanId);
-    if (!selectedPlanData) {
+    const selectedPlan = PLANS.find((plan) => plan?.id === selectedPlanId);
+    if (!selectedPlan) {
       setSubscriptionStatusMsg('Plan not found');
       return;
     }
 
+    // Check if user is selecting their current plan
+    const isCurrentPlan = selectedPlan && userData?.tier_id && Number(selectedPlan.tier_id) === Number(userData.tier_id);
+    if (isCurrentPlan) {
+      setSubscriptionStatusMsg('This is your current plan. No action needed.');
+      return;
+    }
+
     setSubscriptionLoading(true);
-    setSubscriptionStatusMsg('Creating checkout session...');
+    setSubscriptionStatusMsg('Calling stripe to create checkout session...');
 
     try {
+      // Get current session from Supabase client
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('[WEB] No valid session:', sessionError);
+        setSubscriptionStatusMsg('No valid session');
+        setSubscriptionLoading(false);
+        return;
+      }
+
+      const accessToken = session.access_token;
+
       // Call the server to create a checkout session
       const response = await fetch(`${process.env.REACT_APP_API_URL}/s/create-checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify({
           authId: authUser.id,
-          priceId: selectedPlanData?.stripe_price_id
+          planId: selectedPlanId
         }),
       });
 
@@ -165,11 +177,56 @@ const AccountDisplay = () => {
     return 'Subscribe';
   };
 
+  const handleManageSubscription = async () => {
+    if (!authUser) {
+      console.error('[WEB] No auth user');
+      return;
+    }
+
+    setSubscriptionLoading(true);
+    setSubscriptionStatusMsg('Calling stripe to open subscription management...');
+
+    try {
+      // Get current session from Supabase client
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('[WEB] No valid session:', sessionError);
+        setSubscriptionStatusMsg('No valid session');
+        setSubscriptionLoading(false);
+        return;
+      }
+
+      const accessToken = session.access_token;
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/s/create-portal-session`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          authId: authUser.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create portal session');
+      }
+
+      // Redirect to Stripe Customer Portal
+      window.location.href = data.url;
+    } catch (err) {
+      console.error('[WEB] Portal session error:', err);
+    }
+  };
+
   return (
     <div className="sf-page sf-account-page">
       <div className="sf-account-inner">
         <section className="sf-plans-section">
-          <div className="sf-plans-header" style={{ textAlign: 'center' }}>
+          <div className="sf-plans-header sf-plans-header-center">
             <h2>Choose a Plan</h2>
           </div>
           <div className="sf-plans-grid">
@@ -217,7 +274,7 @@ const AccountDisplay = () => {
                         ? `$${pricePerThousand.toFixed(3)} per 1k tokens`
                         : 'Loading...'}
                     </div>
-                    <div className="sf-plan-description sf-plan-card-text-grey" style={{ textAlign: 'center' }}>
+                    <div className="sf-plan-description sf-plan-card-text-grey sf-plan-description-center">
                       {plan?.description}
                     </div>
                   </div>
@@ -241,7 +298,7 @@ const AccountDisplay = () => {
                 {getSubscribeButtonText()}
               </button>
               {subscriptionStatusMsg && (
-                <div style={{ marginTop: '8px', fontSize: '0.9em', opacity: 0.8 }}>
+                <div className="sf-plans-status-message">
                   {subscriptionStatusMsg}
                 </div>
               )}
@@ -249,12 +306,7 @@ const AccountDisplay = () => {
           </div>
         </section>
 
-        <div
-          style={{
-            borderTop: '1px solid var(--sf-border-color, #333)',
-            margin: '24px 0',
-          }}
-        />
+        <div className="sf-divider"></div>
 
         <section className="sf-account-stats">
           <div className="sf-section-header">
@@ -310,7 +362,7 @@ const AccountDisplay = () => {
                   : formatTokens(userData?.tokens_monthly)}
               </span>
               {userData?.next_billing_date && (
-                <div style={{ fontSize: '0.8em', opacity: 0.8, marginTop: '4px' }}>
+                <div className="sf-billing-date">
                   On {new Date(userData.next_billing_date).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
@@ -322,12 +374,7 @@ const AccountDisplay = () => {
           </div>
         </section>
 
-        <div
-          style={{
-            borderTop: '1px solid var(--sf-border-color, #333)',
-            margin: '24px 0',
-          }}
-        />
+        <div className="sf-divider"></div>
 
         <section className="sf-addon-section">
           <div className="sf-addon-header">
@@ -385,12 +432,7 @@ const AccountDisplay = () => {
           </div>
         </section>
 
-        <div
-          style={{
-            borderTop: '1px solid var(--sf-border-color, #333)',
-            margin: '24px 0',
-          }}
-        />
+        <div className="sf-divider"></div>
 
         <section className="sf-account-summary">
           <div>
@@ -419,7 +461,7 @@ const AccountDisplay = () => {
             {userData?.stripe_subscription_id && (
               <div className="sf-account-detail-row">
                 <span>Subscription ID</span>
-                <span style={{ fontSize: '0.8em', opacity: 0.7 }}>{userData?.stripe_subscription_id}</span>
+                <span className="sf-subscription-id">{userData?.stripe_subscription_id}</span>
               </div>
             )}
             <div className="sf-account-detail-row">
@@ -439,17 +481,17 @@ const AccountDisplay = () => {
           </div>
         </section>
 
-        <div
-          style={{
-            borderTop: '1px solid var(--sf-border-color, #333)',
-            margin: '24px 0',
-          }}
-        />
+        <div className="sf-divider"></div>
 
         <section className="sf-account-actions-section">
-          <h2>Account Actions</h2>
+          <h2 className='sf-section-header'>Account Actions</h2>
+          {subscriptionStatusMsg && (
+            <div className="sf-account-status-message">
+              {subscriptionStatusMsg}
+            </div>
+          )} 
           <div className="sf-account-actions-grid">
-            <button type="button" className="sf-download-btn">
+            <button type="button" className="sf-download-btn" onClick={handleManageSubscription}>
               Manage Subscription
             </button>
             <button type="button" className="sf-download-btn">
