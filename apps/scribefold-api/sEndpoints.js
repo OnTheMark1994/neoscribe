@@ -270,10 +270,14 @@ router.post('/webhook', async (req, res, next) => {
 
         // Get plan from subscription items
         const priceId = subscription.items.data[0]?.price?.id;
+        console.log('[STRIPE WEBHOOK] priceId from subscription:', priceId);
+
         const plan = getPlanByPriceId(priceId);
+        console.log('[STRIPE WEBHOOK] Found plan:', plan ? plan.name : 'null');
 
         if (!plan) {
           console.error('[STRIPE WEBHOOK] ERROR: Plan not found for price_id:', priceId);
+          console.error('[STRIPE WEBHOOK] Available price IDs:', Object.values(PLANS).map(p => p.stripe_price_id));
           break;
         }
 
@@ -331,7 +335,20 @@ router.post('/webhook', async (req, res, next) => {
 
         const user = users[0];
 
-        // Update subscription status (don't change tokens)
+        // Check if user has any other active subscriptions (plan change scenario)
+        const activeSubscriptions = await stripe.subscriptions.list({
+          customer: subscription.customer,
+          status: 'active',
+        });
+
+        if (activeSubscriptions.data.length > 0) {
+          console.log('[STRIPE WEBHOOK] User has', activeSubscriptions.data.length, 'other active subscription(s) - skipping tier_id nullification (plan change)');
+          console.log('[STRIPE WEBHOOK] Active subscription IDs:', activeSubscriptions.data.map(s => s.id).join(', '));
+          break;
+        }
+
+        // No other active subscriptions - true cancellation
+        console.log('[STRIPE WEBHOOK] No other active subscriptions - treating as true cancellation');
         await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
           tier_id: null,
           subscription_status: 'canceled',
