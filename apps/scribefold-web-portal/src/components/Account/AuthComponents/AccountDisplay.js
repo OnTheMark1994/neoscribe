@@ -15,6 +15,9 @@ const AccountDisplay = () => {
   const [subscriptionStatusMsg, setSubscriptionStatusMsg] = useState('');
   const dispatch = useDispatch();
 
+  // Get current plan from user's tier_id
+  const currentPlan = PLANS.find(p => p.tier_id === Number(userData?.tier_id));
+
   // Reset loading state on mount (in case user returns from Stripe checkout)
   useEffect(() => {
     setSubscriptionLoading(false);
@@ -245,9 +248,7 @@ const AccountDisplay = () => {
                 hasNumericTokens && hasNumericPrice && numericTokens > 0
                   ? numericPrice / (numericTokens / 1000)
                   : null;
-              const isCurrentPlan =
-                userData?.tier_id != null &&
-                Number(plan?.tier_id) === Number(userData.tier_id);
+              const isCurrentPlan = currentPlan?.id === plan.id;
               const isSelected = selectedPlanId === plan?.id;
               return (
                 <button
@@ -459,8 +460,8 @@ const AccountDisplay = () => {
               <span>
                 {userDataLoading
                   ? 'Loading...'
-                  : userData?.subscription_tier_name
-                    ? `${userData?.subscription_tier_name} (${userData?.subscription_status || 'active'})`
+                  : currentPlan?.name
+                    ? `${currentPlan.name}`
                     : 'No active subscription'}
               </span>
             </div>
@@ -476,7 +477,7 @@ const AccountDisplay = () => {
                 {userDataLoading
                   ? 'Loading...'
                   : userData?.next_billing_date
-                    ? new Date(userData?.next_billing_date).toLocaleDateString('en-US', {
+                    ? new Date(userData.next_billing_date * 1000).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',

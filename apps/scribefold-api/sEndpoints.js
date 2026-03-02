@@ -294,13 +294,14 @@ router.post('/webhook', async (req, res, next) => {
 
         const user = users[0];
 
-        // Update subscription metadata (tier_id, status, subscription_id)
+        // Update subscription metadata (tier_id, status, subscription_id, next_billing_date)
         await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
           tier_id: plan.tier_id,
           subscription_status: subscription.status,
           stripe_subscription_id: subscription.id,
+          next_billing_date: subscription.current_period_end,
         });
-        console.log('[STRIPE WEBHOOK] Setting tier_id to', plan.tier_id, '(', plan.name, '), subscription_status to', subscription.status);
+        console.log('[STRIPE WEBHOOK] Setting tier_id to', plan.tier_id, '(', plan.name, '), subscription_status to', subscription.status, ', next_billing_date to', subscription.current_period_end);
 
         console.log('[STRIPE WEBHOOK] User subscription updated successfully');
         break;
@@ -353,8 +354,9 @@ router.post('/webhook', async (req, res, next) => {
           tier_id: null,
           subscription_status: 'canceled',
           tokens_monthly: 0,
+          next_billing_date: null,
         });
-        console.log('[STRIPE WEBHOOK] Setting tier_id to null, subscription_status to canceled, tokens_monthly to 0');
+        console.log('[STRIPE WEBHOOK] Setting tier_id to null, subscription_status to canceled, tokens_monthly to 0, next_billing_date to null');
         break;
       }
 
