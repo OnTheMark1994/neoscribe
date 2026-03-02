@@ -378,6 +378,19 @@ router.post('/webhook', async (req, res, next) => {
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
 
+          // Get price_id from invoice lines (more reliable than subscription items)
+          const priceId = invoice.lines.data[0]?.price?.id;
+          console.log('[STRIPE WEBHOOK] priceId from invoice:', priceId);
+
+          const plan = getPlanByPriceId(priceId);
+          console.log('[STRIPE WEBHOOK] Found plan:', plan ? plan.name : 'null');
+
+          if (!plan) {
+            console.error('[STRIPE WEBHOOK] ERROR: Plan not found for price_id:', priceId);
+            console.error('[STRIPE WEBHOOK] Available price IDs:', Object.values(PLANS).map(p => p.stripe_price_id));
+            break;
+          }
+
           // Get user by stripe_customer_id
           const { data: users } = await req.supabaseAdmin
             .from('users')
@@ -391,22 +404,15 @@ router.post('/webhook', async (req, res, next) => {
 
           const user = users[0];
 
-          // Get plan from tier_id
-          const plan = getPlanByTierId(user.tier_id);
-          if (!plan) {
-            console.error('[STRIPE WEBHOOK] ERROR: Plan not found for tier_id:', user.tier_id);
-            break;
-          }
-
           // Update next billing date
           await updateUserSubscription(req.supabaseAdmin, user.auth_id, {
             next_billing_date: null,
           });
 
-          // Top up tokens_monthly to tier limit, reset tokens_used to 0
-          const currentMonthly = user.tokens_monthly || 0;
+          // ADD tokens from the paid plan's tier (user paid, they get the tokens)
           const tierLimit = plan.tokens;
-          const newMonthly = Math.max(currentMonthly, tierLimit);
+          const currentMonthly = user.tokens_monthly || 0;
+          const newMonthly = currentMonthly + tierLimit;
 
           await req.supabaseAdmin
             .from('users')
@@ -415,7 +421,7 @@ router.post('/webhook', async (req, res, next) => {
               tokens_used_this_month: 0,
             })
             .eq('auth_id', user.auth_id);
-          console.log('[STRIPE WEBHOOK] Monthly renewal: Setting tokens_monthly to', newMonthly, ', tokens_used_this_month to 0');
+          console.log('[STRIPE WEBHOOK] Payment succeeded: Adding', tierLimit, 'tokens for plan', plan.name, '- Setting tokens_monthly to', newMonthly, ', tokens_used_this_month to 0');
         }
         break;
       }

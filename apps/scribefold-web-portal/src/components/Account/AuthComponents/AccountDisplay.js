@@ -15,6 +15,12 @@ const AccountDisplay = () => {
   const [subscriptionStatusMsg, setSubscriptionStatusMsg] = useState('');
   const dispatch = useDispatch();
 
+  // Reset loading state on mount (in case user returns from Stripe checkout)
+  useEffect(() => {
+    setSubscriptionLoading(false);
+    setSubscriptionStatusMsg('');
+  }, []);
+
   // Check for token on mount
   useEffect(() => {
     const hash = window.location.hash;
