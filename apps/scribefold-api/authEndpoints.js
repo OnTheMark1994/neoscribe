@@ -179,6 +179,8 @@ router.post('/user-data', async (req, res) => {
         tokens_monthly: user.tokens_monthly || 0,
         tokens_used_this_month: user.tokens_used_this_month || 0,
         tokens_used_all_time: user.tokens_used_all_time || 0,
+        next_billing_date: user.next_billing_date,
+        subscription_status: user.subscription_status,
       }
     });
   } catch (error) {

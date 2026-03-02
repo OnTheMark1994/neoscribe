@@ -234,6 +234,68 @@ const AccountDisplay = () => {
   return (
     <div className="sf-page sf-account-page">
       <div className="sf-account-inner">
+
+        {/* Tokens Stats */}
+        <section className="sf-account-stats">
+          <div className="sf-section-header">
+            <h2>Token Usage</h2>
+            <RefreshUserData />
+          </div>
+          <div className="sf-stats-grid">
+            <div className="sf-stat-card">
+              <span className="sf-stat-label">Available Tokens</span>
+              <span className="sf-stat-value">
+                {userDataLoading
+                  ? 'Loading...'
+                  : formatTokens(userData?.tokens || (userData?.tokens_monthly || 0) + (userData?.tokens_added || 0))}
+              </span>
+            </div>
+            <div className="sf-stat-card">
+              <span className="sf-stat-label">Tokens Used This Month</span>
+              <span className="sf-stat-value">
+                {userDataLoading
+                  ? 'Loading...'
+                  : formatTokens(userData?.tokens_used_this_month)}
+              </span>
+            </div>
+            <div className="sf-stat-card">
+              <span className="sf-stat-label">Monthly Tokens Remaining</span>
+              <span className="sf-stat-value">
+                {userDataLoading
+                  ? 'Loading...'
+                  : formatTokens(userData.tokens_monthly)}
+              </span>
+            </div>
+            <div className="sf-stat-card">
+              <span className="sf-stat-label">Added Tokens Remaining</span>
+              <span className="sf-stat-value">
+                {userDataLoading
+                  ? 'Loading...'
+                  : formatTokens(userData?.tokens_added)}
+              </span>
+            </div>
+            <div className="sf-stat-card">
+              <span className="sf-stat-label">Tokens Used All Time</span>
+              <span className="sf-stat-value">
+                {userDataLoading
+                  ? 'Loading...'
+                  : formatTokens(userData?.tokens_used_all_time)}
+              </span>
+            </div>
+            <div className="sf-stat-card">
+              <span className="sf-stat-label">Tokens Added Monthly</span>
+              <span className="sf-stat-value">
+                {userDataLoading
+                  ? 'Loading...'
+                  : formatTokens(userData?.tokens_monthly)}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <div className="sf-divider"></div>
+
+        {/* Plans */}
         <section className="sf-plans-section">
           <div className="sf-plans-header sf-plans-header-center">
             <h2>Choose a Plan</h2>
@@ -315,75 +377,8 @@ const AccountDisplay = () => {
 
         <div className="sf-divider"></div>
 
-        <section className="sf-account-stats">
-          <div className="sf-section-header">
-            <h2>Token Usage</h2>
-            <RefreshUserData />
-          </div>
-          <div className="sf-stats-grid">
-            <div className="sf-stat-card">
-              <span className="sf-stat-label">Available Tokens</span>
-              <span className="sf-stat-value">
-                {userDataLoading
-                  ? 'Loading...'
-                  : formatTokens(userData?.tokens || (userData?.tokens_monthly || 0) + (userData?.tokens_added || 0))}
-              </span>
-            </div>
-            <div className="sf-stat-card">
-              <span className="sf-stat-label">Tokens Used This Month</span>
-              <span className="sf-stat-value">
-                {userDataLoading
-                  ? 'Loading...'
-                  : formatTokens(userData?.tokens_used_this_month)}
-              </span>
-            </div>
-            <div className="sf-stat-card">
-              <span className="sf-stat-label">Monthly Tokens Remaining</span>
-              <span className="sf-stat-value">
-                {userDataLoading
-                  ? 'Loading...'
-                  : formatTokens(userData.tokens_monthly)}
-              </span>
-            </div>
-            <div className="sf-stat-card">
-              <span className="sf-stat-label">Added Tokens Remaining</span>
-              <span className="sf-stat-value">
-                {userDataLoading
-                  ? 'Loading...'
-                  : formatTokens(userData?.tokens_added)}
-              </span>
-            </div>
-            <div className="sf-stat-card">
-              <span className="sf-stat-label">Tokens Used All Time</span>
-              <span className="sf-stat-value">
-                {userDataLoading
-                  ? 'Loading...'
-                  : formatTokens(userData?.tokens_used_all_time)}
-              </span>
-            </div>
-            <div className="sf-stat-card">
-              <span className="sf-stat-label">Tokens Added Monthly</span>
-              <span className="sf-stat-value">
-                {userDataLoading
-                  ? 'Loading...'
-                  : formatTokens(userData?.tokens_monthly)}
-              </span>
-              {userData?.next_billing_date && (
-                <div className="sf-billing-date">
-                  On {new Date(userData.next_billing_date).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <div className="sf-divider"></div>
-
-        <section className="sf-addon-section">
+        {/* One Time Packs */}
+        {/* <section className="sf-addon-section">
           <div className="sf-addon-header">
             <h2>One-time token packs</h2>
             <p>
@@ -437,23 +432,20 @@ const AccountDisplay = () => {
               Get {formatTokens(selectedAddonTokens)} more tokens
             </button>
           </div>
-        </section>
+        </section> */}
 
         <div className="sf-divider"></div>
 
+        {/* Account Details */}
         <section className="sf-account-summary">
           <div>
             <div className="sf-section-header">
-              <h2>Account details</h2>
+              <h2>Account Details</h2>
               <RefreshUserData />
             </div>
             <div className="sf-account-detail-row">
               <span>Email</span>
               <span>{authUser?.email || 'Loading...'}</span>
-            </div>
-            <div className="sf-account-detail-row">
-              <span>User ID</span>
-              <span>{authUser?.id || 'Loading...'}</span>
             </div>
             <div className="sf-account-detail-row">
               <span>Current Plan</span>
@@ -465,12 +457,6 @@ const AccountDisplay = () => {
                     : 'No active subscription'}
               </span>
             </div>
-            {userData?.stripe_subscription_id && (
-              <div className="sf-account-detail-row">
-                <span>Subscription ID</span>
-                <span className="sf-subscription-id">{userData?.stripe_subscription_id}</span>
-              </div>
-            )}
             <div className="sf-account-detail-row">
               <span>Next Billing Date</span>
               <span>
@@ -490,6 +476,7 @@ const AccountDisplay = () => {
 
         <div className="sf-divider"></div>
 
+        {/* Account Actions */}
         <section className="sf-account-actions-section">
           <h2 className='sf-section-header'>Account Actions</h2>
           {subscriptionStatusMsg && (

@@ -1,16 +1,19 @@
 .sf-page {
   max-width: 980px;
   margin: 0 auto;
+  text-align: center;
 }
 
 .sf-account-page {
   max-width: 980px;
   margin: 0 auto;
+  text-align: center;
 }
 
 .sf-account-inner {
   max-width: 860px;
   margin: 0 auto;
+  text-align: center;
 }
 
 .sf-page-header h1 {
@@ -25,10 +28,7 @@
 
 .sf-account-summary {
   margin-top: 28px;
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: flex-start;
+  text-align: center;
 }
 
 .sf-account-detail-row {
@@ -37,6 +37,14 @@
   gap: 16px;
   font-size: 0.95rem;
   padding: 4px 0;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+@media (max-width: 600px) {
+  .sf-account-detail-row {
+    max-width: none;
+  }
 }
 
 .sf-account-detail-row span:first-child {
@@ -46,6 +54,7 @@
 .sf-section-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   margin-bottom: 10px;
 }
