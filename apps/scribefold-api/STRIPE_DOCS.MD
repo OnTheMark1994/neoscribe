@@ -72,6 +72,10 @@ and it shows all of the events that delivered and the status
 
 in the webhook overview there is a edit destination button at the top right that you can use to change the url
 
+it may be better to have a seperate product for each subscription tier
+when I tried to add subscription switching to the user portal in the portal settings in /settings/billing portal
+it told me it can not add multiple prices to switch in the same product  
+
 ---
 
 ## Webhook Flow
@@ -81,6 +85,11 @@ When: `/s/create-checkout` is called (before user enters payment details)
 Where: Saved to users table
 
 ### Webhooks and Updates
+
+**checkout.session.completed**
+- When: User completes checkout for a new subscription
+- Purpose: Cancels old subscription when user changes plans
+- Action: Checks for multiple active subscriptions, cancels old ones to prevent double billing
 
 **invoice.payment_succeeded**
 - When: Successful payment (new subscription AND monthly renewal)

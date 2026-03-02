@@ -200,6 +200,58 @@ router.post('/webhook', async (req, res, next) => {
   try {
     switch (event.type) {
       // ============================================================================
+      // CHECKOUT SESSION COMPLETED
+      // ============================================================================
+      // TRIGGER: User completes checkout for a new subscription
+      // PURPOSE: Cancel old subscription when user changes plans
+      // ACTIONS:
+      //   - Checks if user has existing active subscription
+      //   - Cancels old subscription to prevent double billing
+      // WHY THIS IS SOURCE OF TRUTH:
+      //   - Only webhook that fires when checkout is completed
+      //   - Ensures only one active subscription per customer
+      // ============================================================================
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        console.log('[STRIPE WEBHOOK] checkout.session.completed - Session ID:', session.id, 'Customer:', session.customer);
+
+        if (!session.customer) {
+          console.error('[STRIPE WEBHOOK] ERROR: No customer in checkout session');
+          break;
+        }
+
+        // Get all subscriptions for this customer
+        const subscriptions = await stripe.subscriptions.list({
+          customer: session.customer,
+          status: 'active',
+        });
+
+        console.log('[STRIPE WEBHOOK] Found', subscriptions.data.length, 'active subscription(s) for customer:', session.customer);
+        subscriptions.data.forEach((sub, index) => {
+          console.log(`[STRIPE WEBHOOK]   Subscription ${index + 1}: ID=${sub.id}, Created=${sub.created}, Status=${sub.status}`);
+        });
+
+        if (subscriptions.data.length > 1) {
+          // User has multiple active subscriptions - cancel all except the newest one
+          const sortedSubscriptions = subscriptions.data.sort((a, b) => b.created - a.created);
+          const newSubscription = sortedSubscriptions[0];
+          const oldSubscriptions = sortedSubscriptions.slice(1);
+
+          console.log('[STRIPE WEBHOOK] Keeping newest subscription:', newSubscription.id, '(created:', newSubscription.created + ')');
+          console.log('[STRIPE WEBHOOK] Cancelling', oldSubscriptions.length, 'old subscription(s)...');
+
+          for (const oldSubscription of oldSubscriptions) {
+            console.log('[STRIPE WEBHOOK]   Cancelling subscription:', oldSubscription.id, '(created:', oldSubscription.created + ')');
+            await stripe.subscriptions.cancel(oldSubscription.id);
+            console.log('[STRIPE WEBHOOK]   Successfully cancelled subscription:', oldSubscription.id);
+          }
+        }
+
+        console.log('[STRIPE WEBHOOK] Checkout session completed successfully');
+        break;
+      }
+
+      // ============================================================================
       // CUSTOMER SUBSCRIPTION UPDATED
       // ============================================================================
       // TRIGGER: Plan changes (new subscription, upgrade, downgrade)
