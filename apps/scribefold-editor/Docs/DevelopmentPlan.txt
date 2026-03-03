@@ -164,7 +164,7 @@ Phases:
             montly  
             one time 
         
-    stripe subscriptions
+    stripe subscriptions (done)
         working on 
             get stripe set up 
             get env variables 
@@ -210,9 +210,6 @@ Phases:
                 link web portal to work with stripe
                     maybe create an endpoint and use that  
                 create code to update supabase properly in each situation 
-
-
-
  
     1 week
     referrals feature

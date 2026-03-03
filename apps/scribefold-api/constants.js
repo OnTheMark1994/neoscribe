@@ -56,10 +56,10 @@ const FREE_TOKENS_GRANT = 15000;
 // IMPORTANT: If you update this PLANS object, you must also update the PLANS array
 // in apps/scribefold-web-portal/src/Global/constants.js
 const PLANS = {
-  light: { tier_id: 1, tokens: 1000000, stripe_price_id: process.env.STRIPE_PRICE_ID_LIGHT },
-  basic: { tier_id: 2, tokens: 2500000, stripe_price_id: process.env.STRIPE_PRICE_ID_BASIC },
-  full: { tier_id: 3, tokens: 8500000, stripe_price_id: process.env.STRIPE_PRICE_ID_FULL },
-  heavy: { tier_id: 4, tokens: 85000000, stripe_price_id: process.env.STRIPE_PRICE_ID_HEAVY },
+  light: { name: 'Light', tier_id: 1, tokens: 1000000, stripe_price_id: process.env.STRIPE_PRICE_ID_LIGHT },
+  basic: { name: 'Basic', tier_id: 2, tokens: 2500000, stripe_price_id: process.env.STRIPE_PRICE_ID_BASIC },
+  full: { name: 'Standard', tier_id: 3, tokens: 8500000, stripe_price_id: process.env.STRIPE_PRICE_ID_FULL },
+  heavy: { name: 'Heavy', tier_id: 4, tokens: 85000000, stripe_price_id: process.env.STRIPE_PRICE_ID_HEAVY },
 };
 
 module.exports = {

@@ -8,7 +8,22 @@ const { PLANS } = require('./constants');
 let stripe = null;
 
 // Helper: Get plan by price_id
-const getPlanByPriceId = (priceId) => Object.values(PLANS).find(plan => plan.stripe_price_id === priceId);
+const getPlanByPriceId = (priceId) => {
+  const plan = Object.values(PLANS).find(plan => plan.stripe_price_id === priceId);
+  if (!plan) {
+    console.error('[STRIPE WEBHOOK] Price ID not found:', priceId);
+    console.error('[STRIPE WEBHOOK] Available price IDs:');
+    Object.entries(PLANS).forEach(([key, value]) => {
+      console.error(`[STRIPE WEBHOOK]   ${key}:`, value.stripe_price_id);
+    });
+    console.error('[STRIPE WEBHOOK] Environment variables:');
+    console.error('[STRIPE WEBHOOK]   STRIPE_PRICE_ID_LIGHT:', process.env.STRIPE_PRICE_ID_LIGHT);
+    console.error('[STRIPE WEBHOOK]   STRIPE_PRICE_ID_BASIC:', process.env.STRIPE_PRICE_ID_BASIC);
+    console.error('[STRIPE WEBHOOK]   STRIPE_PRICE_ID_FULL:', process.env.STRIPE_PRICE_ID_FULL);
+    console.error('[STRIPE WEBHOOK]   STRIPE_PRICE_ID_HEAVY:', process.env.STRIPE_PRICE_ID_HEAVY);
+  }
+  return plan;
+};
 
 // Helper: Get plan by tier_id
 const getPlanByTierId = (tierId) => Object.values(PLANS).find(plan => plan.tier_id === tierId);
@@ -271,7 +286,7 @@ router.post('/webhook', async (req, res, next) => {
 
         // Retrieve full subscription to get current_period_end
         const fullSubscription = await stripe.subscriptions.retrieve(subscription.id);
-        console.log('[STRIPE WEBHOOK] Full subscription object:', JSON.stringify(fullSubscription, null, 2));
+        // console.log('[STRIPE WEBHOOK] Full subscription object:', JSON.stringify(fullSubscription, null, 2));
         console.log('[STRIPE WEBHOOK] current_period_end value:', fullSubscription.current_period_end);
 
         // Get plan from subscription items

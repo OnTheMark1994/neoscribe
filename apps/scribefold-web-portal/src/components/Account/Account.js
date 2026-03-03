@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import AuthForm from './AuthComponents/AuthForm';
-import AccountDisplay from './AuthComponents/AccountDisplay';
 import "./Account.css"
+import AccountDisplay from './AccountDisplay/AccountDisplay';
 
 const Account = () => {
   const authUser = useSelector(state => state.userSlice.authUser);
