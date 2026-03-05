@@ -2,6 +2,7 @@ import { foldGutter, foldService } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
 import { StateField, Facet } from '@codemirror/state';
 import { indentWithTab, insertNewlineAndIndent } from '@codemirror/commands';
+import { wrappedLineIndent } from 'codemirror-wrapped-line-indent';
 // This is for the default ctrl f search (leave it here for reference) 
 import { search, searchKeymap } from '@codemirror/search';
 import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Full color: actively shared
@@ -15,7 +16,7 @@ function getLineIndentPrev(text) {
   return match ? match[0].length : 0;
 }
 function calcLineTabs(text){
-  console.log("calc tabs of '", text,"'")
+  // console.log("calc tabs of '", text,"'")
   // for each 4 leading spaces or tabs add one
   if(!text || typeof text !== "string" || text?.length == 0)
     return 0
@@ -52,7 +53,7 @@ function calcIndentStartEndIndex(doc, startLine){
   let endIndex = startIndex
 
   // Log start
-  console.log(`\n\nLine: ${startLine.text.substring(0, 5)} idx:${endIndex} idt:${startIndent}`);
+  // console.log(`\n\nLine: ${startLine.text.substring(0, 5)} idx:${endIndex} idt:${startIndent}`);
 
   // Go through each line after the start line
   while (endIndex < doc.lines){
@@ -60,7 +61,7 @@ function calcIndentStartEndIndex(doc, startLine){
     endIndex++
     // If the end line is outside the bounds 
     if(endIndex > doc.lines){
-      console.log("Reached doc end at "+endIndex)
+      // console.log("Reached doc end at "+endIndex)
       // Return the from and to with end being before the out of bounds line (will be from = to if start is last line) 
       return {from: startIndex, to: endIndex - 1}
     }
@@ -69,11 +70,11 @@ function calcIndentStartEndIndex(doc, startLine){
     let subLine = doc.line(endIndex)
     let lineIndent = calcLineTabs(subLine.text)
 
-    console.log(`Sub-line: ${subLine.text.substring(0, 5)} idt:${lineIndent} eidx:`, endIndex);
+    // console.log(`Sub-line: ${subLine.text.substring(0, 5)} idt:${lineIndent} eidx:`, endIndex);
 
     // If the indent is less or equal then we have reached the end of the foldable area
     if(lineIndent <= startIndent){
-      console.log("Subline less indented, returning", {from: startIndex, to: endIndex - 1})
+      // console.log("Subline less indented, returning", {from: startIndex, to: endIndex - 1})
       // This line is out of the fold area so the line before it is the last line in the fold area (if next line after start line is not in its fold area from = to so no arrow)
       return {from: startIndex, to: endIndex - 1}
     }
@@ -322,7 +323,7 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
     ...(spellcheckExtension ? [spellcheckExtension] : []),
     lineIdState,
     ...(aiModeActive ? [aiShareGutter] : []),
-    ...(lineWrapEnabled ? [EditorView.lineWrapping] : []),
+    ...(lineWrapEnabled ? [EditorView.lineWrapping, wrappedLineIndent] : []),
     foldGutter({
       markerDOM: (open) => {
         const span = document.createElement('span');

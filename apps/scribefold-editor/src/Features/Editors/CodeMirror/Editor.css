@@ -127,3 +127,20 @@
   margin: 4px;
   margin-bottom: 10px;
 }
+.cm-line {
+  /* padding-left: 4ch !important;           or whatever your indent size is */
+  /* text-indent: -4ch !important; */
+  /*
+  codemirror-wrapped-line-indent adjustment
+  codemirror-wrapped-line-indent creates style={...} on the cm-line elements
+  the padding left moves everything to the right, the text-indent moves just the first line back to the left to make up for it
+    ex this is in line:
+    padding-left: calc(2ch + 6px); text-indent: calc(-2ch + 0px);
+    this is the default it was (not in line):
+    padding-left: calc(4ch + 6px); text-indent: calc(-4ch + 0px);
+
+  */
+}
+.cm-lineWrapping{
+
+}

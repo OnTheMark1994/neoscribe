@@ -26,6 +26,7 @@
     "@testing-library/user-event": "^13.5.0",
     "@uiw/react-codemirror": "^4.25.4",
     "codemirror": "^6.0.2",
+    "codemirror-wrapped-line-indent": "^1.0.9",
     "electron-is-dev": "^2.0.0",
     "lodash": "^4.17.21",
     "monaco-editor": "^0.55.1",
