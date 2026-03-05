@@ -26,27 +26,28 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
     const view = editorRef.current;
     if (!view) return;
 
-    // Clear replace text and reset extended options
+    closeSearchPanel(view);
+
     setReplaceText('');
     setShowExtendedOptions(false);
     setIsPanelOpen(false);
-    
-    const q = new SearchQuery({
-      search: searchQuery,
-      replace: '',
-      caseSensitive: caseSensitive,
-    });
-    view.dispatch({
-      effects: setSearchQuery.of(q)
-    });
-
-    // Close CodeMirror's search panel
-    closeSearchPanel(view);
 
     if (onClose) onClose();
   };
 
-  // Keyboard listeners for Ctrl+F, Ctrl+H, and Esc
+  // Escape key handler - always closes search panel regardless of focus
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+          closeSearchBar();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [editorRef]);
+
+  // Keyboard listeners for Ctrl+F, Ctrl+H
   useEffect(() => {
     const handleKeyDown = (e) => {
         const view = editorRef.current;
@@ -65,57 +66,20 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
             // Opening code is in the above keypress listener, just this part is necessary her
             setShowExtendedOptions(true);
         }
-
-        // Esc - close search panel
-        if (e.key === 'Escape') {
-          const open = searchPanelOpen(view.state);
-          if (open) {
-            e.preventDefault();
-            e.stopPropagation();
-            closeSearchBar();
-          }
-        }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editorRef]);
 
   // Check if search panel is open
-  useEffect(() => {
-    const view = editorRef.current;
-    if (!view) return;
-
-    const checkPanelOpen = () => {
-      const open = searchPanelOpen(view.state);
-      setIsPanelOpen(open);
-    };
-
-    checkPanelOpen();
-
-    // Listen for state changes
-    const listener = EditorView.updateListener.of((update) => {
-      if (update.state) {
-        checkPanelOpen();
-      }
-    });
-
-    const unsubscribe = view.dispatch({
-      effects: [listener]
-    });
-
-    return () => {
-      // Cleanup is handled by CodeMirror
-    };
-  }, [editorRef]);
 
   // Auto-focus input when panel opens
   useEffect(() => {
     if (isPanelOpen && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
     }
-  }, [isPanelOpen]);
+  }, [isPanelOpen, inputRef]);
 
   if (!isPanelOpen) return null;
 
@@ -208,10 +172,6 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
               if (e.key === 'Enter') {
                 e.preventDefault();
                 goNext();
-              }
-              if (e.key === 'Escape' && onClose) {
-                e.preventDefault();
-                onClose();
               }
             }}
           />

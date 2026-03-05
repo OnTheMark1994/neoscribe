@@ -87,6 +87,11 @@
   max-width: 500px;
   margin: 16px auto 0;
   margin-bottom: 20px;
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
+  padding: 10px;
+  border-radius: 5px;
 }
 
 .sf-balance-display {
@@ -129,7 +134,7 @@
 
 .sf-request-payment-btn:hover .sf-request-payment-dollar {
   color: #bbf7d0;
-  font-size: 1.4em;
+  /* font-size: 1.4em; */
   text-shadow: 0 0 15px rgba(250, 191, 36, 0.8), 0 0 30px rgba(250, 191, 36, 0.6), 0 0 45px rgba(250, 191, 36, 0.4);
 }
 
@@ -141,14 +146,17 @@
 
 .sf-referral-description {
   margin-top: 16px;
-  color: #d7e6ff;
+  /* color: #d7e6ff; */
   font-size: 0.9rem;
   line-height: 1.5;
   margin-left: auto;
   margin-right: auto;
 
+}
+.gold-text{
   color: #fffff8;
   text-shadow: 0 0 10px rgba(255, 241, 187, 0.532), 0 0 20px rgba(250, 191, 36, 0.4), 0 0 30px rgba(250, 191, 36, 0.2);
+  text-decoration: underline;
 }
 
 @media (max-width: 600px) {

@@ -282,7 +282,7 @@ router.post('/webhook', async (req, res, next) => {
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
         console.log('[STRIPE WEBHOOK] customer.subscription.updated - Subscription ID:', subscription.id, 'Customer:', subscription.customer);
-        console.log("subscription: ", subscription);
+        // console.log("subscription: ", subscription);
 
         // Retrieve full subscription to get current_period_end
         const fullSubscription = await stripe.subscriptions.retrieve(subscription.id);

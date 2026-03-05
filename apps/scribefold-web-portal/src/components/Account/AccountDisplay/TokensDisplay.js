@@ -1,7 +1,12 @@
+import { useSelector } from "react-redux";
 import { formatTokens } from "../../../Global/functions";
 import RefreshUserData from "../../Util/RefreshUserData";
 
-export default function TokensDisplay({userData, userDataLoading}) {
+export default function TokensDisplay() {
+
+  const userData = useSelector(state => state.userSlice.userData);
+  const userDataLoading = useSelector(state => state.userSlice.userDataLoading);
+
   return (
         <section className="sf-account-stats">
           <div className="sf-section-header">

@@ -232,6 +232,40 @@ Phases:
             get the percentages
                 need a sub for that
                 it adds up to being worth it to have it
+        Design 
+            referrals table 
+                on account creation user gets a row in the Referrals table 
+                    they are given a unique referral id in this function which is added to that table row when its created 
+                    rows have arrays of user ids for each category 
+                        clicks, downloads, subscribed (maybe row for each subscription tier), etc 
+            add to array rpc function 
+                when user clicks link and there is a referral id it will try to update the referrals.ref_id.user_clicks
+                    this will only add their id if its not already in there 
+                    this might get computationally expensive though to do this every time they go to the website 
+                        maybe also have a localstorage value to say tallied_click_for_referrall=ref_id that is checked before doing that
+                            if the current referral id is already in that value then the tally api call is not made 
+                            can do same for download, etc 
+            keeping track of payments is key though 
+                when a user has a payment successful call with the customer id, which is then linked to the auth id 
+                    we need a way to use that auth id or user id to add to the balance of the referrer 
+
+
+            a unique id is assigned to them and put in their referral row along with their id 
+                custom referral link, maybe for different tier, maybe add later 
+                the custom one can be a secondary value that is also used to look up the row 
+                    query: if x == referral_id or x == custom_referral_id
+            user that uses to referral link
+                ref id is saved in localstorage 
+                if they create an account localstorage is checked and refid is sent if exists 
+                if a download happens localstorage is checked and refid send if exists  
+            incrementing values 
+                using rpc server functions to prevent race conditions 
+                clicks, downloads, payments, referred clicks user ids array (ids)
+                    maybe they can all be id arrays. 
+                        count of array would be the number 
+                        then we will have a record of who referred for what too 
+
+            
     
     1 week
     general use and bug resolution

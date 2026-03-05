@@ -1,7 +1,7 @@
 import { foldGutter, foldService } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
 import { StateField, Facet } from '@codemirror/state';
-import { indentWithTab } from '@codemirror/commands';
+import { indentWithTab, insertNewlineAndIndent } from '@codemirror/commands';
 // This is for the default ctrl f search (leave it here for reference) 
 import { search, searchKeymap } from '@codemirror/search';
 import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Full color: actively shared
@@ -10,9 +10,77 @@ import AiHideIcon from '../../../images/scribefold-ai-eye-crossed-out.png';   //
 // import AiHideIcon from '../scribefold-ai-eye-slash.png';      // Explicitly hidden
 
 // Helper: count leading whitespace length
-function getLineIndent(text) {
+function getLineIndentPrev(text) {
   const match = /^\s*/.exec(text);
   return match ? match[0].length : 0;
+}
+function calcLineTabs(text){
+  console.log("calc tabs of '", text,"'")
+  // for each 4 leading spaces or tabs add one
+  if(!text || typeof text !== "string" || text?.length == 0)
+    return 0
+
+  let tabCount = 0;
+  let spaceCount = 0;
+
+  for (const char of text) {
+    // console.log("looking at char: ", char)
+    if (char != ' ')
+      return tabCount
+
+    // For each 4 spaces add a tab
+    if (char === ' ') {
+      spaceCount++;
+      if (spaceCount === 2) {
+        tabCount++;
+        spaceCount = 0;
+      }
+    } else if (char === '\t') {
+      tabCount++;
+      spaceCount = 0; // Reset space count on tab
+    }
+  }
+  // console.log("tabs: ", tabCount)
+  return tabCount
+}
+
+// Calculates fold range based on indent levels
+// Returns { from, to } or null if no fold should be created
+function calcIndentStartEndIndex(doc, startLine){
+  const startIndex = startLine.number
+  const startIndent = calcLineTabs(startLine.text)
+  let endIndex = startIndex
+
+  // Log start
+  console.log(`\n\nLine: ${startLine.text.substring(0, 5)} idx:${endIndex} idt:${startIndent}`);
+
+  // Go through each line after the start line
+  while (endIndex < doc.lines){
+    // Increment end index 
+    endIndex++
+    // If the end line is outside the bounds 
+    if(endIndex > doc.lines){
+      console.log("Reached doc end at "+endIndex)
+      // Return the from and to with end being before the out of bounds line (will be from = to if start is last line) 
+      return {from: startIndex, to: endIndex - 1}
+    }
+
+    // Get the indent level of the next line
+    let subLine = doc.line(endIndex)
+    let lineIndent = calcLineTabs(subLine.text)
+
+    console.log(`Sub-line: ${subLine.text.substring(0, 5)} idt:${lineIndent} eidx:`, endIndex);
+
+    // If the indent is less or equal then we have reached the end of the foldable area
+    if(lineIndent <= startIndent){
+      console.log("Subline less indented, returning", {from: startIndex, to: endIndex - 1})
+      // This line is out of the fold area so the line before it is the last line in the fold area (if next line after start line is not in its fold area from = to so no arrow)
+      return {from: startIndex, to: endIndex - 1}
+    }
+
+  }
+  return {from: startIndex, to: endIndex}
+
 }
 
 const customOutlineFolding = (state, lineStart, lineEnd) => {
@@ -26,6 +94,7 @@ const customOutlineFolding = (state, lineStart, lineEnd) => {
 
   let foldEndPos = null;
 
+  // Only for chapter and section ones 
   if (trimmed.startsWith('#chapter') || trimmed.startsWith('#section')) {
     const isChapter = trimmed.startsWith('#chapter');
 
@@ -44,34 +113,35 @@ const customOutlineFolding = (state, lineStart, lineEnd) => {
       currentLineNum++;
     }
 
-    foldEndPos = foundEndLine ? foundEndLine.to : doc.length;
-  } else {
-    const startIndent = getLineIndent(text);
-
-    let nextNonBlankNum = startLine.number + 1;
-    while (nextNonBlankNum <= doc.lines && doc.line(nextNonBlankNum).text.trim().length === 0) {
-      nextNonBlankNum++;
+    foldEndPos = foundEndLine ? foundEndLine.to : doc?.length;
+  } 
+  // For indent folding
+  else {
+    // Use the helper function to calculate indent-based fold range
+    const foldRangeIndicies = calcIndentStartEndIndex(doc, startLine);
+    // If the index is the same return somethign that makes no arrow show (no fold area)
+    if (foldRangeIndicies?.from == foldRangeIndicies?.to) {
+      return
     }
-    if (nextNonBlankNum > doc.lines) return null;
-
-    const nextIndent = getLineIndent(doc.line(nextNonBlankNum).text);
-    if (nextIndent <= startIndent) return null;
-
-    let endLineNum = nextNonBlankNum;
-    while (endLineNum <= doc.lines) {
-      const line = doc.line(endLineNum);
-      if (line.text.trim().length > 0 && getLineIndent(line.text) <= startIndent) {
-        foldEndPos = doc.line(endLineNum - 1).to;
-        break;
+    // If the index values are different return character positions start and end (the editor expects this format not index format)
+    else{
+      // Converted to characters instead of line index values
+      return {
+        // Start folding AFTER the arrow/header line so the header stays visible when folded
+        from: startLine.to,
+        // The end of the end line
+        to: doc.line(foldRangeIndicies.to)?.to
       }
-      endLineNum++;
     }
-    if (!foldEndPos) foldEndPos = doc.length;
   }
 
+  // Only return a fold if it's valid (has content to fold)
+  // foldEndPos must exist AND be after the start position to show an arrow
   if (foldEndPos && foldEndPos > startLine.to) {
+    // Valid fold range: arrow will appear at startLine.to
     return { from: startLine.to, to: foldEndPos };
   }
+  // No valid fold: no arrow will appear
   return null;
 };
 
@@ -265,7 +335,7 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
       }
     }),
     foldService.of(customOutlineFolding),
-    keymap.of([indentWithTab]),
+    keymap.of([indentWithTab, { key: "Enter", run: insertNewlineAndIndent }]),
     // This is for the default ctrl f search (leave it here for reference) 
     search(),
     keymap.of(searchKeymap),

@@ -59,6 +59,7 @@ import { updateSetting } from './ReduxSlices/SettingsSlice';
 import { fileOpened, resetEditor, setFilepath, setModified } from './ReduxSlices/EditorSlice';
 import { openFile as openFileIO, saveFile as saveFileIO, saveFileAs as saveFileAsIO } from './FileIO';
 import { getEditorText, setEditorText } from './EditorRefHelpers';
+import { foldAll, unfoldAll } from '@codemirror/language';
 
 // Detect whether we are running in Electron or browser
 const IS_ELECTRON = Boolean(window.electronAPI);
@@ -88,6 +89,7 @@ export default function TopBar({ editorRef }) {
 
   // Add a trailing * to indicate unsaved changes.
   const displayName = `${fileName}${modified ? '*' : ''}`;
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       // Close dropdown menus when user clicks outside of the top bar.
@@ -98,6 +100,20 @@ export default function TopBar({ editorRef }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Warn user before closing tab/refreshing if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (modified) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to close?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [modified]);
 
   // Helper used by many menu items to close the active dropdown.
   const closeMenu = useCallback(() => setActiveMenu(null), []);
@@ -182,6 +198,22 @@ export default function TopBar({ editorRef }) {
     closeMenu();
   }, [closeMenu, dispatch, fileName, filepath, editorRef]);
 
+  const handleFoldAll = useCallback(() => {
+    const view = editorRef.current;
+    if (view) {
+      foldAll(view);
+    }
+    closeMenu();
+  }, [editorRef, closeMenu]);
+
+  const handleUnfoldAll = useCallback(() => {
+    const view = editorRef.current;
+    if (view) {
+      unfoldAll(view);
+    }
+    closeMenu();
+  }, [editorRef, closeMenu]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const ctrl = e.ctrlKey || e.metaKey;
@@ -200,12 +232,17 @@ export default function TopBar({ editorRef }) {
       } else if (key === 'n') {
         e.preventDefault();
         newFile();
+      } else if (key === 'k') {
+        e.preventDefault();
+        if (shift) handleUnfoldAll();
+        else handleFoldAll();
       }
+      
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [newFile, openFile, saveFile, saveFileAs]);
+  }, [newFile, openFile, saveFile, saveFileAs, handleFoldAll, handleUnfoldAll]);
 
   // If fullscreen mode is active, the CSS class hides the bar (hover container still exists).
   const barClasses = `topBar ${fullscreenActive ? 'topBarHidden' : ''}`;
@@ -367,6 +404,25 @@ export default function TopBar({ editorRef }) {
             >
               Help
             </button>
+          </div>
+
+          <div className="topBarMenuItem">
+            <button
+              className={`topBarMenuButton ${activeMenu === 'tools' ? 'active' : ''}`}
+              onClick={() => setActiveMenu(activeMenu === 'tools' ? null : 'tools')}
+            >
+              Tools
+            </button>
+            {activeMenu === 'tools' && (
+              <div className="topBarDropdown">
+                <button onClick={handleFoldAll}>
+                  <span>Fold All</span><span className="shortcut">Ctrl+K</span>
+                </button>
+                <button onClick={handleUnfoldAll}>
+                  <span>Unfold All</span><span className="shortcut">Ctrl+Shift+K</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

@@ -112,9 +112,7 @@ const AccountDisplay = () => {
 
         {/* Referrals */}
         <ReferralSection />
-
-
-       
+ 
         <div className="sf-divider"></div>
 
         {/* Plans */}
@@ -123,15 +121,13 @@ const AccountDisplay = () => {
         <div className="sf-divider"></div>
 
         {/* Tokens Stats */}
-        <TokensDisplay userData={userData} userDataLoading={userDataLoading}/>
+        <TokensDisplay />
+
+        <div className="sf-divider"></div>
 
         {/* One Time Packs */}
         {/* <OneTimePacksDisplay/> */}
-
         {/* <div className="sf-divider"></div> */}
-
-
-        <div className="sf-divider"></div>
 
         {/* Account Details */}
         <section className="sf-account-summary">
