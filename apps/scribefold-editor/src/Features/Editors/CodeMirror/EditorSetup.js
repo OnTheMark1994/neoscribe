@@ -3,12 +3,10 @@ import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
 import { StateField, Facet } from '@codemirror/state';
 import { indentWithTab, insertNewlineAndIndent } from '@codemirror/commands';
 import { wrappedLineIndent } from 'codemirror-wrapped-line-indent';
-// This is for the default ctrl f search (leave it here for reference) 
 import { search, searchKeymap } from '@codemirror/search';
 import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Full color: actively shared
 import AiShowGreyIcon from '../../../images/scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
 import AiHideIcon from '../../../images/scribefold-ai-eye-crossed-out.png';   // Explicitly hidden
-// import AiHideIcon from '../scribefold-ai-eye-slash.png';      // Explicitly hidden
 
 // Helper: count leading whitespace length
 function getLineIndentPrev(text) {
@@ -315,12 +313,8 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
   const showLineNumbers = !!options.showLineNumbers;
   const spellcheckEnabled = options.spellcheckEnabled !== false;
   const lineWrapEnabled = options.lineWrapEnabled === true;
-  const spellcheckExtension = spellcheckEnabled
-    ? EditorView.contentAttributes.of({ spellcheck: "true" })
-    : null;
 
   const extensions = [
-    ...(spellcheckExtension ? [spellcheckExtension] : []),
     lineIdState,
     ...(aiModeActive ? [aiShareGutter] : []),
     ...(lineWrapEnabled ? [EditorView.lineWrapping, wrappedLineIndent] : []),
@@ -337,7 +331,6 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
     }),
     foldService.of(customOutlineFolding),
     keymap.of([indentWithTab, { key: "Enter", run: insertNewlineAndIndent }]),
-    // This is for the default ctrl f search (leave it here for reference) 
     search(),
     keymap.of(searchKeymap),
     EditorView.theme({

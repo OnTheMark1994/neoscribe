@@ -27,7 +27,7 @@ x
 unsaved work alert (done)
 when there is unsaved work in the browser editor show an alert to ask the user if they want to save their work
 
-
+(done)
 tab indent spaces does not show on the next line for word wrap
 for example if the line wraps and it has one indent the wrapped part on the next line starts all the way to the left (not indented)
   this is the line and the page ends here

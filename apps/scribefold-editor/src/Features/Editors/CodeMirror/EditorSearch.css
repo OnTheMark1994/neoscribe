@@ -4,11 +4,15 @@
 .scribefold-codemirror .cm-panels.cm-panels-bottom {
   background: #252526;
   border-top: 1px solid #3c3c3c;
-  display: none;
-  height: 0px;
-  width: 0px;
+  display: flex;
+  height: auto;
+  width: auto;
 }
-
+.cm-panels-bottom{
+  /* display: none !important; */
+  height: 0px !important;
+  overflow: hidden !important;
+}
 /* Main Search Panel - Use Grid for stacked layout */
 .cm-search.cm-panel {
   background: transparent;

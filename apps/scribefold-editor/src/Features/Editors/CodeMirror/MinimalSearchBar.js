@@ -6,11 +6,9 @@ import {
   findNext,
   findPrevious,
   SearchQuery,
-  searchPanelOpen,
   replaceNext,
   replaceAll,
 } from '@codemirror/search';
-import { EditorView } from '@codemirror/view';
 import './MinimalSearchBar.css';
 
 export default function MinimalSearchBar({ editorRef, onClose }) {
@@ -28,51 +26,57 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
 
     closeSearchPanel(view);
 
+    view.dispatch({
+      effects: setSearchQuery.of(new SearchQuery({ search: '' }))
+    });
+
     setReplaceText('');
     setShowExtendedOptions(false);
+    setSearchQueryState('');
     setIsPanelOpen(false);
 
     if (onClose) onClose();
   };
 
-  // Escape key handler - always closes search panel regardless of focus
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-          closeSearchBar();
+    const handleKeyDown = (e) => {
+      const view = editorRef.current;
+      if (!view) return;
+
+      // Ctrl+F or Ctrl+H - open search panel
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F' || e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        openSearchPanel(view);
+        setIsPanelOpen(true);
+      }
+      // Ctrl+h for starting in search and replace mode 
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        openSearchPanel(view);
+        // Opening code is in the above keypress listener, just this part is necessary her
+        setShowExtendedOptions(true);
       }
     };
 
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    // Capture phase ensures CodeMirror keymaps (and other handlers) don't get the event.
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [editorRef]);
 
-  // Keyboard listeners for Ctrl+F, Ctrl+H
+  // Global Escape handler (should work even when editor is focused)
   useEffect(() => {
-    const handleKeyDown = (e) => {
-        const view = editorRef.current;
-        if (!view) return;
+    if (!isPanelOpen) return;
 
-        // Ctrl+F or Ctrl+H - open search panel
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F' || e.key === 'h' || e.key === 'H')) {
-            e.preventDefault();
-            console.log("ctrk f, view: ", view)
-            openSearchPanel(view);
-            setIsPanelOpen(true)
-        }
-        // Ctrl+h for starting in search and replace mode 
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'h' || e.key === 'H')) {
-            e.preventDefault();
-            // Opening code is in the above keypress listener, just this part is necessary her
-            setShowExtendedOptions(true);
-        }
+    const handleEscape = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      closeSearchBar();
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [editorRef]);
-
-  // Check if search panel is open
+    window.addEventListener('keydown', handleEscape, true);
+    return () => window.removeEventListener('keydown', handleEscape, true);
+  }, [isPanelOpen, editorRef]);
 
   // Auto-focus input when panel opens
   useEffect(() => {
@@ -98,6 +102,28 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
     view.dispatch({
       effects: setSearchQuery.of(q)
     });
+  };
+
+  const handleSearchInputKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeSearchBar();
+      return;
+    }
+
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      e.stopPropagation();
+      goNext();
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      goPrev();
+    }
   };
 
   const handleReplaceInput = (e) => {
@@ -168,13 +194,9 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
             placeholder="Find in document..."
             className="search-input"
             onChange={handleInput}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                goNext();
-              }
-            }}
+            onKeyDown={handleSearchInputKeyDown}
           />
+
           <button
             className={`search-option-button ${caseSensitive ? 'active' : ''}`}
             onClick={toggleCaseSensitive}
