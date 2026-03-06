@@ -11,6 +11,7 @@ import KeyboardWindow from './Features/Windows/KeyboardWindow';
 import ChangeNavigator from './Features/AI/Components/ChangeNavigator';
 import EditorCodeMirror from './Features/Editors/CodeMirror/Editor';
 import Editor from './Features/Editors/CodeMirror/Editor';
+import { DEFAULT_COLORS } from './Features/Settings/Tabs/SettingsOptions/constants';
 
 export default function App() {
 
@@ -23,14 +24,31 @@ export default function App() {
 
   // We are retreiving this so we can display the correct backgroundImageUri
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject)
+  const textColor = settingsObject?.textColor || DEFAULT_COLORS.textColor;
+  const pageBgColor = settingsObject?.pageBgColor || DEFAULT_COLORS.pageBgColor;
+  const indentMarkerColor = settingsObject?.indentMarkerColor || DEFAULT_COLORS.indentMarkerColor;
+  const indentMarkerBgColor = settingsObject?.indentMarkerBgColor || DEFAULT_COLORS.indentMarkerBgColor;
 
   return (
-    // The background of the entire appliation with the background image
-    <div 
-      className={"backgroundContainer"}
-      // We only use inline style when it makes sense to, like in this case when it is changed by redux global state values
-      style={{ backgroundImage: settingsObject?.backgroundImageUri ? `url(${settingsObject.backgroundImageUri})` : undefined }}
-    >
+    <>
+      <style>{`
+        body {
+          --text-color: ${textColor};
+        }
+        .page {
+          --page-bg-color: ${pageBgColor};
+        }
+        .cm-indent-markers {
+          --indent-marker-active-bg-color: ${indentMarkerColor} !important;
+          --indent-marker-bg-color: ${indentMarkerBgColor} !important;
+        }
+      `}</style>
+      {/* The background of the entire appliation with the background image */}
+      <div 
+        className={"backgroundContainer"}
+        // We only use inline style when it makes sense to, like in this case when it is changed by redux global state values
+        style={{ backgroundImage: settingsObject?.backgroundImageUri ? `url(${settingsObject.backgroundImageUri})` : undefined }}
+      >
 
       {/* Global key listener (really just F11 fullscreen toggle) */}
       <KeypressListeners/>
@@ -73,5 +91,6 @@ export default function App() {
       <KeyboardWindow editorRef={editorRef}/>
    
     </div>
+    </>
   );
 }

@@ -14,7 +14,7 @@ export default function Editor({ editorRef, originalDocRef }) {
   const dispatch = useDispatch();
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const showDiffView = useSelector(state => state.editorSlice.showDiffView);
-
+  
   // Listen for context menu events from main process
   useEffect(() => {
     const handleContextMenuEvent = (event, params) => {
@@ -80,6 +80,7 @@ export default function Editor({ editorRef, originalDocRef }) {
       {
         spellcheckEnabled: settingsObject?.spellcheckEnabled,
         lineWrapEnabled: settingsObject?.lineWrapEnabled,
+        indentMarkersEnabled: settingsObject?.indentMarkersEnabled,
       }
     ),
     acceptRevertListener,
@@ -95,6 +96,18 @@ export default function Editor({ editorRef, originalDocRef }) {
 
   return (
     <div className="scribefold-codemirror" onContextMenu={handleContextMenu}>
+      <style>{`
+        body {
+          --text-color: ${settingsObject?.textColor};
+        }
+        .page {
+          --page-bg-color: ${settingsObject?.pageBgColor};
+        }
+        .cm-indent-markers {
+          --indent-marker-active-bg-color: ${settingsObject?.indentMarkerBgColor} !important;
+          --indent-marker-bg-color: ${settingsObject?.indentMarkerColor} !important;
+        }
+      `}</style>
       <MinimalSearchBar editorRef={editorRef}></MinimalSearchBar>
       <CodeMirror
         basicSetup={false}

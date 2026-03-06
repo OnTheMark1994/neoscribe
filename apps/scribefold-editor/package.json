@@ -19,6 +19,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@opensign/react": "^1.0.3",
     "@reduxjs/toolkit": "^2.11.0",
+    "@replit/codemirror-indentation-markers": "^6.5.3",
     "@supabase/supabase-js": "^2.39.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",

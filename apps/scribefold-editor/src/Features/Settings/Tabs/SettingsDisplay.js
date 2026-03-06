@@ -7,6 +7,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { updateSetting } from '../../../Global/ReduxSlices/SettingsSlice';
 import { toggleFullscreenActive } from '../../../Global/ReduxSlices/MenuSlice';
 import ToggleSwitch from '../../Util/ToggleSwitch';
+import ColorPickerRow from './SettingsOptions/ColorPickerRow';
+import { DEFAULT_COLORS, PRESETS } from './SettingsOptions/constants';
 import './SettingsTabs.css';
 
 export default function SettingsDisplay() {
@@ -17,6 +19,7 @@ export default function SettingsDisplay() {
   const spellcheckEnabled = settingsObject?.spellcheckEnabled !== false;
   const lineWrapEnabled = settingsObject?.lineWrapEnabled === true;
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
+  const indentMarkersEnabled = settingsObject?.indentMarkersEnabled === true;
 
   const themes = [
     { label: 'Space Dreams', value: '/theme-images/spacedreams.jpg' },
@@ -88,6 +91,78 @@ export default function SettingsDisplay() {
             onClick={() => dispatch(updateSetting({ key: 'spellcheckEnabled', value: !spellcheckEnabled }))}
           />
         </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Show indent markers</div>
+            <div className="settingsRowLabelSub">Show vertical lines indicating indentation depth.</div>
+          </div>
+          <ToggleSwitch
+            on={indentMarkersEnabled}
+            onClick={() => dispatch(updateSetting({ key: 'indentMarkersEnabled', value: !indentMarkersEnabled }))}
+          />
+        </div>
+      </div>
+
+      <div className="settingsSection">
+        <div className="settingsSectionTitle">Color Selectors</div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Presets</div>
+            <div className="settingsRowLabelSub">Quickly apply common display combinations.</div>
+          </div>
+          <div className="colorPresets">
+            <button
+              type="button"
+              className="settingsButton presetButton"
+              onClick={() => {
+                dispatch(updateSetting({ key: 'textColor', value: PRESETS.preset1.textColor }));
+                dispatch(updateSetting({ key: 'pageBgColor', value: PRESETS.preset1.pageBgColor }));
+              }}
+            >
+              Preset 1
+            </button>
+            <button
+              type="button"
+              className="settingsButton presetButton"
+              onClick={() => {
+                dispatch(updateSetting({ key: 'textColor', value: PRESETS.preset2.textColor }));
+                dispatch(updateSetting({ key: 'pageBgColor', value: PRESETS.preset2.pageBgColor }));
+              }}
+            >
+              Preset 2
+            </button>
+          </div>
+        </div>
+
+        <ColorPickerRow
+          label="Indent marker active"
+          subLabel="Color of the active indent guide lines."
+          settingKey="indentMarkerColor"
+          defaultValue={DEFAULT_COLORS.indentMarkerColor}
+        />
+
+        <ColorPickerRow
+          label="Indent marker"
+          subLabel="Color of the regular indent guide lines."
+          settingKey="indentMarkerBgColor"
+          defaultValue={DEFAULT_COLORS.indentMarkerBgColor}
+        />
+
+        <ColorPickerRow
+          label="Text color"
+          subLabel="Color of the editor text."
+          settingKey="textColor"
+          defaultValue={DEFAULT_COLORS.textColor}
+        />
+
+        <ColorPickerRow
+          label="Page background"
+          subLabel="Background color for the editor page."
+          settingKey="pageBgColor"
+          defaultValue={DEFAULT_COLORS.pageBgColor}
+        />
       </div>
     </div>
   );

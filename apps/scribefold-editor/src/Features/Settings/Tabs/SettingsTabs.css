@@ -155,3 +155,14 @@
   background: rgba(76, 175, 80, 0.18);
   color: rgba(255, 255, 255, 0.95);
 }
+
+.colorPresets {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.presetButton {
+  margin-left: 5px;
+  margin-right: 5px;
+}

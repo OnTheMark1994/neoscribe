@@ -43,7 +43,7 @@
   max-width: 850px;
   height: 100%;
   max-height: calc(100vh - 120px);
-  background-color: rgba(255, 255, 255, 0.31);
+  background-color: var(--page-bg-color, rgba(255, 255, 255, 0.31));
   box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
   border-radius: 4px;
   padding: 0px;

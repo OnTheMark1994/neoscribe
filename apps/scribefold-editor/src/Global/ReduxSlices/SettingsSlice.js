@@ -38,6 +38,11 @@ mod the things a described in the ( areas
     spellcheckEnabled: true,
     lineWrapEnabled: false,
     showMiniKeyboard: false,
+    indentMarkersEnabled: true,                                // Enable/disable indentation markers
+    indentMarkerColor: 'rgba(189, 238, 255, 0.719)',           // Color for indentation markers (active)
+    indentMarkerBgColor: 'rgba(217, 232, 235, 0.1)',           // Background color for indentation markers
+    textColor: 'rgba(51, 51, 51, 1)',                           // Text color in editor
+    pageBgColor: 'rgba(255, 255, 255, 0.31)',                 // Page background color
   };
 
  // Saves the settings object to localStorage.

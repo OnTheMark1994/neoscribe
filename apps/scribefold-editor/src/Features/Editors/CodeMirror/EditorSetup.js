@@ -4,6 +4,7 @@ import { StateField, Facet } from '@codemirror/state';
 import { indentWithTab, insertNewlineAndIndent } from '@codemirror/commands';
 import { wrappedLineIndent } from 'codemirror-wrapped-line-indent';
 import { search, searchKeymap } from '@codemirror/search';
+import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Full color: actively shared
 import AiShowGreyIcon from '../../../images/scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
 import AiHideIcon from '../../../images/scribefold-ai-eye-crossed-out.png';   // Explicitly hidden
@@ -313,6 +314,7 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
   const showLineNumbers = !!options.showLineNumbers;
   const spellcheckEnabled = options.spellcheckEnabled !== false;
   const lineWrapEnabled = options.lineWrapEnabled === true;
+  const indentMarkersEnabled = options.indentMarkersEnabled === true;
 
   const extensions = [
     lineIdState,
@@ -333,6 +335,7 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
     keymap.of([indentWithTab, { key: "Enter", run: insertNewlineAndIndent }]),
     search(),
     keymap.of(searchKeymap),
+    ...(indentMarkersEnabled ? [indentationMarkers()] : []),
     EditorView.theme({
     '&': {
       backgroundColor: 'transparent',

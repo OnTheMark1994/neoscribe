@@ -2,7 +2,11 @@
   width: 100%;
   height: 100%;
 }
-
+.cm-indent-markers{
+  --indent-marker-active-bg-color: rgba(189, 238, 255, 0.719) !important;
+  --indent-marker-bg-color: rgba(217, 232, 235, 0.1) !important;
+}
+ 
 .scribefold-codemirror .cm-theme-light,
 .scribefold-codemirror .cm-theme-dark,
 .scribefold-codemirror .cm-editor,
@@ -143,4 +147,8 @@
 }
 .cm-lineWrapping{
 
+}
+.replit-cm-indentation-marker {
+  border-left: 1px solid #85d0ff80;  /* semi-transparent gray */
+  /* or dashed: border-left-style: dashed; */
 }
