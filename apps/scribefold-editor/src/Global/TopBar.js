@@ -59,7 +59,8 @@ import { updateSetting } from './ReduxSlices/SettingsSlice';
 import { fileOpened, resetEditor, setFilepath, setModified } from './ReduxSlices/EditorSlice';
 import { openFile as openFileIO, saveFile as saveFileIO, saveFileAs as saveFileAsIO } from './FileIO';
 import { getEditorText, setEditorText } from './EditorRefHelpers';
-import { foldAll, unfoldAll } from '@codemirror/language';
+import { unfoldAll } from '@codemirror/language';
+import { customFoldAll } from '../Features/Editors/CodeMirror/EditorSetup';
 
 // Detect whether we are running in Electron or browser
 const IS_ELECTRON = Boolean(window.electronAPI);
@@ -201,7 +202,7 @@ export default function TopBar({ editorRef }) {
   const handleFoldAll = useCallback(() => {
     const view = editorRef.current;
     if (view) {
-      foldAll(view);
+      customFoldAll(view);
     }
     closeMenu();
   }, [editorRef, closeMenu]);

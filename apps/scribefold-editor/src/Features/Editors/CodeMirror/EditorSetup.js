@@ -1,10 +1,11 @@
-import { foldGutter, foldService } from '@codemirror/language';
+import { foldGutter, foldService, foldEffect } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
 import { StateField, Facet } from '@codemirror/state';
 import { indentWithTab, insertNewlineAndIndent, indentMore } from '@codemirror/commands';
 import { wrappedLineIndent } from 'codemirror-wrapped-line-indent';
 import { search, searchKeymap } from '@codemirror/search';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+
 import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Full color: actively shared
 import AiShowGreyIcon from '../../../images/scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
 import AiHideIcon from '../../../images/scribefold-ai-eye-crossed-out.png';   // Explicitly hidden
@@ -332,7 +333,34 @@ const insertNewlineWithIndent = (view) => {
   return true;
 };
 
-export { lineIdState };
+// Custom fold all that recursively folds all nested content
+const customFoldAll = (view) => {
+  const { state } = view;
+  const doc = state.doc;
+  const foldRanges = [];
+
+  // Find all foldable ranges
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    const foldRange = customOutlineFolding(state, line.from, line.to);
+    if (foldRange) {
+      foldRanges.push(foldRange);
+    }
+  }
+
+  // Sort ranges by start position (descending) to fold from inside out
+  foldRanges.sort((a, b) => b.from - a.from);
+
+  // Apply folds
+  if (foldRanges.length > 0) {
+    view.dispatch({
+      effects: foldRanges.map(range => foldEffect.of(range))
+    });
+  }
+};
+
+export { lineIdState, customFoldAll };
+
 export function buildExtensions(onChange, aiModeActive, options = {}) {
   const showLineNumbers = !!options.showLineNumbers;
   const spellcheckEnabled = options.spellcheckEnabled !== false;
