@@ -1,7 +1,7 @@
 import { foldGutter, foldService } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
 import { StateField, Facet } from '@codemirror/state';
-import { indentWithTab, insertNewlineAndIndent } from '@codemirror/commands';
+import { indentWithTab, insertNewlineAndIndent, indentMore } from '@codemirror/commands';
 import { wrappedLineIndent } from 'codemirror-wrapped-line-indent';
 import { search, searchKeymap } from '@codemirror/search';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
@@ -309,6 +309,29 @@ const aiShareGutter = gutter({
   }
 });
 
+// Custom Enter handler that ensures indentation is inserted
+const insertNewlineWithIndent = (view) => {
+  const { state } = view;
+  const doc = state.doc;
+
+  // Get current cursor position
+  const pos = state.selection.main.head;
+  const line = doc.lineAt(pos);
+
+  // Get the indentation of the current line
+  const lineText = line.text;
+  const indentMatch = lineText.match(/^(\s*)/);
+  const indent = indentMatch ? indentMatch[1] : '';
+
+  // Insert newline with indentation
+  view.dispatch({
+    changes: { from: pos, to: pos, insert: '\n' + indent },
+    selection: { anchor: pos + 1 + indent.length }
+  });
+
+  return true;
+};
+
 export { lineIdState };
 export function buildExtensions(onChange, aiModeActive, options = {}) {
   const showLineNumbers = !!options.showLineNumbers;
@@ -332,7 +355,10 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
       }
     }),
     foldService.of(customOutlineFolding),
-    keymap.of([indentWithTab, { key: "Enter", run: insertNewlineAndIndent }]),
+    keymap.of([
+      indentWithTab,
+      { key: "Enter", run: insertNewlineWithIndent }
+    ]),
     search(),
     keymap.of(searchKeymap),
     ...(indentMarkersEnabled ? [indentationMarkers()] : []),

@@ -31,7 +31,7 @@ mod the things a described in the ( areas
  const SETTINGS_STORAGE_KEY = 'scribefold-editor-settingsObject';
 
  const defaultSettingsObject = {
-    backgroundImageUri: '/theme-images/spacedreams.jpg',      // The image that shows as the background of the entire application
+    backgroundImageUri: '/theme-images/Mountains.png',      // The image that shows as the background of the entire application
     devMode: true,
     aiModeActive: true,
     autoJumpToNextChunk: true,
@@ -39,10 +39,10 @@ mod the things a described in the ( areas
     lineWrapEnabled: false,
     showMiniKeyboard: false,
     indentMarkersEnabled: true,                                // Enable/disable indentation markers
-    indentMarkerColor: 'rgba(189, 238, 255, 0.719)',           // Color for indentation markers (active)
-    indentMarkerBgColor: 'rgba(217, 232, 235, 0.1)',           // Background color for indentation markers
-    textColor: 'rgba(51, 51, 51, 1)',                           // Text color in editor
-    pageBgColor: 'rgba(255, 255, 255, 0.31)',                 // Page background color
+    indentMarkerColor: 'rgba(189, 238, 255, .1)',           // Color for indentation markers (regular)
+    indentMarkerColorActive: 'rgba(194, 245, 255, 0.5)',   // Color for indentation markers (active/cursor)
+    textColor: 'rgba(255, 255, 255, 1)',                      // Text color in editor
+    pageBgColor: 'rgba(0, 0, 0, 0)',                         // Page background color
   };
 
  // Saves the settings object to localStorage.

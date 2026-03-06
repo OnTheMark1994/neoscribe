@@ -38,23 +38,31 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
     if (onClose) onClose();
   };
 
+  const focusAndSelect = () => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const view = editorRef.current;
       if (!view) return;
 
-      // Ctrl+F or Ctrl+H - open search panel
+      // Ctrl+F or Ctrl+H - open search panel and focus input
       if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F' || e.key === 'h' || e.key === 'H')) {
         e.preventDefault();
         openSearchPanel(view);
         setIsPanelOpen(true);
+        setTimeout(focusAndSelect, 10);
       }
-      // Ctrl+h for starting in search and replace mode 
+      // Ctrl+h for starting in search and replace mode
       if ((e.ctrlKey || e.metaKey) && (e.key === 'h' || e.key === 'H')) {
         e.preventDefault();
         openSearchPanel(view);
-        // Opening code is in the above keypress listener, just this part is necessary her
         setShowExtendedOptions(true);
+        setTimeout(focusAndSelect, 10);
       }
     };
 
@@ -78,12 +86,11 @@ export default function MinimalSearchBar({ editorRef, onClose }) {
     return () => window.removeEventListener('keydown', handleEscape, true);
   }, [isPanelOpen, editorRef]);
 
-  // Auto-focus input when panel opens
+  // Auto-focus input and select text when panel opens
   useEffect(() => {
-    if (isPanelOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isPanelOpen, inputRef]);
+    if (!isPanelOpen) return;
+    setTimeout(focusAndSelect, 10);
+  }, [isPanelOpen]);
 
   if (!isPanelOpen) return null;
 

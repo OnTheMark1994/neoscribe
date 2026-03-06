@@ -29,7 +29,7 @@ export default function App() {
   const textColor = settingsObject?.textColor || DEFAULT_COLORS.textColor;
   const pageBgColor = settingsObject?.pageBgColor || DEFAULT_COLORS.pageBgColor;
   const indentMarkerColor = settingsObject?.indentMarkerColor || DEFAULT_COLORS.indentMarkerColor;
-  const indentMarkerBgColor = settingsObject?.indentMarkerBgColor || DEFAULT_COLORS.indentMarkerBgColor;
+  const indentMarkerColorActive = settingsObject?.indentMarkerColorActive || DEFAULT_COLORS.indentMarkerColorActive;
 
   return (
     <>
@@ -41,8 +41,8 @@ export default function App() {
           --page-bg-color: ${pageBgColor};
         }
         .cm-indent-markers {
-          --indent-marker-active-bg-color: ${indentMarkerColor} !important;
-          --indent-marker-bg-color: ${indentMarkerBgColor} !important;
+          --indent-marker-active-bg-color: ${indentMarkerColorActive} !important;
+          --indent-marker-bg-color: ${indentMarkerColor} !important;
         }
       `}</style>
       {/* The background of the entire appliation with the background image */}

@@ -1,6 +1,7 @@
 export const DEFAULT_COLORS = {
-  indentMarkerColor: 'rgba(217, 232, 235, 0.1)',
-  indentMarkerBgColor: 'rgba(189, 238, 255, 0.719)',
+  indentMarkerColor: 'rgba(189, 238, 255, .1)',
+  indentMarkerColorActive: 'rgba(194, 245, 255, 0.5)',
+  //   active: rgba(194, 245, 255, 0.8)  regular: rgba(189, 238, 255, .3)
   textColor: 'rgba(51, 51, 51, 1)',
   pageBgColor: 'rgba(255, 255, 255, 0.31)',
 };

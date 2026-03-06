@@ -104,7 +104,7 @@ export default function Editor({ editorRef, originalDocRef }) {
           --page-bg-color: ${settingsObject?.pageBgColor};
         }
         .cm-indent-markers {
-          --indent-marker-active-bg-color: ${settingsObject?.indentMarkerBgColor} !important;
+          --indent-marker-active-bg-color: ${settingsObject?.indentMarkerColorActive} !important;
           --indent-marker-bg-color: ${settingsObject?.indentMarkerColor} !important;
         }
       `}</style>

@@ -32,6 +32,7 @@ export default function SettingsDisplay() {
     { label: 'Writing Desk', value: '/theme-images/writingdesk.jpg' },
   ];
 
+  // Using a base 64 string for the image, maybe better to use a url or file path, some tradeoffs though: browser can't access real file path so will be gone on refresh, string has file size limits though  
   const handleCustomImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -196,10 +197,10 @@ export default function SettingsDisplay() {
         />
 
         <ColorPickerRow
-          label="Indent marker"
-          subLabel="Color of the regular indent guide lines."
-          settingKey="indentMarkerBgColor"
-          defaultValue={DEFAULT_COLORS.indentMarkerBgColor}
+          label="Indent marker active"
+          subLabel="Color of the indent guide when cursor is on the line."
+          settingKey="indentMarkerColorActive"
+          defaultValue={DEFAULT_COLORS.indentMarkerColorActive}
         />
 
         <ColorPickerRow
