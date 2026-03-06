@@ -22,8 +22,10 @@ export default function App() {
   // Controls whether diff view/change navigator is shown
   const showDiffView = useSelector(state => state.editorSlice.showDiffView);
 
-  // We are retreiving this so we can display the correct backgroundImageUri
-  const settingsObject = useSelector(state => state.settingsSlice.settingsObject)
+  const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
+  const backgroundImageUri = settingsObject?.backgroundImageUri;
+  const customBackgroundImage = settingsObject?.customBackgroundImage;
+  const actualBackgroundImage = backgroundImageUri === 'custom' ? customBackgroundImage : backgroundImageUri;
   const textColor = settingsObject?.textColor || DEFAULT_COLORS.textColor;
   const pageBgColor = settingsObject?.pageBgColor || DEFAULT_COLORS.pageBgColor;
   const indentMarkerColor = settingsObject?.indentMarkerColor || DEFAULT_COLORS.indentMarkerColor;
@@ -44,10 +46,9 @@ export default function App() {
         }
       `}</style>
       {/* The background of the entire appliation with the background image */}
-      <div 
+      <div
         className={"backgroundContainer"}
-        // We only use inline style when it makes sense to, like in this case when it is changed by redux global state values
-        style={{ backgroundImage: settingsObject?.backgroundImageUri ? `url(${settingsObject.backgroundImageUri})` : undefined }}
+        style={{ backgroundImage: actualBackgroundImage ? `url(${actualBackgroundImage})` : undefined }}
       >
 
       {/* Global key listener (really just F11 fullscreen toggle) */}

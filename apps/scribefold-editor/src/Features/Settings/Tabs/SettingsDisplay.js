@@ -16,6 +16,7 @@ export default function SettingsDisplay() {
 
   const settingsObject = useSelector(state => state.settingsSlice.settingsObject);
   const backgroundImageUri = settingsObject?.backgroundImageUri;
+  const customBackgroundImage = settingsObject?.customBackgroundImage;
   const spellcheckEnabled = settingsObject?.spellcheckEnabled !== false;
   const lineWrapEnabled = settingsObject?.lineWrapEnabled === true;
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
@@ -30,6 +31,24 @@ export default function SettingsDisplay() {
     { label: 'Tranquility', value: '/theme-images/tranquility.jpg' },
     { label: 'Writing Desk', value: '/theme-images/writingdesk.jpg' },
   ];
+
+  const handleCustomImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64String = event.target.result;
+      dispatch(updateSetting({ key: 'customBackgroundImage', value: base64String }));
+      dispatch(updateSetting({ key: 'backgroundImageUri', value: 'custom' }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveCustomImage = () => {
+    dispatch(updateSetting({ key: 'customBackgroundImage', value: null }));
+    dispatch(updateSetting({ key: 'backgroundImageUri', value: '/theme-images/spacedreams.jpg' }));
+  };
 
   return (
     <div>
@@ -53,6 +72,39 @@ export default function SettingsDisplay() {
               {theme.label}
             </button>
           ))}
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Custom background</div>
+            <div className="settingsRowLabelSub">Upload your own background image.</div>
+          </div>
+          <div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleCustomImageUpload}
+              style={{ display: 'none' }}
+              id="customBackgroundInput"
+            />
+            <button
+              type="button"
+              className="settingsButton"
+              onClick={() => document.getElementById('customBackgroundInput').click()}
+            >
+              Upload Image
+            </button>
+            {customBackgroundImage && (
+              <button
+                type="button"
+                className="settingsButton"
+                onClick={handleRemoveCustomImage}
+                style={{ marginLeft: '8px' }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -14,11 +14,12 @@ export default function AiChatToggle() {
   const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
 
-  if (aiModeActive || fullscreenActive) return null;
+  // if (aiModeActive || fullscreenActive) return null;
+  if (aiModeActive) return null;
 
   return (
     <button
-      className="aiChatToggle"
+      className={`aiChatToggle ${fullscreenActive ? 'aiChatToggleFullscreen' : ''}`}
       onClick={() => dispatch(updateSetting({ key: 'aiModeActive', value: true }))}
       title="Show AI Chat"
     >
