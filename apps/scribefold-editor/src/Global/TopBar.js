@@ -61,6 +61,7 @@ import { openFile as openFileIO, saveFile as saveFileIO, saveFileAs as saveFileA
 import { getEditorText, setEditorText } from './EditorRefHelpers';
 import { unfoldAll } from '@codemirror/language';
 import { customFoldAll } from '../Features/Editors/CodeMirror/EditorSetup';
+import { undo, redo } from '@codemirror/commands';
 
 // Detect whether we are running in Electron or browser
 const IS_ELECTRON = Boolean(window.electronAPI);
@@ -81,6 +82,12 @@ export default function TopBar({ editorRef }) {
 
   // Fullscreen state controls whether the top bar is visually hidden.
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
+
+  // Settings window state
+  const showSettingsWindow = useSelector(state => state.windowSlice.showSettingsWindow);
+
+  // Help window state
+  const showHelpWindow = useSelector(state => state.windowSlice.showHelpWindow);
 
   // Controls whether the AI chat sidebar is visible.
   const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
@@ -215,12 +222,45 @@ export default function TopBar({ editorRef }) {
     closeMenu();
   }, [editorRef, closeMenu]);
 
+  // Undo handler
+  const handleUndo = useCallback(() => {
+    const view = editorRef.current;
+    if (view) {
+      undo(view);
+    }
+    closeMenu();
+  }, [editorRef, closeMenu]);
+
+  // Redo handler
+  const handleRedo = useCallback(() => {
+    const view = editorRef.current;
+    if (view) {
+      redo(view);
+    }
+    closeMenu();
+  }, [editorRef, closeMenu]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const ctrl = e.ctrlKey || e.metaKey;
+      const key = String(e.key || '').toLowerCase();
+
+      // Escape key - close all windows and menus (don't prevent default)
+      if (key === 'escape') {
+        if (showSettingsWindow) {
+          dispatch(setShowSettingsWindow(false));
+        }
+        if (showHelpWindow) {
+          dispatch(setShowHelpWindow(false));
+        }
+        if (activeMenu) {
+          setActiveMenu(null);
+        }
+        return;
+      }
+
       if (!ctrl) return;
 
-      const key = String(e.key || '').toLowerCase();
       const shift = e.shiftKey;
 
       if (key === 's') {
@@ -233,17 +273,20 @@ export default function TopBar({ editorRef }) {
       } else if (key === 'n') {
         e.preventDefault();
         newFile();
+      } else if (key === '.') {
+        e.preventDefault();
+        dispatch(setShowSettingsWindow(true));
       } else if (key === 'k') {
         e.preventDefault();
         if (shift) handleUnfoldAll();
         else handleFoldAll();
       }
-      
+
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [newFile, openFile, saveFile, saveFileAs, handleFoldAll, handleUnfoldAll]);
+  }, [newFile, openFile, saveFile, saveFileAs, handleFoldAll, handleUnfoldAll, showSettingsWindow, showHelpWindow, activeMenu]);
 
   // If fullscreen mode is active, the CSS class hides the bar (hover container still exists).
   const barClasses = `topBar ${fullscreenActive ? 'topBarHidden' : ''}`;
@@ -312,8 +355,6 @@ export default function TopBar({ editorRef }) {
             {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'edit' && (
               <div className="topBarDropdown">
-                <button onClick={closeMenu} disabled><span>Undo</span><span className="shortcut">Ctrl+Z</span></button>
-                <button onClick={closeMenu} disabled><span>Redo</span><span className="shortcut">Ctrl+Y</span></button>
               </div>
             )}
           </div>
@@ -416,6 +457,13 @@ export default function TopBar({ editorRef }) {
             </button>
             {activeMenu === 'tools' && (
               <div className="topBarDropdown">
+                <button onClick={handleUndo}>
+                  <span>Undo</span><span className="shortcut">Ctrl+Z</span>
+                </button>
+                <button onClick={handleRedo}>
+                  <span>Redo</span><span className="shortcut">Ctrl+Y</span>
+                </button>
+                <div className="topBarDivider" />
                 <button onClick={handleFoldAll}>
                   <span>Fold All</span><span className="shortcut">Ctrl+K</span>
                 </button>
