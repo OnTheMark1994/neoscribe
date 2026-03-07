@@ -81,6 +81,7 @@ export default function Editor({ editorRef, originalDocRef }) {
         spellcheckEnabled: settingsObject?.spellcheckEnabled,
         lineWrapEnabled: settingsObject?.lineWrapEnabled,
         indentMarkersEnabled: settingsObject?.indentMarkersEnabled,
+        smartTabEnabled: settingsObject?.smartTabEnabled,
       }
     ),
     acceptRevertListener,

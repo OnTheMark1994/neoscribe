@@ -1,6 +1,6 @@
 import { foldGutter, foldService, foldEffect } from '@codemirror/language';
 import { EditorView, keymap, gutter, GutterMarker } from '@codemirror/view';
-import { StateField, Facet, Transaction } from '@codemirror/state';
+import { StateField, Facet, Transaction, EditorSelection, countColumn, Prec } from '@codemirror/state';
 import { indentWithTab, insertNewlineAndIndent, indentMore, history, historyKeymap } from '@codemirror/commands';
 import { wrappedLineIndent } from 'codemirror-wrapped-line-indent';
 import { search, searchKeymap } from '@codemirror/search';
@@ -32,7 +32,7 @@ function calcLineTabs(text){
     // For each 4 spaces add a tab
     if (char === ' ') {
       spaceCount++;
-      if (spaceCount === 2) {
+      if (spaceCount === 4) {
         tabCount++;
         spaceCount = 0;
       }
@@ -310,6 +310,43 @@ const aiShareGutter = gutter({
   }
 });
 
+// Custom smart tab handler that inserts spaces to reach next tab stop
+const smartTab = (view) => {
+  const { state } = view;
+  const tabSize = 2; // Tab stops at 0, 2, 4, 6, 8...
+
+  const pos = state.selection.main.head;
+  const line = state.doc.lineAt(pos);
+  const textBeforeCursor = line.text.slice(0, pos - line.from);
+  const col = countColumn(textBeforeCursor, tabSize);
+  const toCol = Math.ceil((col + 0.001) / tabSize) * tabSize;
+  const spaces = ' '.repeat(toCol - col);
+
+  view.dispatch({
+    changes: { from: pos, to: pos, insert: spaces },
+    selection: { anchor: pos + spaces.length },
+    scrollIntoView: true,
+    userEvent: 'input.tab'
+  });
+
+  return true;
+};
+
+// Default tab handler - inserts 2 spaces
+const defaultTab = (view) => {
+  const { state } = view;
+  const pos = state.selection.main.head;
+
+  view.dispatch({
+    changes: { from: pos, to: pos, insert: '  ' },
+    selection: { anchor: pos + 2 },
+    scrollIntoView: true,
+    userEvent: 'input.tab'
+  });
+
+  return true;
+};
+
 // Custom Enter handler that ensures indentation is inserted
 const insertNewlineWithIndent = (view) => {
   const { state } = view;
@@ -367,6 +404,11 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
   const spellcheckEnabled = options.spellcheckEnabled !== false;
   const lineWrapEnabled = options.lineWrapEnabled === true;
   const indentMarkersEnabled = options.indentMarkersEnabled === true;
+  const smartTabEnabled = options.smartTabEnabled !== false;
+
+  const tabKeymap = smartTabEnabled
+    ? { key: "Tab", run: smartTab }
+    : { key: "Tab", run: defaultTab };
 
   const extensions = [
     lineIdState,
@@ -385,39 +427,41 @@ export function buildExtensions(onChange, aiModeActive, options = {}) {
       }
     }),
     foldService.of(customOutlineFolding),
-    keymap.of([
-      indentWithTab,
-      { key: "Enter", run: insertNewlineWithIndent }
-    ]),
+    Prec.highest(
+      keymap.of([
+        tabKeymap,
+        { key: "Enter", run: insertNewlineWithIndent }
+      ])
+    ),
     keymap.of(historyKeymap),
     search(),
     keymap.of(searchKeymap),
     ...(indentMarkersEnabled ? [indentationMarkers()] : []),
     EditorView.theme({
-    '&': {
-      backgroundColor: 'transparent',
-      height: '100%',
-      width: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-    },
-    '.cm-scroller': {
-      backgroundColor: 'transparent',
-      flex: 1,
-      minHeight: '0',
-      overflow: 'auto',
-    },
-    '.cm-gutters': {
-      backgroundColor: 'transparent',
-      border: 'none',
-      display: 'flex',
-    },
-    '.cm-lineNumbers': {
-      display: showLineNumbers ? 'block' : 'none',
-    },
-    '.cm-activeLineGutter': {
-      backgroundColor: 'transparent',
-    },
+      '&': {
+        backgroundColor: 'transparent',
+        height: '100%',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      },
+      '.cm-scroller': {
+        backgroundColor: 'transparent',
+        flex: 1,
+        minHeight: '0',
+        overflow: 'auto',
+      },
+      '.cm-gutters': {
+        backgroundColor: 'transparent',
+        border: 'none',
+        display: 'flex',
+      },
+      '.cm-lineNumbers': {
+        display: showLineNumbers ? 'block' : 'none',
+      },
+      '.cm-activeLineGutter': {
+        backgroundColor: 'transparent',
+      },
     }),
     EditorView.updateListener.of((update) => {
       if (update.docChanged && typeof onChange === 'function') {

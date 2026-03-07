@@ -43,6 +43,7 @@ mod the things a described in the ( areas
     indentMarkerColorActive: 'rgba(194, 245, 255, 0.5)',   // Color for indentation markers (active/cursor)
     textColor: 'rgba(255, 255, 255, 1)',                      // Text color in editor
     pageBgColor: 'rgba(0, 0, 0, 0)',                         // Page background color
+    smartTabEnabled: true,                                     // Enable smart tab (tab to next tab stop)
   };
 
  // Saves the settings object to localStorage.

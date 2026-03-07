@@ -21,6 +21,7 @@ export default function SettingsDisplay() {
   const lineWrapEnabled = settingsObject?.lineWrapEnabled === true;
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
   const indentMarkersEnabled = settingsObject?.indentMarkersEnabled === true;
+  const smartTabEnabled = settingsObject?.smartTabEnabled !== false;
 
   const themes = [
     { label: 'Space Dreams', value: '/theme-images/spacedreams.jpg' },
@@ -142,6 +143,17 @@ export default function SettingsDisplay() {
           <ToggleSwitch
             on={spellcheckEnabled}
             onClick={() => dispatch(updateSetting({ key: 'spellcheckEnabled', value: !spellcheckEnabled }))}
+          />
+        </div>
+
+        <div className="settingsRow">
+          <div className="settingsRowLabel">
+            <div className="settingsRowLabelTitle">Smart Tab</div>
+            <div className="settingsRowLabelSub">Tab to next tab stop instead of always adding 2 spaces</div>
+          </div>
+          <ToggleSwitch
+            on={smartTabEnabled}
+            onClick={() => dispatch(updateSetting({ key: 'smartTabEnabled', value: !smartTabEnabled }))}
           />
         </div>
 
