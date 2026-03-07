@@ -1,5 +1,20 @@
 bugs
 
+presing tab does not line it up
+  if there  is a space it will be misaligned, still moving it over by a tab amount but one space off
+  maybe backspace on a tab filled line should delete entire tab not just the space
+
+undo redo (don)
+  the ctrl z and ctrl y undo redo are not working proprely, not untoing or redoing some things but are with others and not in order and not in the right places. please figure out why 
+  Undo/redo problems in CodeMirror 6 almost always come from one of these:
+  History extension missing (history() + historyKeymap) so the browser/native undo partially interferes.
+  Custom transactions not annotated (especially your custom Enter handler) so changes don’t get grouped / recorded the same way as normal typing.
+  Multiple dispatches per “one action” which makes undo feel out-of-order.
+  import { history, historyKeymap } from '@codemirror/commands';
+
+settings (done)
+  preset names to paper and glass
+  
 enter same tab level (done)
 when a user presses enter we want the tab level to be the same on the next line
 ex

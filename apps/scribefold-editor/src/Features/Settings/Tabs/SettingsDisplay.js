@@ -174,7 +174,7 @@ export default function SettingsDisplay() {
                 dispatch(updateSetting({ key: 'pageBgColor', value: PRESETS.preset1.pageBgColor }));
               }}
             >
-              Preset 1
+              Paper
             </button>
             <button
               type="button"
@@ -184,7 +184,7 @@ export default function SettingsDisplay() {
                 dispatch(updateSetting({ key: 'pageBgColor', value: PRESETS.preset2.pageBgColor }));
               }}
             >
-              Preset 2
+              Glass
             </button>
           </div>
         </div>
