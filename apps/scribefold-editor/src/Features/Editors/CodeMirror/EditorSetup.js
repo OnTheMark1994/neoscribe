@@ -10,11 +10,15 @@ import AiShowIcon from '../../../images/scribefold-ai-eye.png';           // Ful
 import AiShowGreyIcon from '../../../images/scribefold-ai-eye-grey.png';   // Dimmed: inherited hidden
 import AiHideIcon from '../../../images/scribefold-ai-eye-crossed-out.png';   // Explicitly hidden
 
+const isChapterHeader = (lineText) => /^#(?:c|chapter)(\s|$)/i.test(String(lineText || '').trimStart());
+const isSectionHeader = (lineText) => /^#(?:s|section)(\s|$)/i.test(String(lineText || '').trimStart());
+
 // Helper: count leading whitespace length
 function getLineIndentPrev(text) {
   const match = /^\s*/.exec(text);
   return match ? match[0].length : 0;
 }
+
 function calcLineTabs(text){
   // console.log("calc tabs of '", text,"'")
   // for each 4 leading spaces or tabs add one
@@ -92,9 +96,6 @@ const customOutlineFolding = (state, lineStart, lineEnd) => {
 
   const text = startLine.text;
   const trimmed = text.trimStart();
-
-  const isChapterHeader = (lineText) => /^#(?:c|chapter)(\s|$)/i.test(String(lineText || '').trimStart());
-  const isSectionHeader = (lineText) => /^#(?:s|section)(\s|$)/i.test(String(lineText || '').trimStart());
 
   let foldEndPos = null;
 
@@ -254,8 +255,8 @@ const aiShareGutter = gutter({
     const text = line.text;
     const trimmed = text.trimStart();
 
-    const isChapter = /^#(?:c|chapter)(\s|$)/i.test(trimmed);
-    const isSection = /^#(?:s|section)(\s|$)/i.test(trimmed);
+    const isChapter = isChapterHeader(trimmed);
+    const isSection = isSectionHeader(trimmed);
 
     if (!isChapter && !isSection) {
       return null;
@@ -280,7 +281,7 @@ const aiShareGutter = gutter({
     while (currentLineNum >= 1) {
       const prevLine = view.state.doc.line(currentLineNum);
       const prevTrimmed = prevLine.text.trimStart();
-      if (/^#(?:c|chapter)(\s|$)/i.test(prevTrimmed)) {
+      if (isChapterHeader(prevTrimmed)) {
         parentChapterHidden = prevLine.text.endsWith(AI_HIDDEN_MARKER);
         break;
       }

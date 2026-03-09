@@ -202,8 +202,8 @@ export default function SettingsDisplay() {
         </div>
 
         <ColorPickerRow
-          label="Indent marker active"
-          subLabel="Color of the active indent guide lines."
+          label="Indent marker"
+          subLabel="Color of the indent guide lines when cursor is not on the line."
           settingKey="indentMarkerColor"
           defaultValue={DEFAULT_COLORS.indentMarkerColor}
         />
