@@ -65,8 +65,8 @@ export function getAIVisibleLinesFromEditor(editorRef) {
     const line = doc.line(i);
     const text = line.text;
     const trimmed = text.trimStart();
-    const isChapter = trimmed.startsWith('#chapter');
-    const isSection = trimmed.startsWith('#section');
+    const isChapter = /^#(?:c|chapter)(\s|$)/i.test(trimmed);
+    const isSection = /^#(?:s|section)(\s|$)/i.test(trimmed);
     const isExplicitlyHidden = text.endsWith(AI_HIDDEN_MARKER);
 
     let shouldShare = false;

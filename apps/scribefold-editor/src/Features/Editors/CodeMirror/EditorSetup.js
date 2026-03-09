@@ -93,11 +93,14 @@ const customOutlineFolding = (state, lineStart, lineEnd) => {
   const text = startLine.text;
   const trimmed = text.trimStart();
 
+  const isChapterHeader = (lineText) => /^#(?:c|chapter)(\s|$)/i.test(String(lineText || '').trimStart());
+  const isSectionHeader = (lineText) => /^#(?:s|section)(\s|$)/i.test(String(lineText || '').trimStart());
+
   let foldEndPos = null;
 
   // Only for chapter and section ones 
-  if (trimmed.startsWith('#chapter') || trimmed.startsWith('#section')) {
-    const isChapter = trimmed.startsWith('#chapter');
+  if (isChapterHeader(trimmed) || isSectionHeader(trimmed)) {
+    const isChapter = isChapterHeader(trimmed);
 
     let currentLineNum = startLine.number + 1;
     let foundEndLine = null;
@@ -106,8 +109,8 @@ const customOutlineFolding = (state, lineStart, lineEnd) => {
       const line = doc.line(currentLineNum);
       const lineTrimmed = line.text.trimStart();
 
-      if (lineTrimmed.startsWith('#chapter') || 
-          (!isChapter && lineTrimmed.startsWith('#section'))) {
+      if (isChapterHeader(lineTrimmed) || 
+          (!isChapter && isSectionHeader(lineTrimmed))) {
         foundEndLine = doc.line(currentLineNum - 1);
         break;
       }
@@ -251,12 +254,14 @@ const aiShareGutter = gutter({
     const text = line.text;
     const trimmed = text.trimStart();
 
-    if (!trimmed.startsWith('#chapter') && !trimmed.startsWith('#section')) {
+    const isChapter = /^#(?:c|chapter)(\s|$)/i.test(trimmed);
+    const isSection = /^#(?:s|section)(\s|$)/i.test(trimmed);
+
+    if (!isChapter && !isSection) {
       return null;
     }
 
     const isExplicitlyHidden = text.endsWith(AI_HIDDEN_MARKER);
-    const isChapter = trimmed.startsWith('#chapter');
 
     // For chapters: simple
     if (isChapter) {
@@ -275,7 +280,7 @@ const aiShareGutter = gutter({
     while (currentLineNum >= 1) {
       const prevLine = view.state.doc.line(currentLineNum);
       const prevTrimmed = prevLine.text.trimStart();
-      if (prevTrimmed.startsWith('#chapter')) {
+      if (/^#(?:c|chapter)(\s|$)/i.test(prevTrimmed)) {
         parentChapterHidden = prevLine.text.endsWith(AI_HIDDEN_MARKER);
         break;
       }
@@ -313,6 +318,14 @@ const aiShareGutter = gutter({
 // Custom smart tab handler that inserts spaces to reach next tab stop
 const smartTab = (view) => {
   const { state } = view;
+
+  // Preserve default CodeMirror behavior: if there's an active selection,
+  // indent the selected lines instead of inserting spaces at the cursor.
+  const hasSelection = state.selection.ranges.some(r => !r.empty);
+  if (hasSelection) {
+    return indentMore(view);
+  }
+
   const tabSize = 2; // Tab stops at 0, 2, 4, 6, 8...
 
   const pos = state.selection.main.head;
@@ -335,6 +348,13 @@ const smartTab = (view) => {
 // Default tab handler - inserts 2 spaces
 const defaultTab = (view) => {
   const { state } = view;
+
+  // If there's a selection, indent the selected lines.
+  const hasSelection = state.selection.ranges.some(r => !r.empty);
+  if (hasSelection) {
+    return indentMore(view);
+  }
+
   const pos = state.selection.main.head;
 
   view.dispatch({

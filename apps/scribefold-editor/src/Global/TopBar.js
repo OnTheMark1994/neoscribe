@@ -344,7 +344,7 @@ export default function TopBar({ editorRef }) {
             )}
           </div>
 
-          <div className="topBarMenuItem">
+          {/* <div className="topBarMenuItem">
             <button
               className={`topBarMenuButton ${activeMenu === 'edit' ? 'active' : ''}`}
               // Toggle the Edit dropdown.
@@ -352,12 +352,11 @@ export default function TopBar({ editorRef }) {
             >
               Edit
             </button>
-            {/* Dropdown content only mounts while this menu is active. */}
             {activeMenu === 'edit' && (
               <div className="topBarDropdown">
               </div>
             )}
-          </div>
+          </div> */}
 
           <div className="topBarMenuItem">
             <button
@@ -484,11 +483,11 @@ export default function TopBar({ editorRef }) {
           {!IS_ELECTRON && (
             // In the web build we show a "Desktop App" link (Electron apps don't need it).
             <a
-              href="#"
+              href={process.env.REACT_APP_WEB_PORTAL_URL+'/#/downloads'}
+              target="_blank"
               className="topBarDesktopLink"
               title="Download Desktop App"
               onClick={(e) => {
-                e.preventDefault();
                 closeMenu();
               }}
             >
