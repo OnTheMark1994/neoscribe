@@ -1,0 +1,58 @@
+.tabsBar{
+    height: 25px;
+    margin-top: -30px;
+    width: 100%;
+    min-width: 120px;
+    /* background-color: orange; */
+}
+.tab{
+    border-radius: 5px 5px 0 0;
+    /* background-color: blue; */
+    width: 140px;
+    height: 100%;
+    font-size: 10px;
+    text-align: center;
+    box-sizing: border-box;
+    padding: 4px;
+    border: 1px solid rgba(46, 48, 50, 0.5  );;
+    border-bottom: 1px solid rgba(46, 48, 50, 0.5);
+    box-shadow: 0 10px 50px rgba(255, 255, 255, 0.1) inset;
+    cursor: pointer;
+    position: relative;
+    background-color: var(--page-bg-color);
+    backdrop-filter: brightness(1.2);
+    font-weight: 500;
+    display: inline-block;
+    margin-right: 2px;
+    overflow: hidden;
+    /* mask-image: linear-gradient(to right, black 90%, transparent 100%);
+     mask-mode: luminance; */
+     padding-right: 20px;
+     user-select: none;
+     opacity: 0.8;
+}
+.tabActive{
+    border-bottom: 0px;
+    box-shadow: 0 10px 50px rgba(255, 255, 255, 0.2) inset;
+    opacity: 1;
+}
+.tabCloseButton{
+    /* color: white; */
+    position: absolute;
+    right: 0px;
+    top: -2px;
+    font-size: 14px;
+    padding: 5px;
+    height: 20px;
+    width: 20px;
+    text-align: center;
+    vertical-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 2px;
+    transition: 500ms;
+}
+.tabCloseButton:hover{
+    background-color: rgba(255, 255, 255, 0.597);
+}

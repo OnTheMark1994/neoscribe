@@ -1,3 +1,6 @@
+my fitness pal 
+calories tracker and bmi calculator
+
 Overal plan and timeline for the development of the application.
 
 Then and Now
@@ -213,6 +216,52 @@ Phases:
  
     1 week
     referrals feature
+        First Promoter (saas)
+            Create account 
+                get api keys 
+            user subscription server code creates a user for it and stores that ref id in their user data
+                so call the fp api sending it the relivant data 
+                this then shows on the web portal 
+                a token to log into their fp web portal is generated and put in user data 
+                    only accessed thorugh server after verifying sent jwt so same security as being logged into supabase   
+                they send the link to someone 
+            the web portal: 
+                extracts the ref id
+                puts it in local storage
+                checks in local storage to see if it registered the click with fp and if not calls an api endpoint to do so 
+                cslling fp /track/signup '
+                    {
+                        "ref_id": "test37we1lts",
+                        "email": "user@example.com",
+                        "uid": "your-user-uuid-12345"  // optional but recommended
+                    }
+                    If emails differ (e.g., user signs up with one email, pays with another), attribution fails unless you use uid matching.
+                        so maybe use uid as well 
+                        maybe send thigns like ip address etc to help with detection                         
+            if user downloads 
+                stores the ref id in a text file in the zip 
+                so need download to have a button that requests and sends the ref id in localstorage 
+                then if user creates an account in the desktop app the referral id is added to their account 
+            so at this point we have regeistered a click and if they create an account in web or desktop the ref id is stored in their user data to show who referred them 
+            registering a payment 
+                could do it with manual code in the webhook (not reccomended becaus other stuff might not work like refunds etc)
+                when there is a person referred with an email associated then someone wiht that email subscribes it knows?    
+                    FP matches these to referrals using:
+                        Email (from Stripe customer → must match the email you sent in prior /track/signup or lead call).
+                        UID (your internal user ID, if you send it via tracking script/API).
+                        Coupon codes (if using Stripe coupons tied to promoters — FP supports native coupon tracking).
+            dashboard 
+                the referral link will be in user data so can be displayed already 
+                maybe the other stuff like 
+                    number of clicks 
+                    number of downloads 
+                    number of subscribers 
+                    cancellations 
+                    amount owed 
+                    when they can collect it 
+                    request payment button 
+                    where to pay it to 
+
         Tracking referred by 
             when user downloads application referral id is tracked somehow
             maybe from their ip on download, and then if they use from that ip for first time around the same time with granted credits we can link that account to that ref id
@@ -232,23 +281,34 @@ Phases:
             get the percentages
                 need a sub for that
                 it adds up to being worth it to have it
-        Design 
-            referrals table 
-                on account creation user gets a row in the Referrals table 
-                    they are given a unique referral id in this function which is added to that table row when its created 
-                    rows have arrays of user ids for each category 
-                        clicks, downloads, subscribed (maybe row for each subscription tier), etc 
-            add to array rpc function 
-                when user clicks link and there is a referral id it will try to update the referrals.ref_id.user_clicks
-                    this will only add their id if its not already in there 
-                    this might get computationally expensive though to do this every time they go to the website 
-                        maybe also have a localstorage value to say tallied_click_for_referrall=ref_id that is checked before doing that
-                            if the current referral id is already in that value then the tally api call is not made 
-                            can do same for download, etc 
-            keeping track of payments is key though 
-                when a user has a payment successful call with the customer id, which is then linked to the auth id 
-                    we need a way to use that auth id or user id to add to the balance of the referrer 
-
+            Design 
+                referrals table 
+                    on account creation user gets a row in the Referrals table 
+                        they are given a unique referral id in this function which is added to that table row when its created 
+                        rows have arrays of user ids for each category 
+                            clicks, downloads, subscribed (maybe row for each subscription tier), etc 
+                add to array rpc function 
+                    when user clicks link and there is a referral id it will try to update the referrals.ref_id.user_clicks
+                        this will only add their id if its not already in there 
+                        this might get computationally expensive though to do this every time they go to the website 
+                            maybe also have a localstorage value to say tallied_click_for_referrall=ref_id that is checked before doing that
+                                if the current referral id is already in that value then the tally api call is not made 
+                                can do same for download, etc 
+                keeping track of payments is key though 
+                    this is more complicated because the user could subscribe and then unsubscribe, 
+                    could use different referral ids at different times, 
+                    needs to be on paid and save the payment date because funds are only available 30 days later becasue of possible cancelations and prorating that coudl be used to abuse the referal payments system 
+                        sould we keep track of this with another table? 
+                            payments and the referral id would be one of them 
+                            and this needs to reflect the id arrays in the referrals table, 
+                                if a referrer has a user in their array then another referrer does the same and the referral id in the subscriber is only the newer one then the first referrer will see that user as someone they referred and who is subscribed but they wont see any payments 
+                    when a user has a payment successful call with the customer id, which is then linked to the auth id 
+                        we need a way to use that auth id or user id to add to the balance of the referrer 
+                    maybe we have a referrals dashboard tab in the web portal 
+                        has detailed info like counts for each stat  
+                        list of users they referred 
+                            they can have usernames if they want, users and referrers 
+                            can look up any user id or name and see who referred them and what their subscription status is 
 
             a unique id is assigned to them and put in their referral row along with their id 
                 custom referral link, maybe for different tier, maybe add later 

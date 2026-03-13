@@ -10,6 +10,7 @@
  import windowSliceReducer from './ReduxSlices/WindowSlice';
  import aiSliceReducer from './ReduxSlices/AiSlice';
  import menuSliceReducer from './ReduxSlices/MenuSlice';
+ import tabsSliceReducer from './ReduxSlices/TabsSlice';
 
  const store = configureStore({
    reducer: {
@@ -19,6 +20,7 @@
      windowSlice: windowSliceReducer,
      aiSlice: aiSliceReducer,
      menuSlice: menuSliceReducer,
+     tabsSlice: tabsSliceReducer,
    },
  });
 

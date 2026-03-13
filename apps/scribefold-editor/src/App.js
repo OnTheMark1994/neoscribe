@@ -12,6 +12,7 @@ import ChangeNavigator from './Features/AI/Components/ChangeNavigator';
 import EditorCodeMirror from './Features/Editors/CodeMirror/Editor';
 import Editor from './Features/Editors/CodeMirror/Editor';
 import { DEFAULT_COLORS } from './Features/Settings/Tabs/SettingsOptions/constants';
+import Tabs from './Features/Editors/CodeMirror/Tabs/Tabs';
 
 export default function App() {
 
@@ -68,6 +69,8 @@ export default function App() {
 
           {/* The page that contains the editor */}
           <div className={"page"}>
+
+            <Tabs></Tabs>
           
             {/* The actual editor */}
               <Editor editorRef={editorRef} originalDocRef={originalDocRef}/>
