@@ -10,8 +10,8 @@ router.get('/releases', async (req, res) => {
   console.log('=== [GET /releases] Incoming request ===');
 
   try {
-    const owner = process.env.GITHUB_REPO_OWNER || 'AbeApple';
-    const repo = process.env.GITHUB_REPO_NAME || 'scribefold-ai-monorepo';
+    const owner = process.env.GITHUB_REPO_OWNER || 'OnTheMark1994';
+    const repo = process.env.GITHUB_REPO_NAME || 'neoscribe';
     const token = process.env.GITHUB_DOWNLOAD_TOKEN;
 
     console.log('[/releases] Env check:', {

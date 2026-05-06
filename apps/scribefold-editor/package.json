@@ -120,8 +120,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "AbeApple",
-      "repo": "scribefold-ai-monorepo"
+      "owner": "OnTheMark1994",
+      "repo": "neoscribe"
     }
   }
 }

@@ -63,6 +63,7 @@ jobs:
         env:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ESLINT_NO_DEV_ERRORS: true
         run: |
           echo "=== Starting Windows build ==="
           cd apps/scribefold-editor
@@ -111,6 +112,7 @@ jobs:
         env:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ESLINT_NO_DEV_ERRORS: true
         run: |
           echo "=== Starting Linux build ==="
           cd apps/scribefold-editor
@@ -158,12 +160,13 @@ jobs:
         env:
           CI: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ESLINT_NO_DEV_ERRORS: true
         run: |
           echo "=== Starting macOS build ==="
           cd apps/scribefold-editor
           echo "PWD: $(pwd)"
           echo "Listing release dir before build (if any):"
-          [ -d release ] && ls -al release || echo "release directory does not exist yet"
+          [ -d release ] && ls -al release || echo "release directory still missing"
           echo "Running npm run build:mac..."
           npm run build:mac
           echo "Build exit code: $?"

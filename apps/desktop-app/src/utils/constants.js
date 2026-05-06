@@ -1,8 +1,0 @@
-// Shared constants for the ScribeFold AI Electron app
-
-// API base URL - uses environment variable with fallback
-// NOTE: Default matches the web portal API URL so all clients hit the same server
-export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://scribefold-ai-api-server.onrender.com';
-
-// Web portal base URL - uses environment variable with fallback
-export const WEB_PORTAL_BASE_URL = process.env.REACT_APP_WEB_PORTAL_BASE_URL || 'https://scribefold-ai-monorepo.onrender.com';

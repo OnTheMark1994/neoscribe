@@ -79,7 +79,7 @@ The web portal downloads page:
 - Reads actual asset names from GitHub API
 - Generates download URLs like:
   ```
-  https://github.com/AbeApple/scribefold-ai-monorepo/releases/download/v1.0.7/ScribeFold.AI-Setup-1.0.7.exe
+  https://github.com/OnTheMark1994/neoscribe/releases/download/v1.0.7/ScribeFold.AI-Setup-1.0.7.exe
   ```
 
 ## Key Files
@@ -178,7 +178,7 @@ git pull
 npm run release
 
 # Monitor workflow
-# https://github.com/AbeApple/scribefold-ai-monorepo/actions
+# https://github.com/OnTheMark1994/neoscribe/actions
 
 # After ~10 minutes, check downloads page
 # https://scribefold.ai/downloads

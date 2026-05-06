@@ -126,7 +126,7 @@ try {
   
   console.log('\n✅ Release v' + newVersion + ' completed successfully!');
   console.log('📋 Check release.log for detailed information');
-  console.log('🔗 Monitor workflow: https://github.com/AbeApple/scribefold-ai-monorepo/actions');
+  console.log('🔗 Monitor workflow: https://github.com/OnTheMark1994/neoscribe/actions');
 
 } catch (error) {
   log(`\n💥 FATAL ERROR: ${error.message}`);
