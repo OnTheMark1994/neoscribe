@@ -56,9 +56,10 @@ import { toggleFullscreenActive } from './ReduxSlices/MenuSlice';
 import { setShowFileEncryptionWindow, setShowHelpWindow, setShowSettingsWindow } from './ReduxSlices/WindowSlice';
 import './TopBar.css';
 import { updateSetting } from './ReduxSlices/SettingsSlice';
-import { fileOpened, resetEditor, setFilepath, setModified } from './ReduxSlices/EditorSlice';
+import { newTab, setTabs, updateActiveTabFromFile } from './ReduxSlices/TabsSlice';
 import { openFile as openFileIO, saveFile as saveFileIO, saveFileAs as saveFileAsIO } from './FileIO';
-import { getEditorText, setEditorText } from './EditorRefHelpers';
+import { createTabId, tabReplaceCurrent, addNewTab } from './Functions';
+import { getEditorText } from './EditorRefHelpers';
 import { unfoldAll } from '@codemirror/language';
 import { customFoldAll } from '../Features/Editors/CodeMirror/EditorSetup';
 import { undo, redo } from '@codemirror/commands';
@@ -66,7 +67,7 @@ import { undo, redo } from '@codemirror/commands';
 // Detect whether we are running in Electron or browser
 const IS_ELECTRON = Boolean(window.electronAPI);
 
-export default function TopBar({ editorRef }) {
+export default function TopBar({ editorRef, editorContentInstancesRef, editorViewInstancesRef }) {
   // Redux dispatch for menu actions.
   const dispatch = useDispatch();
 
@@ -76,9 +77,23 @@ export default function TopBar({ editorRef }) {
   // Tracks which top-level menu (tobar option) is currently open (file/edit/view/ai/help).
   const [activeMenu, setActiveMenu] = useState(null);
 
-  // Editor/file state for displaying the current filename.
-  const filepath = useSelector(state => state.editorSlice.filepath);
-  const modified = useSelector(state => state.editorSlice.modified);
+  // Track tabs and the id of the currently active tab so file name and modified come from tabsSlice
+  const tabs = useSelector(state => state.tabsSlice.tabs);
+  const activeTabId = useSelector(state => state.tabsSlice.activeTabId);
+
+  // Single source of truth for the displayed file path/name and modified flag is the active tab's metadata.
+  const activeTab = tabs?.find(t => t.id === activeTabId) || null;
+
+  const displayFilepath = activeTab?.filepath || '';
+  const displayModified = !!activeTab?.modified;
+
+  // Derive file name from the active tab's path (handles both / and \\ separators).
+  const fileName = displayFilepath
+    ? displayFilepath.split(/[/\\]/).pop()
+    : (activeTab?.title || 'Untitled');
+
+  // Add a trailing * to indicate unsaved changes on the active tab.
+  const displayName = `${fileName}${displayModified ? '*' : ''}`;
 
   // Fullscreen state controls whether the top bar is visually hidden.
   const fullscreenActive = useSelector(state => state.menuSlice.fullscreenActive);
@@ -91,12 +106,6 @@ export default function TopBar({ editorRef }) {
 
   // Controls whether the AI chat sidebar is visible.
   const aiModeActive = useSelector(state => state.settingsSlice.settingsObject?.aiModeActive);
-
-  // Derive file name from path (handles both / and \ path separators).
-  const fileName = filepath ? filepath.split(/[/\\]/).pop() : 'Untitled';
-
-  // Add a trailing * to indicate unsaved changes.
-  const displayName = `${fileName}${modified ? '*' : ''}`;
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -114,35 +123,66 @@ export default function TopBar({ editorRef }) {
     const handleBeforeUnload = (e) => {
       // Only prevent closing in web browser, not in Electron
       // Electron has its own close handling that can be blocked by beforeunload
-      if (modified && !window.electronAPI?.isElectron) {
+      if (displayModified && !window.electronAPI?.isElectron) {
         e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to close?';
-        return e.returnValue;
+        e.returnValue = '';
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [modified]);
+  }, [displayModified]);
 
   // Helper used by many menu items to close the active dropdown.
   const closeMenu = useCallback(() => setActiveMenu(null), []);
 
+  const replaceCurrentTabWithContent = (nextTab, content) => {
+    const previousActiveTabId = activeTabId;
+    const newTabId = nextTab.id;
+
+    // Call helper function to replace current tab
+    const { selectedTabId, newTabs } = tabReplaceCurrent(
+      editorRef,
+      editorContentInstancesRef,
+      editorViewInstancesRef,
+      content,
+      previousActiveTabId,
+      newTabId,
+      nextTab,
+      tabs,
+      'TopBar.js replaceCurrentTabWithContent'
+    );
+
+    // Update Redux state to mirror the helper's result
+    dispatch(setTabs({ tabs: newTabs, activeTabId: selectedTabId }));
+  };
+
+  const activateNewTabWithContent = (nextTab, content) => {
+    const previousActiveTabId = activeTabId;
+    const newTabId = nextTab.id;
+
+    // Call helper function to add new tab
+    addNewTab(editorRef, editorContentInstancesRef, editorViewInstancesRef, content, previousActiveTabId, newTabId, 'TopBar.js activateNewTabWithContent');
+
+    // Update Redux state
+    dispatch(newTab(nextTab));
+  };
+
   // File operation functions
   const newFile = useCallback(() => {
-    if(modified){
+    if(displayModified){
       const confirmed = window.confirm('You have unsaved changes. Continue?');
       if(!confirmed) return;
     }
 
-    dispatch(resetEditor());
-    setEditorText(editorRef, '');
-    dispatch(setModified(false));
+    const id = createTabId((tabs?.length || 0) + 1);
+    console.log('[TopBar] Replacing current tab with new file:', id);
+    replaceCurrentTabWithContent({ id, filepath: '', title: 'Untitled', modified: false, loaded: true }, '');
     closeMenu();
-  }, [closeMenu, dispatch, modified, editorRef]);
+  }, [closeMenu, displayModified, tabs, activeTabId]);
 
   const openFile = useCallback(async () => {
-    if(modified){
+    if(displayModified){
       const confirmed = window.confirm('You have unsaved changes. Continue?');
       if(!confirmed) return;
     }
@@ -156,57 +196,100 @@ export default function TopBar({ editorRef }) {
 
       const nextFilepath = String(result.filePath || result.fileName || '');
 
-      dispatch(fileOpened({ filepath: nextFilepath }));
-
       if (result.encrypted) {
         dispatch(setShowFileEncryptionWindow({
           mode: 'unlock',
           filePath: nextFilepath,
           encryptedText: String(result.encryptedText ?? ''),
         }));
-        dispatch(setModified(false));
         closeMenu();
         return;
       }
 
       const content = String(result.content ?? '');
 
-      setEditorText(editorRef, content);
-      dispatch(setModified(false));
+      const id = createTabId((tabs?.length || 0) + 1);
+      replaceCurrentTabWithContent({ id, filepath: nextFilepath, modified: false, loaded: true }, content);
     } catch (e) {
       console.error('[TopBar] openFile failed', e);
     }
     closeMenu();
-  }, [closeMenu, dispatch, modified, editorRef]);
+  }, [closeMenu, displayModified, tabs, activeTabId]);
+
+  // Create a brand new empty tab, leave editor content alone
+  const newFileInNewTab = () => {
+    if(displayModified){
+      const confirmed = window.confirm('You have unsaved changes. Continue?');
+      if(!confirmed) return;
+    }
+
+    const id = createTabId((tabs?.length || 0) + 1);
+    console.log('[TopBar] Creating new file in new tab:', id);
+    activateNewTabWithContent({ id, filepath: '', title: 'Untitled', modified: false, loaded: true }, '');
+    closeMenu();
+  };
+
+  // Open a file, add in a new tab
+  const openFileInNewTab = async () => {
+    if(displayModified){
+      const confirmed = window.confirm('You have unsaved changes. Continue?');
+      if(!confirmed) return;
+    }
+
+    try {
+      const result = await openFileIO();
+      if(!result?.success) {
+        closeMenu();
+        return;
+      }
+
+      const nextFilepath = String(result.filePath || result.fileName || '');
+
+      if (result.encrypted) {
+        alert('Opening encrypted files in a separate tab is not supported yet. Please use Open instead.');
+        closeMenu();
+        return;
+      }
+
+      const content = String(result.content ?? '');
+
+      const id = createTabId((tabs?.length || 0) + 1);
+      activateNewTabWithContent({ id, filepath: nextFilepath, modified: false, loaded: true }, content);
+    } catch (e) {
+      console.error('[TopBar] openFileInNewTab failed', e);
+    }
+    closeMenu();
+  };
 
   const saveFile = useCallback(async () => {
     try {
       const content = getEditorText(editorRef);
-      const result = await saveFileIO({ filePath: filepath || '', fileName, content });
+      const result = await saveFileIO({ filePath: displayFilepath || '', fileName, content });
       if(result?.success){
-        dispatch(setModified(false));
-        if(result.filePath) dispatch(setFilepath(result.filePath));
+        dispatch(updateActiveTabFromFile({ modified: false }));
+        if(result.filePath) dispatch(updateActiveTabFromFile({ filepath: result.filePath, modified: false }));
       }
     } catch (e) {
       console.error('[TopBar] saveFile failed', e);
     }
     closeMenu();
-  }, [closeMenu, dispatch, fileName, filepath, editorRef]);
+  }, [closeMenu, dispatch, fileName, displayFilepath]);
 
   const saveFileAs = useCallback(async () => {
     try {
       const content = getEditorText(editorRef);
-      const result = await saveFileAsIO({ content, suggestedName: fileName, sourceFilePath: filepath || '' });
+      const result = await saveFileAsIO({ content, suggestedName: fileName, sourceFilePath: displayFilepath || '' });
       if(result?.success){
-        dispatch(setModified(false));
-        if(result.filePath) dispatch(setFilepath(result.filePath));
-        else if(result.fileName) dispatch(setFilepath(result.fileName));
+        const nextPath = result.filePath || result.fileName || '';
+        if(nextPath) {
+          dispatch(updateActiveTabFromFile({ filepath: nextPath, modified: false }));
+        }
       }
     } catch (e) {
       console.error('[TopBar] saveFileAs failed', e);
     }
     closeMenu();
-  }, [closeMenu, dispatch, fileName, filepath, editorRef]);
+  }, [closeMenu, dispatch, fileName, displayFilepath]);
 
   const handleFoldAll = useCallback(() => {
     const view = editorRef.current;
@@ -318,8 +401,22 @@ export default function TopBar({ editorRef }) {
                   <span>New</span><span className="shortcut">Ctrl+N</span>
                 </button>
 
+                <button
+                  onClick={newFileInNewTab}
+                  title="New file + keep the current file open in multiple tabs"
+                >
+                  <span>New in New Tab</span>
+                </button>
+
                 <button onClick={openFile}  title={IS_ELECTRON ? "Open a file":"Browser can't open from file system automatically so you can select a file."}>
                   <span>{IS_ELECTRON ? "Open":"Open / Upload"}</span><span className="shortcut">Ctrl+O</span>
+                </button>
+
+                <button
+                  onClick={openFileInNewTab}
+                  title="Open file + keep the current file open in multiple tabs"
+                >
+                  <span>Open in New Tab</span>
                 </button>
 
                 <div className="topBarDivider" />

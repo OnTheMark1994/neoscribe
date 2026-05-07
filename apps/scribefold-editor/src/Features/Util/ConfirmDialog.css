@@ -1,0 +1,60 @@
+.confirmDialog {
+  width: 400px;
+  max-width: 90vw;
+}
+
+.confirmDialogContent {
+  padding: 20px;
+  text-align: center;
+}
+
+.confirmDialogMessage {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: var(--text-color, #e0e0e0);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.confirmDialogButtons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.confirmDialogButtons button{
+  width: 40%;
+}
+
+.confirmDialogBtn {
+  padding: 10px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 200ms ease;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-color, #e0e0e0);
+}
+
+.confirmDialogBtn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.confirmDialogBtn-confirm {
+  background-color: rgba(100, 150, 255, 0.3);
+  border-color: rgba(100, 150, 255, 0.5);
+}
+
+.confirmDialogBtn-confirm:hover {
+  background-color: rgba(100, 150, 255, 0.5);
+}
+
+.confirmDialogBtn-reject {
+  background-color: transparent;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.confirmDialogBtn-reject:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}

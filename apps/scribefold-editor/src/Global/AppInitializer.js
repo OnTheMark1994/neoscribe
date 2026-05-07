@@ -28,7 +28,7 @@ import { supabase } from './SupabaseClient';
 
 const API_BASE_URL = process.env.REACT_APP_SCRIBEFOLD_API_BASE_URL;
 
-export default function AppInitializer({ editorRef }) {
+export default function AppInitializer({ editorRef, editorContentInstancesRef }) {
   const dispatch = useDispatch();
   const authUser = useSelector(state => state.userSlice.authUser);
   const reloadUserDataTrigger = useSelector(state => state.userSlice.reloadUserDataTrigger);
@@ -114,37 +114,47 @@ export default function AppInitializer({ editorRef }) {
 
         const content = String(result.content ?? '');
         const filepath = String(result.filePath || result.fileName || '');
-        dispatch(fileOpened({ filepath }));
 
-        if (result.encrypted) {
-          dispatch(setShowFileEncryptionWindow({
-            mode: 'unlock',
-            filePath: filepath,
-            encryptedText: String(result.encryptedText ?? ''),
-          }));
+        // Check if we're in Electron or browser
+        const api = window.electronAPI;
+
+        if (api && api.readFile) {
+          // Electron mode - use the old fileOpened approach
+          dispatch(fileOpened({ filepath }));
+
+          if (result.encrypted) {
+            dispatch(setShowFileEncryptionWindow({
+              mode: 'unlock',
+              filePath: filepath,
+              encryptedText: String(result.encryptedText ?? ''),
+            }));
+            dispatch(setModified(false));
+            return;
+          }
+
+          const didSet = setEditorText(editorRef, content);
+          if (!didSet) {
+            let attempts = 0;
+            intervalId = setInterval(() => {
+              if (cancelled) {
+                clearInterval(intervalId);
+                intervalId = null;
+                return;
+              }
+
+              attempts += 1;
+              const ok = setEditorText(editorRef, content);
+              if (ok || attempts >= 50) {
+                clearInterval(intervalId);
+                intervalId = null;
+              }
+            }, 100);
+          }
           dispatch(setModified(false));
-          return;
+        } else {
+          // Browser mode - tabs will handle loading from localStorage
+          console.log('[AppInitializer] Browser mode - tabs will load content from localStorage');
         }
-
-        const didSet = setEditorText(editorRef, content);
-        if (!didSet) {
-          let attempts = 0;
-          intervalId = setInterval(() => {
-            if (cancelled) {
-              clearInterval(intervalId);
-              intervalId = null;
-              return;
-            }
-
-            attempts += 1;
-            const ok = setEditorText(editorRef, content);
-            if (ok || attempts >= 50) {
-              clearInterval(intervalId);
-              intervalId = null;
-            }
-          }, 100);
-        }
-        dispatch(setModified(false));
       } catch (e) {
         // Error handled silently
       }

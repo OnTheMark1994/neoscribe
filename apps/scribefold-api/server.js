@@ -69,8 +69,10 @@ const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toSt
 const keyBuffer = createKeyBuffer(ENCRYPTION_KEY);
 
 // Allow web portal and local dev clients to call this server
-app.use(cors({
-  origin: [
+// Use CORS_ALLOWED_ORIGINS from env, or fallback to default list
+const corsOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : [
     'https://neoscribe-ai.com', // Web portal prod (custom domain)
     'https://app.neoscribe-ai.com', // Editor prod (custom domain)
     'https://api.neoscribe-ai.com', // API prod (custom domain)
@@ -80,7 +82,12 @@ app.use(cors({
     'http://localhost:3000', // Editor local dev
     'http://localhost:3001', // Web portal local dev
     'http://localhost:8080' // API local dev
-  ],
+  ];
+
+console.log('[CORS] Allowed origins:', corsOrigins);
+
+app.use(cors({
+  origin: corsOrigins,
   credentials: true
 }));
 

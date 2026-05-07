@@ -9,7 +9,6 @@ import AiChatToggle from './Features/AI/AiChatToggle';
 import Windows from './Features/Windows/Windows';
 import KeyboardWindow from './Features/Windows/KeyboardWindow';
 import ChangeNavigator from './Features/AI/Components/ChangeNavigator';
-import EditorCodeMirror from './Features/Editors/CodeMirror/Editor';
 import Editor from './Features/Editors/CodeMirror/Editor';
 import { DEFAULT_COLORS } from './Features/Settings/Tabs/SettingsOptions/constants';
 import Tabs from './Features/Editors/CodeMirror/Tabs/Tabs';
@@ -18,6 +17,10 @@ export default function App() {
 
   // Reference to editor instance for cross-component access
   const editorRef = useRef(null)
+  // {tabId: content} used to restore content in browser refresh
+  const editorContentInstancesRef = useRef({})
+  // {tabId: EditorState} used for full restore (fold areas, content, etc) on tab change
+  const editorViewInstancesRef = useRef({})
   // Stores original document content for diff comparison
   const originalDocRef = useRef('')
   // Controls whether diff view/change navigator is shown
@@ -56,13 +59,13 @@ export default function App() {
       <KeypressListeners/>
 
       {/* Auth listener, user data, open last file */}
-      <AppInitializer editorRef={editorRef}/>
+      <AppInitializer editorRef={editorRef} editorContentInstancesRef={editorContentInstancesRef}/>
 
       {/* Left side: top bar + centered page */}
       <div className="pageArea">
 
         {/* The top bar with options like File => Open etc */}
-        <TopBar editorRef={editorRef}/>
+        <TopBar editorRef={editorRef} editorContentInstancesRef={editorContentInstancesRef} editorViewInstancesRef={editorViewInstancesRef}/>
       
         {/* Centers the page area */}
         <div className="pageContainer">
@@ -70,7 +73,7 @@ export default function App() {
           {/* The page that contains the editor */}
           <div className={"page"}>
 
-            <Tabs></Tabs>
+            <Tabs editorRef={editorRef} editorContentInstancesRef={editorContentInstancesRef} editorViewInstancesRef={editorViewInstancesRef}/>
           
             {/* The actual editor */}
               <Editor editorRef={editorRef} originalDocRef={originalDocRef}/>
