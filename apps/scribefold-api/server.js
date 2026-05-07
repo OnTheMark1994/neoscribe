@@ -71,8 +71,9 @@ const keyBuffer = createKeyBuffer(ENCRYPTION_KEY);
 // Allow web portal and local dev clients to call this server
 app.use(cors({
   origin: [
+    'https://neoscribe.onrender.com', // Web portal prod
     'https://scribefold-editor.onrender.com', // Editor prod
-    'https://scribefold-ai-monorepo.onrender.com', // Web portal prod
+    'https://scribefold-ai-monorepo.onrender.com', // Web portal prod (old)
     'http://localhost:3000', // Editor local dev
     'http://localhost:3001', // Web portal local dev
     'http://localhost:8080' // API local dev

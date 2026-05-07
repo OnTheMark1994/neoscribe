@@ -5,22 +5,22 @@ services:
     runtime: node
     region: oregon
     plan: starter
-    rootDir: apps/api-server
+    rootDir: apps/scribefold-api
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: "3000"
+        value: "8080"
 
   # Web Portal – Static site (FIXED: No region for static)
   - type: web
     name: scribefold-ai-web-portal
     runtime: static
     plan: starter
-    rootDir: apps/web-portal
+    rootDir: apps/scribefold-web-portal
     buildCommand: npm install && npm run build
     staticPublishPath: ./build
     envVars:
