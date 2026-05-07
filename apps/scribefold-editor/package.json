@@ -94,8 +94,8 @@
     },
     "files": [
       "build/**/*",
-      "public/electron.js",
-      "public/preload.js",
+      "public/**/*",
+      "electron/**/*",
       "node_modules/**/*"
     ],
     "win": {

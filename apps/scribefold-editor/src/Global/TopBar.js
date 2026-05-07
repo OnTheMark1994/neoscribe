@@ -112,7 +112,9 @@ export default function TopBar({ editorRef }) {
   // Warn user before closing tab/refreshing if there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (modified) {
+      // Only prevent closing in web browser, not in Electron
+      // Electron has its own close handling that can be blocked by beforeunload
+      if (modified && !window.electronAPI?.isElectron) {
         e.preventDefault();
         e.returnValue = 'You have unsaved changes. Are you sure you want to close?';
         return e.returnValue;
