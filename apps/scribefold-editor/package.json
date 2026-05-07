@@ -87,7 +87,7 @@
   },
   "build": {
     "appId": "com.scribefoldai.app",
-    "productName": "ScribeFold AI",
+    "productName": "NeoScribe-AI",
     "directories": {
       "buildResources": "public",
       "output": "release"
