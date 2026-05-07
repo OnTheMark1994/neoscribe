@@ -3,6 +3,8 @@ import { NavLink } from 'react-router-dom';
 import './Home.css';
 
 const Home = () => {
+  const webAppUrl = process.env.REACT_APP_WEB_APP_URL || 'https://scribefold-editor.onrender.com/';
+
   return (
     <div className="sf-home">
       <section className="sf-hero">
@@ -10,7 +12,7 @@ const Home = () => {
           <h1>ScribeFold AI Desktop</h1>
           <p className="sf-hero-tagline">
             A minimalist writing environment with a built in context aware AI writing assistant and foldable chapters and sections for organization.
-            
+
           </p>
           <p className="sf-hero-sub">
             Check the downloads page for the latest released designed for authors and knowledge workers.
@@ -18,7 +20,7 @@ const Home = () => {
           <div className="sf-hero-actions">
             <NavLink to="/downloads" className="sf-primary-btn">Download ScribeFold AI</NavLink>
             <a
-              href="https://scribefold-editor.onrender.com/"
+              href={webAppUrl}
               className="sf-secondary-btn"
               target="_blank"
               rel="noopener noreferrer"
