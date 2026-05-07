@@ -51,7 +51,7 @@ export default function Tabs({ editorRef, editorContentInstancesRef, editorViewI
     }
 
     // After first run: save tabs to localStorage
-    saveTabsSliceToStorage({ tabs: tabs || {}, activeTabId });
+    saveTabsSliceToStorage({ tabs, activeTabId });
 
   }, [tabs, activeTabId, dispatch]);
 

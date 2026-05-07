@@ -161,11 +161,11 @@ export default function TopBar({ editorRef, editorContentInstancesRef, editorVie
     const previousActiveTabId = activeTabId;
     const newTabId = nextTab.id;
 
-    // Call helper function to add new tab
-    addNewTab(editorRef, editorContentInstancesRef, editorViewInstancesRef, content, previousActiveTabId, newTabId, 'TopBar.js activateNewTabWithContent');
-
-    // Update Redux state
+    // Update Redux state FIRST
     dispatch(newTab(nextTab));
+
+    // Then call helper function to update editor state and save current tab
+    addNewTab(editorRef, editorContentInstancesRef, editorViewInstancesRef, content, previousActiveTabId, newTabId, 'TopBar.js activateNewTabWithContent');
   };
 
   // File operation functions
@@ -208,8 +208,12 @@ export default function TopBar({ editorRef, editorContentInstancesRef, editorVie
 
       const content = String(result.content ?? '');
 
+      // Derive title from filepath
+      const parts = nextFilepath.split(/[/\\]/);
+      const title = parts[parts.length - 1] || 'Untitled';
+
       const id = createTabId((tabs?.length || 0) + 1);
-      replaceCurrentTabWithContent({ id, filepath: nextFilepath, modified: false, loaded: true }, content);
+      replaceCurrentTabWithContent({ id, filepath: nextFilepath, title, modified: false, loaded: true }, content);
     } catch (e) {
       console.error('[TopBar] openFile failed', e);
     }
@@ -253,8 +257,12 @@ export default function TopBar({ editorRef, editorContentInstancesRef, editorVie
 
       const content = String(result.content ?? '');
 
+      // Derive title from filepath
+      const parts = nextFilepath.split(/[/\\]/);
+      const title = parts[parts.length - 1] || 'Untitled';
+
       const id = createTabId((tabs?.length || 0) + 1);
-      activateNewTabWithContent({ id, filepath: nextFilepath, modified: false, loaded: true }, content);
+      activateNewTabWithContent({ id, filepath: nextFilepath, title, modified: false, loaded: true }, content);
     } catch (e) {
       console.error('[TopBar] openFileInNewTab failed', e);
     }

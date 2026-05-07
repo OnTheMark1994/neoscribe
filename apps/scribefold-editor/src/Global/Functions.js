@@ -221,8 +221,23 @@ export function tabReplaceCurrent(
     editorViewInstancesRef.current[tabIdNew] = view.state;
   }
 
+  // Ensure newTabData has a title
+  if (!newTabData.title) {
+    if (newTabData.filepath) {
+      const parts = newTabData.filepath.split(/[/\\]/);
+      newTabData.title = parts[parts.length - 1] || 'Untitled';
+    } else {
+      newTabData.title = 'Untitled';
+    }
+  }
+
   // delete tab from tabs array & replace with newTabData
   const newTabs = safeTabs.map((t) => (t.id === tabIdCurrent ? newTabData : t));
+
+  // If tabIdCurrent is null or doesn't exist in tabs, add the new tab instead of replacing
+  if (!tabIdCurrent || !safeTabs.find(t => t.id === tabIdCurrent)) {
+    newTabs.push(newTabData);
+  }
 
   const selectedTabId = tabIdNew;
   return { selectedTabId, newTabs };
